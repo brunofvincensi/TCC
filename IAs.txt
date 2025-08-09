@@ -1,0 +1,21 @@
+XGBoost
+Random Forest
+
+
+Bibliotecas básicas: (Python)
+
+numpy (cálculos numéricos).
+
+pandas (manipulação de dados).
+
+matplotlib (gráficos).
+
+https://repositorio.ufu.br/bitstream/123456789/43927/1/Aplicac%CC%A7a%CC%83oNSGAIIIProblema.pdf
+
+-- Código java que implementa o NSGA-III
+NEBRO, A. J.; DURILLO, J. J.; VERGNE, M. Redesigning the jMetal multi-objective
+optimization framework. In: Proceedings of the Companion Publication of
+the 2015 Annual Conference on Genetic and Evolutionary Computation.
+New York, NY, USA: Association for Computing Machinery, 2015. (GECCO
+Companion ’15), p. 1093–1100. ISBN 9781450334884. Disponível em: <https:
+//doi.org/10.1145/2739482.2768462>. Citado na página 23.
