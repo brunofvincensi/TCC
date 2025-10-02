@@ -1,5 +1,4 @@
-from models import db
-
+from . import db
 
 # Tabela de associação para o relacionamento N:N entre Carteira e Ativo
 class CarteiraAtivo(db.Model):

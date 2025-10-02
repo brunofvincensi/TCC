@@ -1,7 +1,6 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
-from models import db
-from models.ativo import Ativo
+from models import db, Ativo
 
 ativo_bp = Blueprint('ativos', __name__)
 

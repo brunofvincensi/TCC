@@ -1,9 +1,8 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db
-from models.carteira import Carteira, ParametrosOtimizacao, CarteiraAtivo, ParametrosRestricaoAtivo
 from models.ativo import Ativo
 from services.otimizacao_service import OtimizacaoService
+from models import db, Carteira, ParametrosOtimizacao, CarteiraAtivo, ParametrosRestricaoAtivo
 
 carteira_bp = Blueprint('carteiras', __name__)
 
