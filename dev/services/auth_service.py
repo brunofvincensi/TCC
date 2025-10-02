@@ -1,5 +1,5 @@
 from flask_jwt_extended import create_access_token
-from models.usuario import Usuario
+from models import Usuario
 
 
 class AuthService:

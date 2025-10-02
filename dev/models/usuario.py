@@ -10,6 +10,8 @@ class Usuario(db.Model):
     senha_hash = db.Column(db.String(255), nullable=False)
     ativo = db.Column(db.Boolean, default=True)
 
+    carteiras = db.relationship('Carteira', back_populates='usuario', cascade="all, delete-orphan")
+
     def set_password(self, senha):
         """Criptografa e define a senha do usuário"""
         self.senha_hash = generate_password_hash(senha)
