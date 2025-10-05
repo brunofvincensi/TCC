@@ -1,103 +1,124 @@
-import click
 import csv
 import yfinance as yf
-from flask.cli import with_appcontext
+import pandas as pd
 from models import db
 from models.ativo import Ativo, HistoricoPrecos
 
+# A função de registro não é mais necessária
+# def register_commands(app):
+#     ...
 
-def register_commands(app):
-    """Função para registrar os comandos na aplicação Flask."""
-    app.cli.add_command(seed_assets)
-    app.cli.add_command(update_prices)
-
-
-@click.command(name='seed-assets')
-@with_appcontext
-def seed_assets():
-    """
-    Lê o arquivo ativos.csv na raiz do projeto e popula a tabela de Ativos.
-    Este comando é idempotente: ele não duplicará ativos que já existem.
-    """
-    try:
-        print("Iniciando a população da tabela de ativos a partir de 'ativos.csv'...")
-        with open('ativos.csv', 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                # Verifica se o ativo já existe no banco de dados para não duplicar
-                ativo = Ativo.query.filter_by(ticker=row['ticker']).first()
-                if not ativo:
-                    novo_ativo = Ativo(
-                        ticker=row['ticker'],
-                        nome=row['nome'],
-                        tipo=row['tipo'],
-                        setor=row.get('setor')  # .get() é mais seguro se a coluna for opcional
-                    )
-                    db.session.add(novo_ativo)
-                    print(f"-> Ativo {row['ticker']} adicionado.")
-
-            db.session.commit()
-            print("\n✅ Tabela de ativos populada com sucesso!")
-
-    except FileNotFoundError:
-        print("\n❌ ERRO: O arquivo 'ativos.csv' não foi encontrado na raiz do projeto.")
-    except Exception as e:
-        db.session.rollback()
-        print(f"\n❌ Ocorreu um erro inesperado: {e}")
-
-
-@click.command(name='update-prices')
-@click.option('--full-history', is_flag=True,
-              help="Busca todo o histórico de preços. Por padrão, busca apenas os últimos 5 dias.")
-@with_appcontext
-def update_prices(full_history):
-    """
-    Busca e atualiza o histórico de preços para todos os ativos cadastrados no banco.
-    Este comando também é idempotente: não duplicará preços para datas que já existem.
-    """
-    ativos = Ativo.query.all()
-    if not ativos:
-        print("Nenhum ativo encontrado no banco de dados. Execute 'flask seed-assets' primeiro.")
-        return
-
-    periodo = "max" if full_history else "5d"
-    print(f"\nIniciando atualização de preços (período: {periodo}) para {len(ativos)} ativos...")
-
-    for ativo in ativos:
-        print(f"Buscando histórico para {ativo.ticker}...")
+def seed_assets(app):
+    """Lê o arquivo ativos.csv e popula a tabela de Ativos."""
+    with app.app_context():
         try:
-            # Baixa os dados do Yahoo Finance
-            dados = yf.download(ativo.ticker, period=periodo, progress=False, auto_adjust=True)
+            print("Iniciando a população da tabela de ativos a partir de 'ativos.csv'...")
+            # ... (o resto da lógica da função seed_assets continua exatamente a mesma)
+            with open('backend/ativos.csv', 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    ativo = Ativo.query.filter_by(ticker=row['ticker']).first()
+                    if not ativo:
+                        novo_ativo = Ativo(
+                            ticker=row['ticker'],
+                            nome=row['nome'],
+                            tipo=row['tipo'],
+                            setor=row.get('setor')
+                        )
+                        db.session.add(novo_ativo)
+                        print(f"-> Ativo {row['ticker']} adicionado.")
 
-            if dados.empty:
-                print(f"  - Nenhum dado retornado para {ativo.ticker}. Pulando.")
-                continue
-
-            # Itera sobre os dados e insere no banco
-            novos_registros = 0
-            for index, row in dados.iterrows():
-                data = index.date()
-                preco_fechamento = row['Close']
-
-                # Verifica se o registro já existe para não duplicar
-                existe = HistoricoPrecos.query.filter_by(id_ativo=ativo.id, data=data).first()
-                if not existe:
-                    novo_preco = HistoricoPrecos(
-                        id_ativo=ativo.id,
-                        data=data,
-                        preco_fechamento=preco_fechamento
-                    )
-                    db.session.add(novo_preco)
-                    novos_registros += 1
-
-            if novos_registros > 0:
                 db.session.commit()
-                print(f"  - {novos_registros} novos registros de preço adicionados para {ativo.ticker}.")
-            else:
-                print(f"  - Histórico de {ativo.ticker} já está atualizado.")
-
+                print("\n✅ Tabela de ativos populada com sucesso!")
+        except FileNotFoundError:
+            print("\n❌ ERRO: O arquivo 'backend/ativos.csv' não foi encontrado.")
         except Exception as e:
             db.session.rollback()
-            print(f"  - ❌ Erro ao buscar dados para {ativo.ticker}: {e}")
+            print(f"\n❌ Ocorreu um erro inesperado: {e}")
 
-    print("\n✅ Atualização de preços concluída!")
+
+def update_prices(app, full_history=False):
+    """Busca o histórico MENSAL de preços ajustados por dividendos."""
+    with app.app_context():
+        ativos = Ativo.query.all()
+        if not ativos:
+            print("Nenhum ativo encontrado no banco. Execute 'setup' primeiro.")
+            return
+
+        periodo = "max" if full_history else "1y"
+        print(f"\nIniciando atualização de preços MENSAIS (período: {periodo})...")
+
+        for ativo in ativos:
+            print(f"Buscando histórico para {ativo.ticker}...")
+            try:
+                dados = yf.download(
+                    ativo.ticker + '.SA',
+                    interval="1mo",
+                    period=periodo,
+                    progress=False,
+                    auto_adjust=True
+                )
+
+                if dados.empty:
+                    print(f"  - Nenhum dado retornado para {ativo.ticker}. Pulando.")
+                    continue
+
+                # Calcular variação mensal ANTES de resetar o índice
+                dados['variacao_mensal'] = dados['Close'].pct_change()
+
+                # Resetar o índice para transformar as datas em coluna
+                dados = dados.reset_index()
+
+                novos_registros = 0
+                for index, row in dados.iterrows():
+                    try:
+                        # Extrair data - row é uma Series, então precisamos acessar com .iloc[0] se necessário
+                        data_col = row['Date']
+
+                        # Se for Series, pega o primeiro valor
+                        if isinstance(data_col, pd.Series):
+                            data_col = data_col.iloc[0]
+
+                        # Converter para date
+                        data_mes = pd.to_datetime(data_col).date()
+
+                        # Verificar se já existe
+                        existe = HistoricoPrecos.query.filter_by(id_ativo=ativo.id, data=data_mes).first()
+
+                        if not existe:
+                            # Extrair Close
+                            close_val = row['Close']
+                            if isinstance(close_val, pd.Series):
+                                close_val = close_val.iloc[0]
+                            preco_fechamento = float(close_val) if not pd.isna(close_val) else None
+
+                            # Extrair variacao_mensal
+                            var_val = row['variacao_mensal']
+                            if isinstance(var_val, pd.Series):
+                                var_val = var_val.iloc[0]
+                            variacao = float(var_val) if not pd.isna(var_val) else None
+
+                            novo_preco = HistoricoPrecos(
+                                id_ativo=ativo.id,
+                                data=data_mes,
+                                preco_fechamento=preco_fechamento,
+                                variacao_mensal=variacao
+                            )
+                            db.session.add(novo_preco)
+                            novos_registros += 1
+
+                    except Exception as e:
+                        print(f"  - Erro ao processar linha {index}: {e}")
+                        continue
+
+                if novos_registros > 0:
+                    db.session.commit()
+                    print(f"  - {novos_registros} novos registros adicionados.")
+                else:
+                    print(f"  - Histórico já está atualizado.")
+
+            except Exception as e:
+                db.session.rollback()
+                print(f"  - ❌ Erro ao buscar dados para {ativo.ticker}: {e}")
+
+        print("\n✅ Atualização de preços mensais concluída!")

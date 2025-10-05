@@ -3,7 +3,7 @@ from flask_jwt_extended import JWTManager
 from config import Config
 from models import db
 from routes import register_blueprints
-from commands import register_commands
+# from commands import register_commands
 
 
 def create_app():
@@ -21,7 +21,7 @@ def create_app():
     register_blueprints(app)
 
     # Registras os comandos via terminal
-    register_commands(app)
+    # register_commands(app)
 
     # Criar tabelas
     with app.app_context():
