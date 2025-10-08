@@ -21,6 +21,6 @@ class AuthService:
         if not usuario.ativo:
             return None, 'Usuário inativo'
 
-        access_token = create_access_token(identity=usuario.id)
+        access_token = create_access_token(identity=str(usuario.id))
 
         return access_token, usuario.to_dict()
