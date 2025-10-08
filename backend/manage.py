@@ -27,7 +27,7 @@ def main():
     if command == "setup":
         print("🚀 Configurando o ambiente pela primeira vez...")
         seed_assets(app)
-        update_prices(app, full_history=True)
+      #  update_prices(app, full_history=True)
         print("\n✅ Ambiente configurado com sucesso!")
 
     elif command == "run":

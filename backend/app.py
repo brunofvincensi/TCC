@@ -3,8 +3,6 @@ from flask_jwt_extended import JWTManager
 from config import Config
 from models import db
 from routes import register_blueprints
-# from commands import register_commands
-
 
 def create_app():
     """Factory pattern para criar a aplicação"""

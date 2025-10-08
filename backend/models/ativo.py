@@ -1,7 +1,6 @@
 from . import db
-import enum  # 1. Importe a biblioteca nativa de Enum
+import enum
 
-# 2. Crie a classe Enum com os tipos de ativo permitidos
 class TipoAtivo(enum.Enum):
     ACAO = "Ação"
     RENDA_FIXA = "Renda Fixa"
