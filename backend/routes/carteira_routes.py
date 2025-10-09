@@ -94,7 +94,7 @@ def listar_carteiras_usuario():
     """Lista todas as carteiras do usuário logado."""
     usuario_id = get_jwt_identity()
     carteiras = Carteira.query.filter_by(id_usuario=usuario_id).all()
-    return jsonify([c.to_dict() for c in carteiras]), 200
+    return jsonify([{"nome": c.nome, "id": c.id} for c in carteiras]), 200
 
 
 @carteira_bp.route('/carteiras/<int:id_carteira>', methods=['GET'])

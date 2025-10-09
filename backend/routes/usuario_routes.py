@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import db, Usuario
 
 usuario_bp = Blueprint('usuarios', __name__)
@@ -58,11 +58,12 @@ def buscar_usuario(id):
     return jsonify(usuario.to_dict()), 200
 
 
-@usuario_bp.route('/usuarios/<int:id>', methods=['PUT'])
+@usuario_bp.route('/usuarios', methods=['PUT'])
 @jwt_required()
-def atualizar_usuario(id):
+def atualizar_usuario():
     """UPDATE - Atualizar usuário"""
-    usuario = Usuario.query.get(id)
+    usuario_id = get_jwt_identity()
+    usuario = Usuario.query.get(usuario_id)
 
     if not usuario:
         return jsonify({'erro': 'Usuário não encontrado'}), 404
@@ -77,7 +78,7 @@ def atualizar_usuario(id):
         # Verificar se o novo email já existe em outro usuário
         email_existe = Usuario.query.filter(
             Usuario.email == data['email'],
-            Usuario.id != id
+            Usuario.id != usuario_id
         ).first()
 
         if email_existe:
@@ -102,11 +103,12 @@ def atualizar_usuario(id):
         return jsonify({'erro': str(e)}), 500
 
 
-@usuario_bp.route('/usuarios/<int:id>', methods=['DELETE'])
+@usuario_bp.route('/usuarios', methods=['DELETE'])
 @jwt_required()
-def deletar_usuario(id):
+def deletar_usuario():
     """DELETE - Deletar usuário"""
-    usuario = Usuario.query.get(id)
+    usuario_id = get_jwt_identity()
+    usuario = Usuario.query.get(usuario_id)
 
     if not usuario:
         return jsonify({'erro': 'Usuário não encontrado'}), 404

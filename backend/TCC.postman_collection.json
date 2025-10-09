@@ -1,0 +1,403 @@
+{
+	"info": {
+		"_postman_id": "998fe3a8-73f4-4f7f-b294-3c58faedb0b1",
+		"name": "TCC",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "17275484"
+	},
+	"item": [
+		{
+			"name": "Integrações",
+			"item": [
+				{
+					"name": "B3",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://sistemaswebb3-listados.b3.com.br/indexPage/day/IFNC?language=pt-br",
+							"protocol": "https",
+							"host": [
+								"sistemaswebb3-listados",
+								"b3",
+								"com",
+								"br"
+							],
+							"path": [
+								"indexPage",
+								"day",
+								"IFNC"
+							],
+							"query": [
+								{
+									"key": "language",
+									"value": "pt-br"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "API",
+			"item": [
+				{
+					"name": "Usuario",
+					"item": [
+						{
+							"name": "Criar usuario",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n\r\n    \"nome\": \"Bruno Ferrari\",\r\n    \"email\": \"brunofvincensei@gmail.com\",\r\n    \"senha\": \"123456\"\r\n\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "http://localhost:5000/api/usuarios",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "5000",
+									"path": [
+										"api",
+										"usuarios"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Todos os usuários",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTk2Njk4MiwianRpIjoiMWZlYTIxNzMtMDcwMy00MmU5LTgxYmUtYTZkMTFhNmI2NTgyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6MywibmJmIjoxNzU5OTY2OTgyLCJjc3JmIjoiZDBkZmEyNmUtZDljMi00NzA2LTk0OTMtZmRjNmJiOTg3N2Y4IiwiZXhwIjoxNzU5OTcwNTgyfQ.8UeIGL6pP2iwT_BxLpX0vZvWPQedjJEVkE7hd0z6eGk",
+										"type": "text",
+										"disabled": true
+									}
+								],
+								"url": {
+									"raw": "http://localhost:5000/api/usuarios",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "5000",
+									"path": [
+										"api",
+										"usuarios"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Editar usuario",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc1OTk2Njk4MiwianRpIjoiMWZlYTIxNzMtMDcwMy00MmU5LTgxYmUtYTZkMTFhNmI2NTgyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6MywibmJmIjoxNzU5OTY2OTgyLCJjc3JmIjoiZDBkZmEyNmUtZDljMi00NzA2LTk0OTMtZmRjNmJiOTg3N2Y4IiwiZXhwIjoxNzU5OTcwNTgyfQ.8UeIGL6pP2iwT_BxLpX0vZvWPQedjJEVkE7hd0z6eGk",
+										"type": "text",
+										"disabled": true
+									}
+								],
+								"url": {
+									"raw": "http://localhost:5000/api/usuarios",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "5000",
+									"path": [
+										"api",
+										"usuarios"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Deletar usuario",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:5000/api/usuarios/3",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "5000",
+									"path": [
+										"api",
+										"usuarios",
+										"3"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Carteira",
+					"item": [
+						{
+							"name": "Todas as carteiras do usuario",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:5000/api/carteiras",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "5000",
+									"path": [
+										"api",
+										"carteiras"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Uma carteira",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:5000/api/carteiras/1",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "5000",
+									"path": [
+										"api",
+										"carteiras",
+										"1"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Criar carteira",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n\r\n    \"nome\" : \"Carteira 1\",\r\n    \"info_carteira\": {\r\n        \"nome\": \"Carteira1\",\r\n        \"descricao\": \"treteteewg\"\r\n    },\r\n    \"parametros\": {\r\n        \"perfil_risco\": \"Moderado\"\r\n    }\r\n\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "http://localhost:5000/api/carteiras/otimizar",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "5000",
+									"path": [
+										"api",
+										"carteiras",
+										"otimizar"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Remover carteira",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:5000/api/carteiras/1",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "5000",
+									"path": [
+										"api",
+										"carteiras",
+										"1"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Ativo",
+					"item": [
+						{
+							"name": "Todos os ativos",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "http://localhost:5000/api/ativos",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "5000",
+									"path": [
+										"api",
+										"ativos"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"accessToken = JSON.parse(responseBody).token\r",
+									"pm.environment.set(\"token\", accessToken);"
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"email\": \"brunofvincensei@gmail.com\",\r\n    \"senha\": \"123456\"\r\n\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:5000/api/login",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "5000",
+							"path": [
+								"api",
+								"login"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}
