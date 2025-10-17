@@ -3,8 +3,12 @@ import pandas as pd
 from pymoo.core.problem import ElementwiseProblem
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
+
+from app import create_app
 from models import db, Ativo, HistoricoPrecos
 from models.ativo import TipoAtivo
+
+import matplotlib.pyplot as plt
 
 # --------------------------------------------------------------------------
 # 1. CLASSE DO PROBLEMA PARA O PYMOO
@@ -21,7 +25,7 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         # ✅ Limites por ativo
         xl = np.full(n_ativos, peso_min)
         xu = np.full(n_ativos, peso_max)
-        super().__init__(n_var=n_ativos, n_obj=3, n_ieq_constr=2, xl=xl, xu=xu)
+        super().__init__(n_var=n_ativos, n_obj=3, n_ieq_constr=0, xl=0.01, xu=1)
         self.mu = retornos_medios
         self.cov = matriz_covariancia
         self.hist = historico_retornos
@@ -29,6 +33,22 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         self.alpha = alpha
         self.peso_min = peso_min
         self.peso_max = peso_max
+
+
+    # 🔧 O "conserto" das soluções ocorre aqui:
+    def repair(self, x, **kwargs):
+        # 1️⃣ Remove valores negativos (caso mutação ou crossover gerem)
+        x = np.maximum(x, 0)
+
+        # 2️⃣ Normaliza para que a soma dos pesos = 1
+        soma = np.sum(x)
+        if soma == 0:
+            # caso extremo: todos zeros → distribui igualmente
+            x = np.ones_like(x) / len(x)
+        else:
+            x = x / soma
+
+        return x
 
     def _calcular_cvar(self, pesos):
         """Calcula o Conditional Value-at-Risk para uma dada carteira."""
@@ -42,21 +62,18 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         perdas_ordenadas = np.sort(perdas_validas)
         k = max(1, int(self.alpha * len(perdas_ordenadas)))  # ✅ Mínimo de 1
 
-        # VaR (Value at Risk)
-        var = perdas_ordenadas[-k]
         # CVaR = média das perdas acima do VaR
         cvar = perdas_ordenadas[-k:].mean()
-
-        # Garantia matemática: CVaR >= VaR
-        return max(var, cvar)
+        return cvar
 
     def _evaluate(self, x, out, *args, **kwargs):
         """Avalia uma única carteira (x = vetor de pesos)."""
         # Garante que os pesos sejam positivos e que a soma seja 1 (normalização)
-        pesos = np.maximum(x, 0)
-        if pesos.sum() == 0:
-            pesos = np.ones_like(pesos) / len(pesos)
-        pesos /= pesos.sum()
+        pesos = x
+        # pesos = np.maximum(x, 0)
+        # if pesos.sum() == 0:
+        #     pesos = np.ones_like(pesos) / len(pesos)
+        # pesos /= pesos.sum()
 
         # --- Objetivos ---
         # Obj 1: Retorno esperado (negativo porque o pymoo minimiza)
@@ -84,10 +101,11 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         restricao = np.abs(np.sum(pesos) - 1.0) - 1e-6  # Usamos uma pequena tolerância
 
         # ✅ Diversificação: nenhum ativo deve ter mais que peso_max
-        restricao_concentracao = np.max(pesos) - self.peso_max
+     #   restricao_concentracao = np.max(pesos) - self.peso_max
 
         out["F"] = [retorno, variancia, cvar]
-        out["G"] = [restricao, restricao_concentracao]
+        # sem restrição para o algorimo conseguir uma solução ótima
+     #   out["G"] =  [restricao] #[restricao, restricao_concentracao]
 
 
 # --------------------------------------------------------------------------
@@ -95,9 +113,8 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
 #    Ele agora orquestra o processo usando os parâmetros do usuário.
 # --------------------------------------------------------------------------
 class Nsga2OtimizacaoService:
-    def __init__(self, app, ids_ativos_disponiveis, ids_ativos_restringidos, nivel_risco, prazo_anos):
+    def __init__(self, app, ids_ativos_restringidos, nivel_risco, prazo_anos):
         self.app = app
-        self.ids_ativos_disponiveis = ids_ativos_disponiveis
         self.ids_ativos_restringidos = ids_ativos_restringidos
         self.nivel_risco = nivel_risco
         self.prazo_anos = prazo_anos
@@ -134,7 +151,6 @@ class Nsga2OtimizacaoService:
         """Busca dados e aplica o ajuste de risco pelo prazo."""
         with self.app.app_context():
             query_ativos = db.session.query(Ativo).filter(
-                Ativo.id.in_(self.ids_ativos_disponiveis),
                 ~Ativo.id.in_(self.ids_ativos_restringidos),
                 Ativo.tipo == TipoAtivo.ACAO
             )
@@ -144,15 +160,22 @@ class Nsga2OtimizacaoService:
 
             ids_para_otimizar = [a.id for a in self.ativos_para_otimizar]
             query_historico = db.session.query(
-                HistoricoPrecos.data, HistoricoPrecos.variacao_mensal, Ativo.ticker
+                HistoricoPrecos.data,
+                HistoricoPrecos.variacao_mensal,
+                Ativo.ticker
             ).join(Ativo, HistoricoPrecos.id_ativo == Ativo.id) \
                 .filter(HistoricoPrecos.id_ativo.in_(ids_para_otimizar)) \
                 .order_by(HistoricoPrecos.data)
 
-            df_historico = pd.read_sql(query_historico.statement, db.session.bind)
+            # ✅ CORREÇÃO: Usar connection em vez de bind
+            df_historico = pd.read_sql(
+                query_historico.statement,
+                con=db.session.connection()
+            )
             if df_historico.empty:
                 raise ValueError("Sem histórico para os ativos selecionados.")
 
+            # Limita os históricos para o ativo que tem o histórico mais curto
             df_retornos = df_historico.pivot(index='data', columns='ticker', values='variacao_mensal').dropna()
 
             self.retornos_medios = df_retornos.mean()
@@ -215,14 +238,26 @@ class Nsga2OtimizacaoService:
         )
 
         algoritmo = NSGA2(pop_size=100)
-        resultado = minimize(problema, algoritmo, ('n_gen', 200), verbose=False)
+        resultado = minimize(problema, algoritmo, ('n_gen', 200), verbose=True)
         print("🏁 Otimização NSGA-II concluída.")
 
         if resultado.X is None:
             raise ValueError("O algoritmo não conseguiu encontrar nenhuma solução.")
 
         # Seleciona a melhor carteira da fronteira de Pareto
-        pesos_otimos = self._escolher_melhor_carteira(resultado.F, resultado.X)
+        pesos_otimos = resultado.X[0] # self._escolher_melhor_carteira(resultado.F, resultado.X)
+
+        pesos_otimos = resultado.X[0]
+        pesos_otimos = np.maximum(pesos_otimos, 0)
+        pesos_otimos /= pesos_otimos.sum()
+
+        F = resultado.F
+        plt.scatter(F[:, 1], -F[:, 0], c=F[:, 2], cmap='viridis')
+        plt.xlabel("Risco (variância)")
+        plt.ylabel("Retorno esperado")
+        plt.colorbar(label="CVaR")
+        plt.title("Fronteira de Pareto - NSGA-II")
+        plt.show()
 
         composicao_final = []
         for i, ativo in enumerate(self.ativos_para_otimizar):
@@ -233,4 +268,19 @@ class Nsga2OtimizacaoService:
                     'ticker': ativo.ticker,
                     'peso': float(peso)
                 })
+
         return composicao_final
+
+
+
+def main():
+    """Função principal que interpreta os comandos."""
+    app = create_app()
+    serivice = Nsga2OtimizacaoService(app, [1], "moderado", 10)
+    carteira = serivice.otimizar()
+    print(carteira);
+
+
+if __name__ == "__main__":
+    main()
+
