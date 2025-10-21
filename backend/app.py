@@ -1,4 +1,5 @@
 from flask import Flask, jsonify
+from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from config import Config
 from models import db
@@ -7,6 +8,10 @@ from routes import register_blueprints
 def create_app():
     """Factory pattern para criar a aplicação"""
     app = Flask(__name__)
+
+    # Habilitar CORS para o frontend (durante desenvolvimento permitir origens locais)
+    # Ajuste a lista "origins" conforme necessário em produção
+    CORS(app, resources={r"/api/*": {"origins": ["http://localhost:5173", "http://localhost:3000"]}}, supports_credentials=True)
 
     # Carregar configurações
     app.config.from_object(Config)
