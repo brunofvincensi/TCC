@@ -25,7 +25,7 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         # ✅ Limites por ativo
         xl = np.full(n_ativos, peso_min)
         xu = np.full(n_ativos, peso_max)
-        super().__init__(n_var=n_ativos, n_obj=3, n_ieq_constr=0, xl=0.01, xu=1)
+        super().__init__(n_var=n_ativos, n_obj=3, n_ieq_constr=1, xl=0.01, xu=1)
         self.mu = retornos_medios
         self.cov = matriz_covariancia
         self.hist = historico_retornos
@@ -35,12 +35,12 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         self.peso_max = peso_max
 
 
-    # 🔧 O "conserto" das soluções ocorre aqui:
+    # Serve para "consertar/ajustar" as soluções
     def repair(self, x, **kwargs):
-        # 1️⃣ Remove valores negativos (caso mutação ou crossover gerem)
+        # Remove valores negativos (caso mutação ou crossover gerem)
         x = np.maximum(x, 0)
 
-        # 2️⃣ Normaliza para que a soma dos pesos = 1
+        # Normaliza para que a soma dos pesos = 1
         soma = np.sum(x)
         if soma == 0:
             # caso extremo: todos zeros → distribui igualmente
@@ -101,12 +101,12 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         restricao = np.abs(np.sum(pesos) - 1.0) - 1e-6  # Usamos uma pequena tolerância
 
         # ✅ Diversificação: nenhum ativo deve ter mais que peso_max
-     #   restricao_concentracao = np.max(pesos) - self.peso_max
+        restricao_concentracao = np.max(pesos) - self.peso_max
 
         out["F"] = [retorno, variancia, cvar]
         # sem restrição para o algorimo conseguir uma solução ótima
      #   out["G"] =  [restricao] #[restricao, restricao_concentracao]
-
+        out["G"] =  [restricao_concentracao] #[restricao, restricao_concentracao]
 
 # --------------------------------------------------------------------------
 # 2. SERVIÇO PRINCIPAL DE OTIMIZAÇÃO
@@ -181,6 +181,9 @@ class Nsga2OtimizacaoService:
             self.retornos_medios = df_retornos.mean()
             matriz_cov_mensal = df_retornos.cov()
 
+            # Matriz de confusão
+            print(matriz_cov_mensal)
+
             # --- APLICAÇÃO DO AJUSTE PELO PRAZO ---
             print(f"Ajustando matriz de covariância para um prazo de {self.prazo_anos} anos.")
             self.matriz_covariancia = self._ajustar_covariancia_pelo_prazo(matriz_cov_mensal, self.prazo_anos)
@@ -237,7 +240,7 @@ class Nsga2OtimizacaoService:
             nivel_risco=self.nivel_risco
         )
 
-        algoritmo = NSGA2(pop_size=100)
+        algoritmo = NSGA2(pop_size=300)
         resultado = minimize(problema, algoritmo, ('n_gen', 200), verbose=True)
         print("🏁 Otimização NSGA-II concluída.")
 
@@ -245,9 +248,10 @@ class Nsga2OtimizacaoService:
             raise ValueError("O algoritmo não conseguiu encontrar nenhuma solução.")
 
         # Seleciona a melhor carteira da fronteira de Pareto
-        pesos_otimos = resultado.X[0] # self._escolher_melhor_carteira(resultado.F, resultado.X)
+        pesos_otimos = self._escolher_melhor_carteira(resultado.F, resultado.X)
 
-        pesos_otimos = resultado.X[0]
+        # Ajustar para já retornar certo, limitar em 1 no processamento
+      #  pesos_otimos = resultado.X[10]
         pesos_otimos = np.maximum(pesos_otimos, 0)
         pesos_otimos /= pesos_otimos.sum()
 

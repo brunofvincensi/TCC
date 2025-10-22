@@ -52,7 +52,8 @@ def update_prices(app, full_history=False):
             if ativo.tipo == TipoAtivo.ACAO:
                 yfinanceProcessor.process(ativo, app, full_history)
             elif ativo.tipo == TipoAtivo.RENDA_FIXA:
-                anbimaProcessor.process(ativo, app, full_history)
+                print("oi")
+                # anbimaProcessor.process(ativo, app, full_history)
             else:
                 print(f"Pulando {ativo.ticker} (tipo: {ativo.tipo.value}). Lógica de processamento não implementada.")
 
