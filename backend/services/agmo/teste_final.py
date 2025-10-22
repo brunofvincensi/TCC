@@ -1,8 +1,12 @@
+from pymoo.config import Config
+Config.warnings['not_compiled'] = False
+
 import numpy as np
 import pandas as pd
 from pymoo.core.problem import ElementwiseProblem
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
+from otimizacao_utils import _printar_matriz
 
 from app import create_app
 from models import db, Ativo, HistoricoPrecos
@@ -123,30 +127,6 @@ class Nsga2OtimizacaoService:
         self.matriz_covariancia = None
         self.historico_retornos = None
 
-    def _ajustar_covariancia_pelo_prazo(self, cov, prazo_anos):
-        """
-        Ajusta risco pelo prazo com transição inteligente:
-        - Curto prazo (< 3 anos): mantém risco original
-        - Médio prazo (3-10 anos): transição gradual
-        - Longo prazo (> 10 anos): suavização forte
-        """
-        if prazo_anos <= 0:
-            return cov
-
-        # Curva de ajuste não-linear
-        if prazo_anos <= 3:
-            fator = 1.0  # Sem ajuste
-        elif prazo_anos <= 10:
-            # Transição suave entre 1.0 e suavização
-            t = (prazo_anos - 3) / 7  # 0 a 1
-            fator = 1.0 - (0.7 * t)  # 1.0 → 0.3
-        else:
-            # Longo prazo: suavização forte
-            fator = 1 / np.sqrt(prazo_anos / 3)  # Normalizado por 3 anos
-
-        print(f"  Ajuste temporal ({prazo_anos} anos): Fator de risco = {fator:.2f}x")
-        return cov * fator
-
     def _preparar_dados(self):
         """Busca dados e aplica o ajuste de risco pelo prazo."""
         with self.app.app_context():
@@ -178,18 +158,81 @@ class Nsga2OtimizacaoService:
             # Limita os históricos para o ativo que tem o histórico mais curto
             df_retornos = df_historico.pivot(index='data', columns='ticker', values='variacao_mensal').dropna()
 
+            print(f"  ✅ Período histórico: {len(df_retornos)} meses")
+            print(f"  📅 De {df_retornos.index.min()} até {df_retornos.index.max()}")
+
+            # Calcular estatísticas
             self.retornos_medios = df_retornos.mean()
-            matriz_cov_mensal = df_retornos.cov()
+            self.matriz_covariancia = df_retornos.cov()
+            matriz_corr = df_retornos.corr()
 
-            # Matriz de confusão
-            print(matriz_cov_mensal)
+            # ✅ PRINTAR MATRIZ DE CORRELAÇÃO
+            print(f"\n{'=' * 70}")
+            print(f"📊 MATRIZ DE CORRELAÇÃO")
+            print(f"{'=' * 70}")
+            _printar_matriz(matriz_corr, formato=".3f")
 
-            # --- APLICAÇÃO DO AJUSTE PELO PRAZO ---
-            print(f"Ajustando matriz de covariância para um prazo de {self.prazo_anos} anos.")
-            self.matriz_covariancia = self._ajustar_covariancia_pelo_prazo(matriz_cov_mensal, self.prazo_anos)
+            # Análise da correlação
+            self._analisar_correlacao(matriz_corr)
+
+            # ✅ PRINTAR MATRIZ DE COVARIÂNCIA (antes do ajuste)
+            print(f"\n{'=' * 70}")
+            print(f"📊 MATRIZ DE COVARIÂNCIA (Mensal)")
+            print(f"{'=' * 70}")
+            _printar_matriz(self.matriz_covariancia, formato=".6f")
 
             self.historico_retornos = df_retornos
-            print("✅ Dados preparados e ajustados pelo prazo.")
+
+            # Estatísticas gerais
+            print(f"\n{'=' * 70}")
+            print(f"📊 ESTATÍSTICAS GERAIS")
+            print(f"{'=' * 70}")
+            print(f"  Retorno médio mensal: {self.retornos_medios.mean() * 100:.2f}%")
+            print(f"  Volatilidade média: {np.sqrt(np.diag(self.matriz_covariancia)).mean() * 100:.2f}%")
+
+            # Estatísticas por ativo
+            print(f"\n  📈 Por Ativo:")
+            for ticker in df_retornos.columns:
+                ret = self.retornos_medios[ticker] * 100
+                vol = np.sqrt(self.matriz_covariancia.loc[ticker, ticker]) * 100
+                sharpe = ret / vol if vol > 0 else 0
+                print(f"     {ticker:8s} | Ret: {ret:6.2f}% | Vol: {vol:6.2f}% | Sharpe: {sharpe:5.2f}")
+
+            print(f"\n  ✅ Dados preparados com sucesso!")
+
+    def _analisar_correlacao(self, matriz_corr):
+        """
+        Analisa e printa insights da matriz de correlação
+        """
+        print(f"\n  🔍 Análise de Correlação:")
+
+        # Extrair apenas metade superior (sem diagonal)
+        mask = np.triu(np.ones_like(matriz_corr, dtype=bool), k=1)
+        correlacoes = matriz_corr.where(mask).stack()
+
+        # Estatísticas
+        print(f"     Correlação Média: {correlacoes.mean():.3f}")
+        print(f"     Correlação Máxima: {correlacoes.max():.3f}")
+        print(f"     Correlação Mínima: {correlacoes.min():.3f}")
+
+        # Pares com correlação muito alta (> 0.8)
+        altas = correlacoes[correlacoes > 0.8].sort_values(ascending=False)
+        if len(altas) > 0:
+            print(f"\n  ⚠️  Pares com Correlação ALTA (> 0.8):")
+            for par, corr in altas.head(5).items():
+                print(f"     {par[0]:8s} ↔ {par[1]:8s}: {corr:.3f}")
+
+        # Pares com correlação negativa (< -0.3)
+        negativas = correlacoes[correlacoes < -0.3].sort_values()
+        if len(negativas) > 0:
+            print(f"\n  ✅ Pares com Correlação NEGATIVA (< -0.3) [Boa diversificação!]:")
+            for par, corr in negativas.head(5).items():
+                print(f"     {par[0]:8s} ↔ {par[1]:8s}: {corr:.3f}")
+
+        # Aviso se tudo muito correlacionado
+        if correlacoes.mean() > 0.7:
+            print(f"\n  ⚠️  ATENÇÃO: Ativos muito correlacionados (média {correlacoes.mean():.2f})")
+            print(f"     Considere adicionar ativos de outros setores para diversificação.")
 
     def _escolher_melhor_carteira(self, objetivos, solucoes):
         """Seleciona a melhor carteira da Fronteira de Pareto com base no perfil de risco."""
@@ -241,7 +284,7 @@ class Nsga2OtimizacaoService:
         )
 
         algoritmo = NSGA2(pop_size=300)
-        resultado = minimize(problema, algoritmo, ('n_gen', 200), verbose=True)
+        resultado = minimize(problema, algoritmo, ('n_gen', 50), verbose=True)
         print("🏁 Otimização NSGA-II concluída.")
 
         if resultado.X is None:
@@ -252,8 +295,8 @@ class Nsga2OtimizacaoService:
 
         # Ajustar para já retornar certo, limitar em 1 no processamento
       #  pesos_otimos = resultado.X[10]
-        pesos_otimos = np.maximum(pesos_otimos, 0)
-        pesos_otimos /= pesos_otimos.sum()
+     #   pesos_otimos = np.maximum(pesos_otimos, 0)
+      #  pesos_otimos /= pesos_otimos.sum()
 
         F = resultado.F
         plt.scatter(F[:, 1], -F[:, 0], c=F[:, 2], cmap='viridis')
