@@ -1,4 +1,7 @@
 from pymoo.config import Config
+
+from services.agmo.custom_crossover import SimplexCrossover, SimplexMutation, SimplexSampling
+
 Config.warnings['not_compiled'] = False
 
 import numpy as np
@@ -24,35 +27,25 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
     pelo perfil de risco do usuário.
     """
 
-    def __init__(self, retornos_medios, matriz_covariancia, historico_retornos, nivel_risco='moderado', alpha=0.05, peso_min=0.01, peso_max=0.30):
+    def __init__(self, retornos_medios, matriz_covariancia, historico_retornos, tickers, nivel_risco, alpha=0.05, peso_min=0.01, peso_max=0.30):
         n_ativos = len(retornos_medios)
         # ✅ Limites por ativo
         xl = np.full(n_ativos, peso_min)
         xu = np.full(n_ativos, peso_max)
-        super().__init__(n_var=n_ativos, n_obj=3, n_ieq_constr=1, xl=0.01, xu=1)
+        # n_ieq_constr=numero de restrições / n_eq_constr=numero de restrições de soma
+        super().__init__(n_var=n_ativos,
+                         n_obj=2,
+                         n_ieq_constr=1,
+                         n_eq_constr=0,
+                         xl=0.01, xu=1)
         self.mu = retornos_medios
         self.cov = matriz_covariancia
         self.hist = historico_retornos
+        self.tickers = tickers
         self.nivel_risco = nivel_risco
         self.alpha = alpha
         self.peso_min = peso_min
         self.peso_max = peso_max
-
-
-    # Serve para "consertar/ajustar" as soluções
-    def repair(self, x, **kwargs):
-        # Remove valores negativos (caso mutação ou crossover gerem)
-        x = np.maximum(x, 0)
-
-        # Normaliza para que a soma dos pesos = 1
-        soma = np.sum(x)
-        if soma == 0:
-            # caso extremo: todos zeros → distribui igualmente
-            x = np.ones_like(x) / len(x)
-        else:
-            x = x / soma
-
-        return x
 
     def _calcular_cvar(self, pesos):
         """Calcula o Conditional Value-at-Risk para uma dada carteira."""
@@ -71,13 +64,29 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         return cvar
 
     def _evaluate(self, x, out, *args, **kwargs):
+        """Avalia uma única carteira"""
+
+        # # ========== DEBUG ==========
+        # print(f"\n{'=' * 70}")
+        # print(f"🔍 DEBUG _evaluate")
+        # print(f"{'=' * 70}")
+        #
+        # print(f"\n📊 Vetor x (RAW - antes da normalização):")
+        # print(f"   Shape: {x.shape}")
+        # print(f"   Valores: {x}")
+        # print(f"   Soma: {x.sum():.6f}")
+        # print(f"   Min: {x.min():.6f}")
+        # print(f"   Max: {x.max():.6f}")
+        #
+        # print(f"\n💼 Mapeamento x → Ativos:")
+        # for i, (ticker, peso_raw) in enumerate(zip(self.tickers, x)):
+        #     print(f"   x[{i}] = {peso_raw:.6f} → {ticker}")
+
         """Avalia uma única carteira (x = vetor de pesos)."""
-        # Garante que os pesos sejam positivos e que a soma seja 1 (normalização)
         pesos = x
+        # ✅ NORMALIZA SEMPRE
         # pesos = np.maximum(x, 0)
-        # if pesos.sum() == 0:
-        #     pesos = np.ones_like(pesos) / len(pesos)
-        # pesos /= pesos.sum()
+        # pesos = pesos / pesos.sum()  # GARANTE soma = 1
 
         # --- Objetivos ---
         # Obj 1: Retorno esperado (negativo porque o pymoo minimiza)
@@ -100,17 +109,15 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
             cvar *= 0.8
         # Para 'moderado', não fazemos nada (peso 1.0)
 
-        # --- Restrição ---
-        # A soma dos pesos deve ser igual a 1. Formatado como g(x) <= 0.
-        restricao = np.abs(np.sum(pesos) - 1.0) - 1e-6  # Usamos uma pequena tolerância
-
         # ✅ Diversificação: nenhum ativo deve ter mais que peso_max
         restricao_concentracao = np.max(pesos) - self.peso_max
 
-        out["F"] = [retorno, variancia, cvar]
-        # sem restrição para o algorimo conseguir uma solução ótima
-     #   out["G"] =  [restricao] #[restricao, restricao_concentracao]
-        out["G"] =  [restricao_concentracao] #[restricao, restricao_concentracao]
+        # Restrição de IGUALDADE (soma = 1)
+        restricao_eq = np.sum(pesos) - 1.0  # h(x) = 0
+
+        out["F"] = [retorno, variancia]  # , cvar]
+        out["G"] =  [restricao_concentracao] # ✅ Restrição de concentração
+       # out["H"] = [restricao_eq]  # ✅ Restrição de igualdade
 
 # --------------------------------------------------------------------------
 # 2. SERVIÇO PRINCIPAL DE OTIMIZAÇÃO
@@ -126,6 +133,7 @@ class Nsga2OtimizacaoService:
         self.retornos_medios = None
         self.matriz_covariancia = None
         self.historico_retornos = None
+        self.tickers = None
 
     def _preparar_dados(self):
         """Busca dados e aplica o ajuste de risco pelo prazo."""
@@ -157,6 +165,8 @@ class Nsga2OtimizacaoService:
 
             # Limita os históricos para o ativo que tem o histórico mais curto
             df_retornos = df_historico.pivot(index='data', columns='ticker', values='variacao_mensal').dropna()
+
+            self.tickers = df_retornos.columns.tolist()
 
             print(f"  ✅ Período histórico: {len(df_retornos)} meses")
             print(f"  📅 De {df_retornos.index.min()} até {df_retornos.index.max()}")
@@ -265,8 +275,8 @@ class Nsga2OtimizacaoService:
 
         # Calcula um "score" para cada carteira.
         # Queremos maximizar o retorno (objetivo 0) e minimizar os outros (1 e 2).
-        scores = (objetivos_norm[:, 0] * pesos[0]) - (objetivos_norm[:, 1] * pesos[1]) - (
-                    objetivos_norm[:, 2] * pesos[2])
+        scores = ((objetivos_norm[:, 0] * pesos[0]) - (objetivos_norm[:, 1] * pesos[1]))
+              #    - (objetivos_norm[:, 2] * pesos[2]))
 
         # O índice da carteira com o maior score é a nossa escolha.
         idx_melhor = np.argmax(scores)
@@ -280,10 +290,15 @@ class Nsga2OtimizacaoService:
             retornos_medios=self.retornos_medios.values,
             matriz_covariancia=self.matriz_covariancia.values,
             historico_retornos=self.historico_retornos.values,
+            tickers = self.tickers,
             nivel_risco=self.nivel_risco
         )
 
-        algoritmo = NSGA2(pop_size=300)
+        sampling = SimplexSampling()
+        crossover = SimplexCrossover(eta=15)
+        mutation = SimplexMutation(eta=20)
+
+        algoritmo = NSGA2(pop_size=300, crossover=crossover, mutation=mutation, sampling=sampling)
         resultado = minimize(problema, algoritmo, ('n_gen', 50), verbose=True)
         print("🏁 Otimização NSGA-II concluída.")
 
@@ -299,12 +314,12 @@ class Nsga2OtimizacaoService:
       #  pesos_otimos /= pesos_otimos.sum()
 
         F = resultado.F
-        plt.scatter(F[:, 1], -F[:, 0], c=F[:, 2], cmap='viridis')
-        plt.xlabel("Risco (variância)")
-        plt.ylabel("Retorno esperado")
-        plt.colorbar(label="CVaR")
-        plt.title("Fronteira de Pareto - NSGA-II")
-        plt.show()
+        # plt.scatter(F[:, 1], -F[:, 0], c=F[:, 2], cmap='viridis')
+        # plt.xlabel("Risco (variância)")
+        # plt.ylabel("Retorno esperado")
+        # plt.colorbar(label="CVaR")
+        # plt.title("Fronteira de Pareto - NSGA-II")
+        # plt.show()
 
         composicao_final = []
         for i, ativo in enumerate(self.ativos_para_otimizar):
@@ -323,9 +338,9 @@ class Nsga2OtimizacaoService:
 def main():
     """Função principal que interpreta os comandos."""
     app = create_app()
-    serivice = Nsga2OtimizacaoService(app, [1], "moderado", 10)
+    serivice = Nsga2OtimizacaoService(app, [1], "moderado", 2)
     carteira = serivice.otimizar()
-    print(carteira);
+    print(carteira)
 
 
 if __name__ == "__main__":
