@@ -5,7 +5,13 @@ from pymoo.core.crossover import Crossover
 from pymoo.core.mutation import Mutation
 from pymoo.core.sampling import Sampling
 
+"""
+SimplexSampling: População inicial gerada via distribuição de Dirichlet, garantindo distribuição uniforme no simplex*
 
+SimplexCrossover: Utiliza interpolação convexa, preservando matematicamente a soma unitária*
+
+SimplexMutation: Transfere peso entre dois ativos aleatórios, mantendo a soma constante*
+"""
 class SimplexSampling(Sampling):
     """
     Amostragem que gera população inicial no simplex (soma = 1)

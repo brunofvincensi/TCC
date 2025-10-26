@@ -34,7 +34,7 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         xu = np.full(n_ativos, peso_max)
         # n_ieq_constr=numero de restrições / n_eq_constr=numero de restrições de soma
         super().__init__(n_var=n_ativos,
-                         n_obj=2,
+                         n_obj=3,
                          n_ieq_constr=1,
                          n_eq_constr=0,
                          xl=0.01, xu=1)
@@ -61,6 +61,15 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
 
         # CVaR = média das perdas acima do VaR
         cvar = perdas_ordenadas[-k:].mean()
+
+        # # Objetivo 3: CVaR (expected shortfall)
+        # # Calcula retornos da carteira ao longo do tempo
+        # retornos_portfolio = self.hist @ pesos
+        # perdas = -retornos_portfolio  # perdas positivas
+        # perdas_ordenadas = np.sort(perdas)
+        # k = int(np.ceil(self.alpha * len(perdas_ordenadas)))
+        # cvar = np.mean(perdas_ordenadas[:k])  # média das piores perdas
+
         return cvar
 
     def _evaluate(self, x, out, *args, **kwargs):
@@ -115,7 +124,7 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         # Restrição de IGUALDADE (soma = 1)
         restricao_eq = np.sum(pesos) - 1.0  # h(x) = 0
 
-        out["F"] = [retorno, variancia]  # , cvar]
+        out["F"] = [retorno, variancia, cvar]
         out["G"] =  [restricao_concentracao] # ✅ Restrição de concentração
        # out["H"] = [restricao_eq]  # ✅ Restrição de igualdade
 
@@ -298,7 +307,7 @@ class Nsga2OtimizacaoService:
         crossover = SimplexCrossover(eta=15)
         mutation = SimplexMutation(eta=20)
 
-        algoritmo = NSGA2(pop_size=300, crossover=crossover, mutation=mutation, sampling=sampling)
+        algoritmo = NSGA2(pop_size=100, crossover=crossover, mutation=mutation, sampling=sampling)
         resultado = minimize(problema, algoritmo, ('n_gen', 50), verbose=True)
         print("🏁 Otimização NSGA-II concluída.")
 
@@ -308,18 +317,13 @@ class Nsga2OtimizacaoService:
         # Seleciona a melhor carteira da fronteira de Pareto
         pesos_otimos = self._escolher_melhor_carteira(resultado.F, resultado.X)
 
-        # Ajustar para já retornar certo, limitar em 1 no processamento
-      #  pesos_otimos = resultado.X[10]
-     #   pesos_otimos = np.maximum(pesos_otimos, 0)
-      #  pesos_otimos /= pesos_otimos.sum()
-
         F = resultado.F
-        # plt.scatter(F[:, 1], -F[:, 0], c=F[:, 2], cmap='viridis')
-        # plt.xlabel("Risco (variância)")
-        # plt.ylabel("Retorno esperado")
-        # plt.colorbar(label="CVaR")
-        # plt.title("Fronteira de Pareto - NSGA-II")
-        # plt.show()
+        plt.scatter(F[:, 1], -F[:, 0], c=F[:, 2], cmap='viridis')
+        plt.xlabel("Risco (variância)")
+        plt.ylabel("Retorno esperado")
+        plt.colorbar(label="CVaR")
+        plt.title("Fronteira de Pareto - NSGA-II")
+        plt.show()
 
         composicao_final = []
         for i, ativo in enumerate(self.ativos_para_otimizar):
@@ -338,7 +342,7 @@ class Nsga2OtimizacaoService:
 def main():
     """Função principal que interpreta os comandos."""
     app = create_app()
-    serivice = Nsga2OtimizacaoService(app, [1], "moderado", 2)
+    serivice = Nsga2OtimizacaoService(app, [1], "conservador", 2)
     carteira = serivice.otimizar()
     print(carteira)
 
