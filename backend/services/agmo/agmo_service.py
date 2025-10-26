@@ -1,11 +1,16 @@
+from dateutil.relativedelta import relativedelta
 from pymoo.config import Config
 
+from routes.carteira_routes import carteira_bp
 from services.agmo.custom_crossover import SimplexCrossover, SimplexMutation, SimplexSampling
 
 Config.warnings['not_compiled'] = False
 
 import numpy as np
 import pandas as pd
+from typing import List, Dict, Tuple, Optional
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 from pymoo.core.problem import ElementwiseProblem
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
@@ -124,11 +129,25 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
 #    Ele agora orquestra o processo usando os parâmetros do usuário.
 # --------------------------------------------------------------------------
 class Nsga2OtimizacaoService:
-    def __init__(self, app, ids_ativos_restringidos, nivel_risco, prazo_anos):
+    def __init__(self, app, ids_ativos_restringidos, nivel_risco, prazo_anos, data_referencia=None, data_inicio=None):
+        """
+        Serviço de otimização de carteira usando NSGA-II.
+
+        Args:
+            app: Instância da aplicação Flask
+            ids_ativos_restringidos: Lista de IDs de ativos a serem excluídos da otimização
+            nivel_risco: Perfil de risco ('conservador', 'moderado', 'arrojado')
+            prazo_anos: Prazo do investimento em anos
+            data_referencia: Data de referência para backtest (opcional). Se fornecida,
+                           usa apenas dados históricos até essa data. Formato: datetime.date
+        """
         self.app = app
         self.ids_ativos_restringidos = ids_ativos_restringidos
         self.nivel_risco = nivel_risco
         self.prazo_anos = prazo_anos
+        self.data_referencia = data_referencia
+        # Data inicial da janela de análise
+        self.data_inicio = data_inicio
         self.ativos_para_otimizar = []
         self.retornos_medios = None
         self.matriz_covariancia = None
@@ -152,8 +171,17 @@ class Nsga2OtimizacaoService:
                 HistoricoPrecos.variacao_mensal,
                 Ativo.ticker
             ).join(Ativo, HistoricoPrecos.id_ativo == Ativo.id) \
-                .filter(HistoricoPrecos.id_ativo.in_(ids_para_otimizar)) \
-                .order_by(HistoricoPrecos.data)
+                .filter(HistoricoPrecos.id_ativo.in_(ids_para_otimizar))
+
+            # ✅ BACKTEST: Se data_referencia foi fornecida, filtra apenas dados até essa data
+            if self.data_referencia is not None:
+                if self.data_inicio is not None:
+                    query_historico = query_historico.filter(HistoricoPrecos.data >= self.data_inicio)
+
+                query_historico = query_historico.filter(HistoricoPrecos.data <= self.data_referencia)
+                print(f"  📅 MODO BACKTEST: Usando dados até {self.data_referencia}")
+
+            query_historico = query_historico.order_by(HistoricoPrecos.data)
 
             # ✅ CORREÇÃO: Usar connection em vez de bind
             df_historico = pd.read_sql(
@@ -168,7 +196,19 @@ class Nsga2OtimizacaoService:
 
             self.tickers = df_retornos.columns.tolist()
 
-            print(f"  ✅ Período histórico: {len(df_retornos)} meses")
+            # ✅ Validação de dados suficientes
+            if len(df_retornos) < 12:  # Mínimo de 12 meses para análise
+                raise ValueError(f"Dados históricos insuficientes para análise. "
+                               f"Encontrados {len(df_retornos)} meses, mínimo necessário: 12 meses.")
+
+            if self.data_referencia is not None:
+                print(f"\n{'=' * 70}")
+                print(f"📅 MODO BACKTEST ATIVADO")
+                print(f"{'=' * 70}")
+                print(f"  Data de referência: {self.data_referencia}")
+                print(f"  ⚠️  Usando APENAS dados históricos até essa data")
+
+            print(f"\n  ✅ Período histórico: {len(df_retornos)} meses")
             print(f"  📅 De {df_retornos.index.min()} até {df_retornos.index.max()}")
 
             # Calcular estatísticas
@@ -185,7 +225,7 @@ class Nsga2OtimizacaoService:
             # Análise da correlação
             self._analisar_correlacao(matriz_corr)
 
-            # ✅ PRINTAR MATRIZ DE COVARIÂNCIA (antes do ajuste)
+            # ✅ PRINTAR MATRIZ DE COVARIÂNCIA
             print(f"\n{'=' * 70}")
             print(f"📊 MATRIZ DE COVARIÂNCIA (Mensal)")
             print(f"{'=' * 70}")
@@ -283,7 +323,17 @@ class Nsga2OtimizacaoService:
         return solucoes[idx_melhor]
 
     def otimizar(self):
-        """Orquestra o processo completo de otimização personalizada."""
+        """
+        Orquestra o processo completo de otimização personalizada.
+
+        Returns:
+            dict: Dicionário contendo:
+                - composicao: Lista de dicionários com id_ativo, ticker e peso
+                - data_referencia: Data de referência usada (None se não for backtest)
+                - periodo_inicio: Data inicial dos dados históricos usados
+                - periodo_fim: Data final dos dados históricos usados
+                - num_meses: Número de meses de dados históricos utilizados
+        """
         self._preparar_dados()
 
         problema = PersonalizedPortfolioProblem(
@@ -323,19 +373,149 @@ class Nsga2OtimizacaoService:
                 composicao_final.append({
                     'id_ativo': ativo.id,
                     'ticker': ativo.ticker,
+                    'nome': ativo.nome,
                     'peso': float(peso)
                 })
 
-        return composicao_final
+        # Normalizar pesos para soma = 1
+        soma_pesos = sum(item['peso'] for item in composicao_final)
+        for item in composicao_final:
+            item['peso'] = item['peso'] / soma_pesos
 
+        print(f"  ✅ Carteira otimizada com {len(composicao_final)} ativos")
+
+        # ✅ RETORNA informações adicionais sobre o período usado (útil para backtest)
+        resultado = {
+            'composicao': composicao_final,
+            'data_referencia': self.data_referencia,
+            'periodo_inicio': self.historico_retornos.index.min(),
+            'periodo_fim': self.historico_retornos.index.max(),
+            'num_meses': len(self.historico_retornos),
+            'modo_backtest': self.data_referencia is not None
+        }
+
+        return resultado
+
+
+def _calcular_retorno_carteira(app, carteira: List[Dict],
+                               data_inicio,
+                               data_fim) -> Tuple[float, List[float]]:
+    """
+    Calcula o retorno de uma carteira em um período específico
+
+    Args:
+        carteira: Lista com composição da carteira
+        data_inicio: Data inicial do período
+        data_fim: Data final do período
+
+    Returns:
+        Tupla com (retorno_total, lista_de_retornos_mensais)
+    """
+    with app.app_context():
+        # Buscar retornos dos ativos no período
+        ids_ativos = [item['id_ativo'] for item in carteira]
+
+        query = db.session.query(
+            HistoricoPrecos.data,
+            HistoricoPrecos.variacao_mensal,
+            Ativo.ticker
+        ).join(Ativo, HistoricoPrecos.id_ativo == Ativo.id) \
+            .filter(
+            HistoricoPrecos.id_ativo.in_(ids_ativos),
+            HistoricoPrecos.data > data_inicio,
+            HistoricoPrecos.data <= data_fim
+        ) \
+            .order_by(HistoricoPrecos.data)
+
+        df = pd.read_sql(query.statement, con=db.session.connection())
+
+        if df.empty:
+            return 0.0, []
+
+        # Pivot para ter retornos por ativo
+        df_retornos = df.pivot(
+            index='data',
+            columns='ticker',
+            values='variacao_mensal'
+        )
+
+        # Calcular retorno ponderado da carteira
+        pesos_dict = {item['ticker']: item['peso'] for item in carteira}
+
+        retornos_mensais = []
+        for data_idx in df_retornos.index:
+            retorno_mes = 0
+            for ticker in df_retornos.columns:
+                if ticker in pesos_dict:
+                    ret_ativo = df_retornos.loc[data_idx, ticker]
+                    if pd.notna(ret_ativo):
+                        retorno_mes += pesos_dict[ticker] * ret_ativo
+
+            retornos_mensais.append(retorno_mes)
+
+        # Calcular retorno acumulado
+        retorno_total = (1 + pd.Series(retornos_mensais)).prod() - 1
+
+        return float(retorno_total), retornos_mensais
+
+
+def otimizar_carteira_atual(app):
+    print("\n" + "=" * 80)
+    print("EXEMPLO 1: Otimização normal (usando todos os dados disponíveis)")
+    print("=" * 80)
+    service = Nsga2OtimizacaoService(app, [1], "conservador", 2)
+    resultado = service.otimizar()
+    print(f"\n✅ Resultado:")
+    print(f"   Composição: {resultado['composicao']}")
+    print(f"   Período: {resultado['periodo_inicio']} até {resultado['periodo_fim']}")
+    print(f"   Meses: {resultado['num_meses']}")
+
+def backtest(app):
+    from datetime import date
+    print("\n" + "=" * 80)
+    print("EXEMPLO 2: Otimização com BACKTEST (dados até 2023-12-31)")
+    print("=" * 80)
+    data_backtest = date(2015, 12, 31)
+    service_backtest = Nsga2OtimizacaoService(app, [1, 7], "conservador", 2, data_referencia=data_backtest)
+    carteira_backtest = service_backtest.otimizar()
+    print(f"\n✅ Resultado do Backtest:")
+    print(f"   Composição: {carteira_backtest['composicao']}")
+    print(f"   Data de referência: {carteira_backtest['data_referencia']}")
+    print(f"   Período: {carteira_backtest['periodo_inicio']} até {carteira_backtest['periodo_fim']}")
+    print(f"   Meses: {carteira_backtest['num_meses']}")
+    print(f"   Modo Backtest: {carteira_backtest['modo_backtest']}")
+
+    dataFim = date(2025, 10, 20)
+    retorno_periodo, retornos_mensais = _calcular_retorno_carteira(
+        app,
+        carteira_backtest['composicao'],
+        data_backtest,
+        dataFim
+    )
+
+    # Calcular métricas
+    # retorno_acumulado_total = (1 + retorno_acumulado_total) * (1 + retorno_periodo) - 1
+
+    if retornos_mensais:
+        volatilidade = np.std(retornos_mensais) * np.sqrt(12)  # Anualizada
+        retorno_medio = np.mean(retornos_mensais) * 12  # Anualizado
+        sharpe = retorno_medio / volatilidade if volatilidade > 0 else 0
+    else:
+        volatilidade = 0
+        sharpe = 0
+
+    print(f"     Retorno Acumulado: {retorno_periodo * 100:+.2f}%")
 
 
 def main():
     """Função principal que interpreta os comandos."""
     app = create_app()
-    serivice = Nsga2OtimizacaoService(app, [1], "conservador", 2)
-    carteira = serivice.otimizar()
-    print(carteira)
+
+    # Exemplo 1: Otimização normal (sem backtest)
+ #   otimizar_carteira_atual(app)
+
+    # Exemplo 2: Otimização com backtest (usando dados até uma data específica)
+    backtest(app)
 
 
 if __name__ == "__main__":
