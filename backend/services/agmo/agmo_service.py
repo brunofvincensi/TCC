@@ -61,15 +61,6 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
 
         # CVaR = média das perdas acima do VaR
         cvar = perdas_ordenadas[-k:].mean()
-
-        # # Objetivo 3: CVaR (expected shortfall)
-        # # Calcula retornos da carteira ao longo do tempo
-        # retornos_portfolio = self.hist @ pesos
-        # perdas = -retornos_portfolio  # perdas positivas
-        # perdas_ordenadas = np.sort(perdas)
-        # k = int(np.ceil(self.alpha * len(perdas_ordenadas)))
-        # cvar = np.mean(perdas_ordenadas[:k])  # média das piores perdas
-
         return cvar
 
     def _evaluate(self, x, out, *args, **kwargs):

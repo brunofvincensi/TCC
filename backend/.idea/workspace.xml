@@ -6,13 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="f5574c18-72f1-49e3-9514-a88c6c842f55" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.env" beforeDir="false" afterPath="$PROJECT_DIR$/.env" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/dev.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dev.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/brincar.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/custom_crossover.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agmo/custom_crossover.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/teste2.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/teste_final.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agmo/teste_final.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -65,7 +59,29 @@
       <recent name="C:\bruno.ferrari\TCC\backend\services\agmo" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.teste_final">
+  <component name="RunManager" selected="Python.agmo_service">
+    <configuration name="agmo_service" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="dev" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/services/agmo" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="C:\bruno.ferrari\TCC\backend\services\agmo\agmo_service.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <configuration name="app" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="dev" />
       <option name="ENV_FILES" value="" />
@@ -158,28 +174,6 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="teste_final" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
-      <module name="dev" />
-      <option name="ENV_FILES" value="" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/services/agmo" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/services/agmo/teste_final.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
     <configuration name="update_prices" type="PythonConfigurationType" factoryName="Python">
       <module name="dev" />
       <option name="ENV_FILES" value="" />
@@ -210,11 +204,11 @@
       <item itemvalue="Python.app" />
       <item itemvalue="Python.brincar" />
       <item itemvalue="Python.testeGPT" />
-      <item itemvalue="Python.teste_final" />
+      <item itemvalue="Python.agmo_service" />
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.teste_final" />
+        <item itemvalue="Python.agmo_service" />
         <item itemvalue="Python.testeGPT" />
         <item itemvalue="Python.brincar" />
         <item itemvalue="Python.app" />
