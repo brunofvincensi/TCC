@@ -9,6 +9,7 @@ from typing import List, Dict, Tuple, Optional
 from pymoo.core.problem import ElementwiseProblem
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
+from pymoo.core.callback import Callback
 from otimizacao_utils import _printar_matriz
 
 from app import create_app
@@ -16,6 +17,49 @@ from models import db, Ativo, HistoricoPrecos
 from models.ativo import TipoAtivo
 
 import matplotlib.pyplot as plt
+
+# --------------------------------------------------------------------------
+# 0. CALLBACK PARA RASTREAMENTO DE CONVERGÊNCIA
+# --------------------------------------------------------------------------
+class ConvergenceCallback(Callback):
+    """
+    Callback do pymoo para rastrear métricas de convergência durante a otimização.
+    """
+
+    def __init__(self, convergence_tracker=None):
+        """
+        Args:
+            convergence_tracker: Instância de ConvergenceTracker para registrar métricas
+        """
+        super().__init__()
+        self.convergence_tracker = convergence_tracker
+
+    def notify(self, algorithm):
+        """
+        Chamado a cada geração pelo pymoo.
+
+        Args:
+            algorithm: Instância do algoritmo com população atual
+        """
+        if self.convergence_tracker is None:
+            return
+
+        # Extrai fronteira de Pareto atual
+        if hasattr(algorithm, 'opt') and algorithm.opt is not None:
+            pareto_front = algorithm.opt.get("F")
+        else:
+            # Se não há Pareto, usa toda a população
+            pareto_front = algorithm.pop.get("F")
+
+        # Fitness de toda a população
+        population_fitness = algorithm.pop.get("F")
+
+        # Atualiza o tracker
+        self.convergence_tracker.update(
+            generation=algorithm.n_gen,
+            pareto_front=pareto_front,
+            population_fitness=population_fitness
+        )
 
 # --------------------------------------------------------------------------
 # 1. CLASSE DO PROBLEMA PARA O PYMOO
@@ -314,9 +358,18 @@ class Nsga2OtimizacaoService:
         idx_melhor = np.argmax(scores)
         return solucoes[idx_melhor]
 
-    def otimizar(self):
+    def otimizar(self, population_size: int = 100, generations: int = 50,
+                 crossover_eta: float = 15.0, mutation_eta: float = 20.0,
+                 convergence_tracker=None):
         """
         Orquestra o processo completo de otimização personalizada.
+
+        Args:
+            population_size: Tamanho da população para o NSGA-II
+            generations: Número de gerações
+            crossover_eta: Parâmetro eta do crossover
+            mutation_eta: Parâmetro eta da mutação
+            convergence_tracker: Instância de ConvergenceTracker para rastrear convergência (opcional)
 
         Returns:
             dict: Dicionário contendo:
@@ -337,11 +390,19 @@ class Nsga2OtimizacaoService:
         )
 
         sampling = SimplexSampling()
-        crossover = SimplexCrossover(eta=15)
-        mutation = SimplexMutation(eta=20)
+        crossover = SimplexCrossover(eta=crossover_eta)
+        mutation = SimplexMutation(eta=mutation_eta)
 
-        algoritmo = NSGA2(pop_size=100, crossover=crossover, mutation=mutation, sampling=sampling)
-        resultado = minimize(problema, algoritmo, ('n_gen', 50), verbose=True)
+        algoritmo = NSGA2(pop_size=population_size, crossover=crossover,
+                         mutation=mutation, sampling=sampling)
+
+        # Prepara callback se tracker foi fornecido
+        callback = None
+        if convergence_tracker is not None:
+            callback = ConvergenceCallback(convergence_tracker)
+
+        resultado = minimize(problema, algoritmo, ('n_gen', generations),
+                           callback=callback, verbose=True)
         print("🏁 Otimização NSGA-II concluída.")
 
         if resultado.X is None:

@@ -1,0 +1,383 @@
+"""
+Exemplos de Uso do Sistema de Tuning de Hiperparâmetros
+
+Este script demonstra como utilizar o HyperparameterTuningService para:
+1. Analisar convergência do algoritmo
+2. Realizar grid search de hiperparâmetros
+3. Encontrar a configuração ótima
+
+Para executar:
+    python exemplo_tuning.py
+
+Autor: Sistema de Otimização de Portfólio - TCC
+"""
+
+import sys
+import os
+from datetime import datetime, timedelta
+import logging
+
+# Adiciona o diretório raiz ao path para importações
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+
+from app import create_app
+from models import db, Ativo
+from services.agmo.hyperparameter_tuning_service import HyperparameterTuningService
+
+# Configuração de logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+
+def exemplo_1_analise_convergencia():
+    """
+    Exemplo 1: Análise de Convergência
+
+    Analisa como o algoritmo converge ao longo das gerações.
+    Útil para determinar o número mínimo de gerações necessárias.
+    """
+    print("\n" + "=" * 80)
+    print("EXEMPLO 1: ANÁLISE DE CONVERGÊNCIA")
+    print("=" * 80)
+    print("\nObjetivo: Determinar quantas gerações são necessárias para convergência\n")
+
+    app = create_app()
+
+    # Busca alguns ativos para teste
+    with app.app_context():
+        ativos = db.session.query(Ativo).limit(10).all()
+        ids_ativos = [a.id for a in ativos]
+        print(f"Usando {len(ids_ativos)} ativos para análise: {[a.ticker for a in ativos]}\n")
+
+    # Cria o serviço de tuning
+    tuning_service = HyperparameterTuningService(app)
+
+    # Executa análise de convergência
+    print("Executando análise de convergência...")
+    print("- População: 100")
+    print("- Gerações máximas: 200")
+    print("- Execuções: 5 (para análise estatística)")
+    print("\nIsso pode levar alguns minutos...\n")
+
+    try:
+        resultados = tuning_service.convergence_analysis(
+            ids_ativos=ids_ativos,
+            nivel_risco='moderado',
+            max_generations=200,
+            population_size=100,
+            n_runs=5
+        )
+
+        print("\n✅ Análise concluída!")
+        print(f"\n📊 Resultados:")
+        print(f"   - Número de execuções: {resultados['n_runs']}")
+        print(f"   - Geração média de convergência: {resultados['convergence_mean']:.1f}")
+        print(f"   - Desvio padrão: {resultados['convergence_std']:.1f}")
+        print(f"\n💡 Recomendação: Use pelo menos {int(resultados['convergence_mean'] + resultados['convergence_std'])} gerações")
+        print(f"\n📁 Gráficos salvos em: tuning_results/")
+
+    except Exception as e:
+        logger.error(f"Erro na análise de convergência: {e}")
+        raise
+
+
+def exemplo_2_grid_search_basico():
+    """
+    Exemplo 2: Grid Search Básico
+
+    Testa diferentes combinações de população e gerações.
+    Útil para encontrar o melhor trade-off qualidade vs tempo.
+    """
+    print("\n" + "=" * 80)
+    print("EXEMPLO 2: GRID SEARCH BÁSICO")
+    print("=" * 80)
+    print("\nObjetivo: Encontrar a melhor combinação de população × gerações\n")
+
+    app = create_app()
+
+    # Busca ativos
+    with app.app_context():
+        ativos = db.session.query(Ativo).limit(10).all()
+        ids_ativos = [a.id for a in ativos]
+        print(f"Usando {len(ids_ativos)} ativos: {[a.ticker for a in ativos]}\n")
+
+    # Cria o serviço
+    tuning_service = HyperparameterTuningService(app)
+
+    # Configurações para testar
+    population_sizes = [50, 100, 200]
+    generation_counts = [25, 50, 100]
+
+    print("Configurações a testar:")
+    print(f"   - Tamanhos de população: {population_sizes}")
+    print(f"   - Números de gerações: {generation_counts}")
+    print(f"   - Execuções por configuração: 3")
+    print(f"   - Total de execuções: {len(population_sizes) * len(generation_counts) * 3}")
+    print("\nIsso pode levar vários minutos...\n")
+
+    try:
+        summary = tuning_service.grid_search(
+            ids_ativos=ids_ativos,
+            nivel_risco='moderado',
+            population_sizes=population_sizes,
+            generation_counts=generation_counts,
+            n_runs=3
+        )
+
+        print("\n✅ Grid Search concluído!")
+        print(f"\n📊 Top 5 Configurações (por Hypervolume):")
+        print(summary.head(5).to_string())
+
+        # Melhor configuração
+        best = summary.iloc[0]
+        print(f"\n🏆 Melhor Configuração:")
+        print(f"   - População: {int(best['population_size'])}")
+        print(f"   - Gerações: {int(best['generations'])}")
+        print(f"   - Hypervolume: {best['final_hypervolume_mean']:.6f} (±{best['final_hypervolume_std']:.6f})")
+        print(f"   - Tempo médio: {best['execution_time_mean']:.2f}s (±{best['execution_time_std']:.2f}s)")
+
+        print(f"\n📁 Resultados salvos em: tuning_results/")
+
+    except Exception as e:
+        logger.error(f"Erro no grid search: {e}")
+        raise
+
+
+def exemplo_3_grid_search_completo():
+    """
+    Exemplo 3: Grid Search Completo (para TCC)
+
+    Teste abrangente para inclusão no TCC.
+    Testa mais configurações e executa mais vezes para resultados robustos.
+    """
+    print("\n" + "=" * 80)
+    print("EXEMPLO 3: GRID SEARCH COMPLETO (PARA TCC)")
+    print("=" * 80)
+    print("\nObjetivo: Análise abrangente para fundamentar escolha de hiperparâmetros\n")
+
+    app = create_app()
+
+    # Busca ativos
+    with app.app_context():
+        ativos = db.session.query(Ativo).limit(15).all()
+        ids_ativos = [a.id for a in ativos]
+        print(f"Usando {len(ids_ativos)} ativos: {[a.ticker for a in ativos]}\n")
+
+    # Cria o serviço
+    tuning_service = HyperparameterTuningService(app)
+
+    # Configurações abrangentes
+    population_sizes = [50, 100, 150, 200, 300]
+    generation_counts = [25, 50, 75, 100, 150, 200]
+
+    print("Configurações a testar:")
+    print(f"   - Tamanhos de população: {population_sizes}")
+    print(f"   - Números de gerações: {generation_counts}")
+    print(f"   - Execuções por configuração: 10 (para análise estatística robusta)")
+    print(f"   - Total de execuções: {len(population_sizes) * len(generation_counts) * 10}")
+    print("\n⚠️  ATENÇÃO: Isso pode levar HORAS para completar!")
+    print("   Considere executar em um servidor ou durante a noite.\n")
+
+    resposta = input("Deseja continuar? (s/n): ")
+    if resposta.lower() != 's':
+        print("Operação cancelada.")
+        return
+
+    try:
+        summary = tuning_service.grid_search(
+            ids_ativos=ids_ativos,
+            nivel_risco='moderado',
+            population_sizes=population_sizes,
+            generation_counts=generation_counts,
+            n_runs=10,
+            time_limit=None  # Sem limite de tempo
+        )
+
+        print("\n✅ Grid Search Completo concluído!")
+        print(f"\n📊 Resumo dos Resultados:")
+        print(summary.to_string())
+
+        # Análise detalhada
+        best = summary.iloc[0]
+        print(f"\n🏆 Configuração Ótima:")
+        print(f"   - População: {int(best['population_size'])}")
+        print(f"   - Gerações: {int(best['generations'])}")
+        print(f"   - Hypervolume: {best['final_hypervolume_mean']:.6f} (±{best['final_hypervolume_std']:.6f})")
+        print(f"   - Spread: {best['final_spread_mean']:.6f} (±{best['final_spread_std']:.6f})")
+        print(f"   - Spacing: {best['final_spacing_mean']:.6f} (±{best['final_spacing_std']:.6f})")
+        print(f"   - Tamanho Pareto: {best['pareto_size_mean']:.1f} (±{best['pareto_size_std']:.1f})")
+        print(f"   - Tempo médio: {best['execution_time_mean']:.2f}s (±{best['execution_time_std']:.2f}s)")
+
+        # Exporta todos os resultados
+        filename = tuning_service.export_results()
+        print(f"\n📁 Todos os resultados exportados para: {filename}")
+        print(f"📁 Gráficos e tabelas em: tuning_results/")
+
+        print("\n💡 Recomendações para o TCC:")
+        print("   1. Use os gráficos gerados para o capítulo de metodologia")
+        print("   2. Inclua a tabela de resultados completa em um apêndice")
+        print("   3. Discuta o trade-off qualidade vs tempo computacional")
+        print("   4. Compare diferentes perfis de risco com a configuração ótima")
+
+    except Exception as e:
+        logger.error(f"Erro no grid search completo: {e}")
+        raise
+
+
+def exemplo_4_teste_por_perfil_risco():
+    """
+    Exemplo 4: Teste por Perfil de Risco
+
+    Verifica se diferentes perfis de risco necessitam de hiperparâmetros diferentes.
+    """
+    print("\n" + "=" * 80)
+    print("EXEMPLO 4: ANÁLISE POR PERFIL DE RISCO")
+    print("=" * 80)
+    print("\nObjetivo: Verificar se perfis diferentes convergem de forma diferente\n")
+
+    app = create_app()
+
+    # Busca ativos
+    with app.app_context():
+        ativos = db.session.query(Ativo).limit(10).all()
+        ids_ativos = [a.id for a in ativos]
+        print(f"Usando {len(ids_ativos)} ativos\n")
+
+    perfis = ['conservador', 'moderado', 'arrojado']
+    resultados_perfis = {}
+
+    for perfil in perfis:
+        print(f"\n{'='*60}")
+        print(f"Testando perfil: {perfil.upper()}")
+        print(f"{'='*60}\n")
+
+        tuning_service = HyperparameterTuningService(app)
+
+        try:
+            resultados = tuning_service.convergence_analysis(
+                ids_ativos=ids_ativos,
+                nivel_risco=perfil,
+                max_generations=150,
+                population_size=100,
+                n_runs=5
+            )
+
+            resultados_perfis[perfil] = resultados
+
+            print(f"\n✅ Análise do perfil '{perfil}' concluída!")
+            print(f"   - Convergência média: {resultados['convergence_mean']:.1f} gerações")
+            print(f"   - Desvio padrão: {resultados['convergence_std']:.1f}")
+
+        except Exception as e:
+            logger.error(f"Erro no perfil {perfil}: {e}")
+            continue
+
+    # Comparação final
+    print("\n" + "=" * 80)
+    print("COMPARAÇÃO ENTRE PERFIS")
+    print("=" * 80)
+    for perfil, resultado in resultados_perfis.items():
+        print(f"\n{perfil.upper()}:")
+        print(f"   Convergência: {resultado['convergence_mean']:.1f} ± {resultado['convergence_std']:.1f} gerações")
+
+    print("\n💡 Conclusão: Se os valores forem similares, pode-se usar a mesma configuração")
+    print("              para todos os perfis. Caso contrário, ajuste individualmente.")
+
+
+def exemplo_5_quick_test():
+    """
+    Exemplo 5: Teste Rápido
+
+    Teste rápido apenas para validar que tudo está funcionando.
+    Ideal para desenvolvimento e debugging.
+    """
+    print("\n" + "=" * 80)
+    print("EXEMPLO 5: TESTE RÁPIDO (DESENVOLVIMENTO)")
+    print("=" * 80)
+    print("\nObjetivo: Validar que o sistema está funcionando corretamente\n")
+
+    app = create_app()
+
+    # Busca ativos
+    with app.app_context():
+        ativos = db.session.query(Ativo).limit(5).all()
+        ids_ativos = [a.id for a in ativos]
+        print(f"Usando apenas {len(ids_ativos)} ativos para teste rápido\n")
+
+    tuning_service = HyperparameterTuningService(app)
+
+    print("Executando teste rápido:")
+    print("   - População: [50, 100]")
+    print("   - Gerações: [25, 50]")
+    print("   - 2 execuções por configuração")
+    print("\nIsso deve levar apenas alguns minutos...\n")
+
+    try:
+        summary = tuning_service.grid_search(
+            ids_ativos=ids_ativos,
+            nivel_risco='moderado',
+            population_sizes=[50, 100],
+            generation_counts=[25, 50],
+            n_runs=2
+        )
+
+        print("\n✅ Teste rápido concluído com sucesso!")
+        print(f"\n📊 Resultados:")
+        print(summary.to_string())
+
+        best_config = tuning_service.get_best_configuration()
+        print(f"\n🏆 Melhor configuração: {best_config}")
+
+    except Exception as e:
+        logger.error(f"Erro no teste rápido: {e}")
+        raise
+
+
+def menu_principal():
+    """Menu principal para escolher qual exemplo executar."""
+    print("\n" + "=" * 80)
+    print("SISTEMA DE TUNING DE HIPERPARÂMETROS - EXEMPLOS")
+    print("=" * 80)
+    print("\nEscolha o exemplo que deseja executar:\n")
+    print("1. Análise de Convergência (recomendado para começar)")
+    print("2. Grid Search Básico")
+    print("3. Grid Search Completo (para TCC - DEMORADO)")
+    print("4. Análise por Perfil de Risco")
+    print("5. Teste Rápido (validação)")
+    print("0. Sair")
+
+    escolha = input("\nDigite o número do exemplo: ")
+
+    exemplos = {
+        '1': exemplo_1_analise_convergencia,
+        '2': exemplo_2_grid_search_basico,
+        '3': exemplo_3_grid_search_completo,
+        '4': exemplo_4_teste_por_perfil_risco,
+        '5': exemplo_5_quick_test,
+    }
+
+    if escolha in exemplos:
+        try:
+            exemplos[escolha]()
+        except KeyboardInterrupt:
+            print("\n\n⚠️  Operação interrompida pelo usuário.")
+        except Exception as e:
+            print(f"\n❌ Erro durante execução: {e}")
+            logger.exception("Erro detalhado:")
+    elif escolha == '0':
+        print("\nSaindo...")
+    else:
+        print("\n❌ Opção inválida!")
+
+
+if __name__ == "__main__":
+    try:
+        menu_principal()
+    except KeyboardInterrupt:
+        print("\n\nPrograma encerrado pelo usuário.")
+    except Exception as e:
+        logger.exception("Erro fatal:")
+        print(f"\n❌ Erro fatal: {e}")
