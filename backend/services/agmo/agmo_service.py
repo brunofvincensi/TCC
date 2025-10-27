@@ -1,7 +1,4 @@
-from dateutil.relativedelta import relativedelta
 from pymoo.config import Config
-
-from routes.carteira_routes import carteira_bp
 from services.agmo.custom_crossover import SimplexCrossover, SimplexMutation, SimplexSampling
 
 Config.warnings['not_compiled'] = False
@@ -9,8 +6,6 @@ Config.warnings['not_compiled'] = False
 import numpy as np
 import pandas as pd
 from typing import List, Dict, Tuple, Optional
-from datetime import datetime, timedelta
-from dateutil.relativedelta import relativedelta
 from pymoo.core.problem import ElementwiseProblem
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
@@ -89,9 +84,6 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
 
         """Avalia uma única carteira (x = vetor de pesos)."""
         pesos = x
-        # ✅ NORMALIZA SEMPRE
-        # pesos = np.maximum(x, 0)
-        # pesos = pesos / pesos.sum()  # GARANTE soma = 1
 
         # --- Objetivos ---
         # Obj 1: Retorno esperado (negativo porque o pymoo minimiza)
@@ -475,8 +467,8 @@ def backtest(app):
     print("\n" + "=" * 80)
     print("EXEMPLO 2: Otimização com BACKTEST (dados até 2023-12-31)")
     print("=" * 80)
-    data_backtest = date(2015, 12, 31)
-    service_backtest = Nsga2OtimizacaoService(app, [1, 7], "conservador", 2, data_referencia=data_backtest)
+    data_backtest = date(2023, 1, 1)
+    service_backtest = Nsga2OtimizacaoService(app, [1], "moderado", 2, data_referencia=data_backtest)
     carteira_backtest = service_backtest.otimizar()
     print(f"\n✅ Resultado do Backtest:")
     print(f"   Composição: {carteira_backtest['composicao']}")
@@ -493,17 +485,6 @@ def backtest(app):
         dataFim
     )
 
-    # Calcular métricas
-    # retorno_acumulado_total = (1 + retorno_acumulado_total) * (1 + retorno_periodo) - 1
-
-    if retornos_mensais:
-        volatilidade = np.std(retornos_mensais) * np.sqrt(12)  # Anualizada
-        retorno_medio = np.mean(retornos_mensais) * 12  # Anualizado
-        sharpe = retorno_medio / volatilidade if volatilidade > 0 else 0
-    else:
-        volatilidade = 0
-        sharpe = 0
-
     print(f"     Retorno Acumulado: {retorno_periodo * 100:+.2f}%")
 
 
@@ -512,7 +493,7 @@ def main():
     app = create_app()
 
     # Exemplo 1: Otimização normal (sem backtest)
- #   otimizar_carteira_atual(app)
+    otimizar_carteira_atual(app)
 
     # Exemplo 2: Otimização com backtest (usando dados até uma data específica)
     backtest(app)
