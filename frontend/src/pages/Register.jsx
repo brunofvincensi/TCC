@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
+import api from '../services/api.js';
 
 export default function Register() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    name: '',
+    nome: '',
     email: '',
-    password: '',
+    senha: '',
   });
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -17,11 +18,16 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
+    setError('');
     try {
       await api.post('http://localhost:5000/api/usuarios', formData); // Substitua pelo endpoint correto
       navigate('/login');
     } catch (err) {
-      setError('Erro ao registrar. Tente novamente.');
+      const backendError = err?.response?.data?.erro || err?.response?.data?.message || err?.message;
+      setError(backendError || 'Erro ao registrar. Tente novamente.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -31,9 +37,9 @@ export default function Register() {
         <h1 className="text-2xl font-bold text-center mb-6 text-white">Cadastro</h1>
         <input
           type="text"
-          name="name"
+          name="nome"
           placeholder="Nome"
-          value={formData.name}
+          value={formData.nome}
           onChange={handleChange}
           className="w-full p-2 mb-4 bg-gray-700 text-white rounded focus:outline-none"
           required
@@ -49,9 +55,9 @@ export default function Register() {
         />
         <input
           type="password"
-          name="password"
+          name="senha"
           placeholder="Senha"
-          value={formData.password}
+          value={formData.senha}
           onChange={handleChange}
           className="w-full p-2 mb-4 bg-gray-700 text-white rounded focus:outline-none"
           required
@@ -60,8 +66,9 @@ export default function Register() {
         <button
           type="submit"
           className="w-full bg-blue-600 hover:bg-blue-700 p-2 rounded text-white"
+          disabled={loading}
         >
-          Cadastrar
+          {loading ? 'Cadastrando...' : 'Cadastrar'}
         </button>
       </form>
     </div>
