@@ -554,7 +554,7 @@ def main():
     app = create_app()
 
     # Exemplo 1: Otimização normal (sem backtest)
-    otimizar_carteira_atual(app)
+   # otimizar_carteira_atual(app)
 
     # Exemplo 2: Otimização com backtest (usando dados até uma data específica)
     backtest(app)

@@ -226,68 +226,7 @@ def exemplo_3_grid_search_completo():
         logger.error(f"Erro no grid search completo: {e}")
         raise
 
-
-def exemplo_4_teste_por_perfil_risco():
-    """
-    Exemplo 4: Teste por Perfil de Risco
-
-    Verifica se diferentes perfis de risco necessitam de hiperparâmetros diferentes.
-    """
-    print("\n" + "=" * 80)
-    print("EXEMPLO 4: ANÁLISE POR PERFIL DE RISCO")
-    print("=" * 80)
-    print("\nObjetivo: Verificar se perfis diferentes convergem de forma diferente\n")
-
-    app = create_app()
-
-    # Busca ativos
-    with app.app_context():
-        ativos = db.session.query(Ativo).limit(10).all()
-        ids_ativos = [a.id for a in ativos]
-        print(f"Usando {len(ids_ativos)} ativos\n")
-
-    perfis = ['conservador', 'moderado', 'arrojado']
-    resultados_perfis = {}
-
-    for perfil in perfis:
-        print(f"\n{'='*60}")
-        print(f"Testando perfil: {perfil.upper()}")
-        print(f"{'='*60}\n")
-
-        tuning_service = HyperparameterTuningService(app)
-
-        try:
-            resultados = tuning_service.convergence_analysis(
-                ids_ativos=ids_ativos,
-                nivel_risco=perfil,
-                max_generations=150,
-                population_size=100,
-                n_runs=5
-            )
-
-            resultados_perfis[perfil] = resultados
-
-            print(f"\n✅ Análise do perfil '{perfil}' concluída!")
-            print(f"   - Convergência média: {resultados['convergence_mean']:.1f} gerações")
-            print(f"   - Desvio padrão: {resultados['convergence_std']:.1f}")
-
-        except Exception as e:
-            logger.error(f"Erro no perfil {perfil}: {e}")
-            continue
-
-    # Comparação final
-    print("\n" + "=" * 80)
-    print("COMPARAÇÃO ENTRE PERFIS")
-    print("=" * 80)
-    for perfil, resultado in resultados_perfis.items():
-        print(f"\n{perfil.upper()}:")
-        print(f"   Convergência: {resultado['convergence_mean']:.1f} ± {resultado['convergence_std']:.1f} gerações")
-
-    print("\n💡 Conclusão: Se os valores forem similares, pode-se usar a mesma configuração")
-    print("              para todos os perfis. Caso contrário, ajuste individualmente.")
-
-
-def exemplo_5_quick_test():
+def exemplo_4_quick_test():
     """
     Exemplo 5: Teste Rápido
 
@@ -355,8 +294,7 @@ def menu_principal():
         '1': exemplo_1_analise_convergencia,
         '2': exemplo_2_grid_search_basico,
         '3': exemplo_3_grid_search_completo,
-        '4': exemplo_4_teste_por_perfil_risco,
-        '5': exemplo_5_quick_test,
+        '4': exemplo_4_quick_test,
     }
 
     if escolha in exemplos:

@@ -111,7 +111,7 @@ class HyperparameterTuningService:
                    f"{max_generations} gerações, população {population_size}")
 
         # Prepara dados para otimização
-        service = Nsga2OtimizacaoService(self.app)
+        service = Nsga2OtimizacaoService(self.app, [], "moderado", 10)
 
         if data_inicio and data_fim:
             # Busca dados históricos do período especificado
@@ -263,15 +263,13 @@ class HyperparameterTuningService:
         Returns:
             TuningResult com resultados da execução
         """
-        service = Nsga2OtimizacaoService(self.app)
+        service = Nsga2OtimizacaoService(self.app, [], "moderado", 10)
         convergence_tracker = ConvergenceTracker()
 
         start_time = time.time()
 
         # Executa otimização
         result = service.otimizar(
-            ids_ativos=ids_ativos,
-            nivel_risco=nivel_risco,
             population_size=config.population_size,
             generations=config.generations,
             convergence_tracker=convergence_tracker
