@@ -528,7 +528,7 @@ def backtest(app):
     print("\n" + "=" * 80)
     print("EXEMPLO 2: Otimização com BACKTEST (dados até 2023-12-31)")
     print("=" * 80)
-    data_backtest = date(2023, 1, 1)
+    data_backtest = date(2015, 1, 1)
     service_backtest = Nsga2OtimizacaoService(app, [1], "moderado", 2, data_referencia=data_backtest)
     carteira_backtest = service_backtest.otimizar()
     print(f"\n✅ Resultado do Backtest:")
