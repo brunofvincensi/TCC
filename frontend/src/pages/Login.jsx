@@ -60,6 +60,15 @@ export default function Login() {
         >
           {loading ? 'Entrando...' : 'Entrar'}
         </button>
+        <div className='mt-4 text-center'>
+          <button
+            type='button'
+            onClick={() => navigate('/register')}
+            className='text-sm text-blue-400 hover:underline'
+          >
+            Cadastre-se
+          </button>
+        </div>
       </form>
     </div>
   );
