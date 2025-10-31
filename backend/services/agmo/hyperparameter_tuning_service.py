@@ -605,3 +605,312 @@ class HyperparameterTuningService:
                 best_config = data['config']
 
         return best_config
+
+    def adaptive_tuning_by_num_assets(
+        self,
+        asset_ranges: List[int] = None,
+        nivel_risco: str = 'neutro',
+        population_sizes: List[int] = None,
+        generation_counts: List[int] = None,
+        n_runs: int = 5,
+        save_to_db: bool = True
+    ) -> pd.DataFrame:
+        """
+        Realiza tuning adaptativo para diferentes quantidades de ativos.
+
+        Este método executa grid search para múltiplas quantidades de ativos,
+        determinando a configuração ótima para cada uma. Isso permite que o
+        sistema use automaticamente hiperparâmetros apropriados baseados na
+        complexidade do problema (número de ativos).
+
+        Args:
+            asset_ranges: Lista com quantidades de ativos a testar
+                         (default: [5, 10, 15, 20])
+            nivel_risco: Perfil de risco
+            population_sizes: Lista de tamanhos de população
+                            (default: [50, 100, 150, 200, 300])
+            generation_counts: Lista de números de gerações
+                             (default: [25, 50, 75, 100, 150, 200])
+            n_runs: Número de execuções por configuração
+            save_to_db: Se deve salvar resultados no banco de dados
+
+        Returns:
+            DataFrame com configurações ótimas por quantidade de ativos
+        """
+        if asset_ranges is None:
+            asset_ranges = [5, 10, 15, 20]
+
+        if population_sizes is None:
+            population_sizes = [50, 100, 150, 200, 300]
+
+        if generation_counts is None:
+            generation_counts = [25, 50, 75, 100, 150, 200]
+
+        logger.info(f"Iniciando Tuning Adaptativo por Quantidade de Ativos")
+        logger.info(f"  Quantidades de ativos: {asset_ranges}")
+        logger.info(f"  Populações: {population_sizes}")
+        logger.info(f"  Gerações: {generation_counts}")
+        logger.info(f"  Execuções por config: {n_runs}")
+        logger.info(f"  Perfil de risco: {nivel_risco}")
+
+        optimal_configs = []
+
+        for num_ativos in asset_ranges:
+            logger.info(f"\n{'='*70}")
+            logger.info(f"Testando com {num_ativos} ativos")
+            logger.info(f"{'='*70}")
+
+            # Busca ativos do banco para teste
+            with self.app.app_context():
+                from models import db, Ativo
+                ativos = db.session.query(Ativo).limit(num_ativos).all()
+
+                if len(ativos) < num_ativos:
+                    logger.warning(f"Apenas {len(ativos)} ativos disponíveis. "
+                                 f"Pulando testes com {num_ativos} ativos.")
+                    continue
+
+                ids_ativos = [a.id for a in ativos]
+
+            # Executa grid search para esta quantidade de ativos
+            try:
+                summary = self.grid_search(
+                    ids_ativos=ids_ativos,
+                    nivel_risco=nivel_risco,
+                    population_sizes=population_sizes,
+                    generation_counts=generation_counts,
+                    n_runs=n_runs
+                )
+
+                # Extrai melhor configuração
+                if not summary.empty:
+                    best = summary.iloc[0]
+
+                    optimal_config = {
+                        'num_ativos': num_ativos,
+                        'nivel_risco': nivel_risco,
+                        'population_size': int(best['population_size']),
+                        'generations': int(best['generations']),
+                        'crossover_eta': 15.0,
+                        'mutation_eta': 20.0,
+                        'hypervolume_mean': float(best['final_hypervolume_mean']),
+                        'hypervolume_std': float(best['final_hypervolume_std']),
+                        'spread_mean': float(best['final_spread_mean']),
+                        'spread_std': float(best['final_spread_std']),
+                        'spacing_mean': float(best['final_spacing_mean']),
+                        'spacing_std': float(best['final_spacing_std']),
+                        'pareto_size_mean': float(best['pareto_size_mean']),
+                        'execution_time_mean': float(best['execution_time_mean']),
+                        'execution_time_std': float(best['execution_time_std']),
+                        'convergence_generation_mean': float(best.get('convergence_generation_mean', 0)) if pd.notna(best.get('convergence_generation_mean')) else None,
+                        'n_runs': n_runs,
+                        'n_configurations_tested': len(population_sizes) * len(generation_counts)
+                    }
+
+                    optimal_configs.append(optimal_config)
+
+                    logger.info(f"\n✅ Melhor configuração para {num_ativos} ativos:")
+                    logger.info(f"   População: {optimal_config['population_size']}")
+                    logger.info(f"   Gerações: {optimal_config['generations']}")
+                    logger.info(f"   Hypervolume: {optimal_config['hypervolume_mean']:.6f} "
+                              f"(±{optimal_config['hypervolume_std']:.6f})")
+                    logger.info(f"   Tempo: {optimal_config['execution_time_mean']:.2f}s "
+                              f"(±{optimal_config['execution_time_std']:.2f}s)")
+
+            except Exception as e:
+                logger.error(f"Erro ao testar {num_ativos} ativos: {e}")
+                continue
+
+        # Converte para DataFrame
+        df_optimal = pd.DataFrame(optimal_configs)
+
+        if df_optimal.empty:
+            logger.warning("Nenhuma configuração ótima foi encontrada!")
+            return df_optimal
+
+        # Salva no banco de dados se solicitado
+        if save_to_db and self.app:
+            self.save_optimal_configs_to_db(df_optimal)
+
+        # Salva em arquivo também
+        output_dir = Path('tuning_results')
+        output_dir.mkdir(exist_ok=True)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = output_dir / f'adaptive_tuning_{timestamp}.csv'
+        df_optimal.to_csv(filename, index=False)
+        logger.info(f"\n📁 Configurações ótimas salvas em: {filename}")
+
+        # Gera visualização
+        self._plot_adaptive_tuning_results(df_optimal)
+
+        return df_optimal
+
+    def save_optimal_configs_to_db(self, df_optimal: pd.DataFrame):
+        """
+        Salva configurações ótimas no banco de dados.
+
+        Args:
+            df_optimal: DataFrame com configurações ótimas
+        """
+        if not self.app:
+            logger.warning("App não disponível. Não é possível salvar no banco.")
+            return
+
+        with self.app.app_context():
+            from models import db, HyperparameterConfig
+
+            saved_count = 0
+            updated_count = 0
+
+            for _, row in df_optimal.iterrows():
+                num_ativos = int(row['num_ativos'])
+                nivel_risco = row['nivel_risco']
+
+                # Verifica se já existe configuração para esta quantidade
+                existing = HyperparameterConfig.query.filter_by(
+                    num_ativos=num_ativos,
+                    nivel_risco=nivel_risco
+                ).first()
+
+                if existing:
+                    # Desativa a antiga
+                    existing.is_active = False
+                    updated_count += 1
+
+                # Cria nova configuração
+                new_config = HyperparameterConfig(
+                    num_ativos=num_ativos,
+                    nivel_risco=nivel_risco,
+                    population_size=int(row['population_size']),
+                    generations=int(row['generations']),
+                    crossover_eta=float(row['crossover_eta']),
+                    mutation_eta=float(row['mutation_eta']),
+                    hypervolume_mean=float(row['hypervolume_mean']),
+                    hypervolume_std=float(row['hypervolume_std']),
+                    spread_mean=float(row['spread_mean']),
+                    spread_std=float(row['spread_std']),
+                    spacing_mean=float(row['spacing_mean']),
+                    spacing_std=float(row['spacing_std']),
+                    pareto_size_mean=float(row['pareto_size_mean']),
+                    execution_time_mean=float(row['execution_time_mean']),
+                    execution_time_std=float(row['execution_time_std']),
+                    convergence_generation_mean=float(row['convergence_generation_mean']) if pd.notna(row.get('convergence_generation_mean')) else None,
+                    n_runs=int(row['n_runs']),
+                    n_configurations_tested=int(row['n_configurations_tested']),
+                    tuning_date=datetime.utcnow(),
+                    notes=f"Adaptive tuning - automated configuration",
+                    is_active=True
+                )
+
+                db.session.add(new_config)
+                saved_count += 1
+
+            db.session.commit()
+
+            logger.info(f"\n✅ Configurações salvas no banco de dados:")
+            logger.info(f"   Novas: {saved_count}")
+            logger.info(f"   Atualizadas: {updated_count}")
+
+    def _plot_adaptive_tuning_results(self, df_optimal: pd.DataFrame):
+        """
+        Gera visualizações dos resultados do tuning adaptativo.
+
+        Args:
+            df_optimal: DataFrame com configurações ótimas
+        """
+        if df_optimal.empty:
+            return
+
+        output_dir = Path('tuning_results')
+        output_dir.mkdir(exist_ok=True)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+        fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+        fig.suptitle('Tuning Adaptativo por Quantidade de Ativos',
+                    fontsize=14, fontweight='bold')
+
+        # 1. População ótima vs Número de ativos
+        ax = axes[0, 0]
+        ax.plot(df_optimal['num_ativos'], df_optimal['population_size'],
+               'o-', markersize=10, linewidth=2, color='steelblue')
+        ax.set_xlabel('Número de Ativos')
+        ax.set_ylabel('População Ótima')
+        ax.set_title('População Ótima por Número de Ativos')
+        ax.grid(True, alpha=0.3)
+
+        # 2. Gerações ótimas vs Número de ativos
+        ax = axes[0, 1]
+        ax.plot(df_optimal['num_ativos'], df_optimal['generations'],
+               'o-', markersize=10, linewidth=2, color='forestgreen')
+        ax.set_xlabel('Número de Ativos')
+        ax.set_ylabel('Gerações Ótimas')
+        ax.set_title('Gerações Ótimas por Número de Ativos')
+        ax.grid(True, alpha=0.3)
+
+        # 3. Hypervolume vs Número de ativos
+        ax = axes[1, 0]
+        ax.errorbar(df_optimal['num_ativos'], df_optimal['hypervolume_mean'],
+                   yerr=df_optimal['hypervolume_std'],
+                   fmt='o-', markersize=10, linewidth=2, capsize=5,
+                   color='crimson')
+        ax.set_xlabel('Número de Ativos')
+        ax.set_ylabel('Hypervolume')
+        ax.set_title('Qualidade da Solução (Hypervolume)')
+        ax.grid(True, alpha=0.3)
+
+        # 4. Tempo de execução vs Número de ativos
+        ax = axes[1, 1]
+        ax.errorbar(df_optimal['num_ativos'], df_optimal['execution_time_mean'],
+                   yerr=df_optimal['execution_time_std'],
+                   fmt='o-', markersize=10, linewidth=2, capsize=5,
+                   color='darkorange')
+        ax.set_xlabel('Número de Ativos')
+        ax.set_ylabel('Tempo de Execução (s)')
+        ax.set_title('Custo Computacional')
+        ax.grid(True, alpha=0.3)
+
+        plt.tight_layout()
+
+        filename = output_dir / f'adaptive_tuning_plot_{timestamp}.png'
+        plt.savefig(filename, dpi=300, bbox_inches='tight')
+        logger.info(f"📊 Gráfico salvo em: {filename}")
+        plt.close()
+
+    @staticmethod
+    def get_optimal_config_from_db(num_ativos: int, nivel_risco: str = 'neutro',
+                                   app=None):
+        """
+        Busca configuração ótima do banco de dados.
+
+        Args:
+            num_ativos: Número de ativos
+            nivel_risco: Perfil de risco
+            app: Instância Flask
+
+        Returns:
+            Dicionário com hiperparâmetros ou None
+        """
+        if not app:
+            return None
+
+        with app.app_context():
+            from models import HyperparameterConfig
+
+            config = HyperparameterConfig.get_optimal_config(num_ativos, nivel_risco)
+
+            if config:
+                logger.info(f"✅ Usando configuração ótima do banco para "
+                          f"{num_ativos} ativos (perfil: {nivel_risco})")
+                logger.info(f"   População: {config.population_size}, "
+                          f"Gerações: {config.generations}")
+
+                return {
+                    'population_size': config.population_size,
+                    'generations': config.generations,
+                    'crossover_eta': config.crossover_eta,
+                    'mutation_eta': config.mutation_eta
+                }
+
+            logger.warning(f"⚠️  Configuração não encontrada para {num_ativos} ativos. "
+                         f"Usando valores padrão.")
+            return None
