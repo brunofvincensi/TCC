@@ -435,27 +435,11 @@ class Nsga2OtimizacaoService:
         for item in composicao_final:
             item['peso'] = item['peso'] / soma_pesos
 
-        # ✅ Calcula métricas da carteira otimizada
-        retorno_esperado = np.dot(pesos_otimos, self.retornos_medios.values)
-        risco_carteira = np.sqrt(np.dot(pesos_otimos, self.matriz_covariancia.values @ pesos_otimos))
-        sharpe_ratio = retorno_esperado / risco_carteira if risco_carteira > 0 else 0
-
-        # Adiciona métricas ao resultado
-        metricas = {
-            'retorno_esperado_mensal': float(retorno_esperado),
-            'retorno_esperado_anual': float(retorno_esperado * 12),
-            'volatilidade_mensal': float(risco_carteira),
-            'volatilidade_anual': float(risco_carteira * np.sqrt(12)),
-            'sharpe_ratio': float(sharpe_ratio)
-        }
-
-        # ✅ APRESENTAÇÃO FORMATADA DOS RESULTADOS
-        self._printar_resultado_otimizacao(composicao_final, metricas)
+        print(f"  ✅ Carteira otimizada com {len(composicao_final)} ativos")
 
         # ✅ RETORNA informações adicionais sobre o período usado (útil para backtest)
         resultado = {
             'composicao': composicao_final,
-            'metricas': metricas,
             'data_referencia': self.data_referencia,
             'periodo_inicio': self.historico_retornos.index.min(),
             'periodo_fim': self.historico_retornos.index.max(),
@@ -464,86 +448,6 @@ class Nsga2OtimizacaoService:
         }
 
         return resultado
-
-    def _printar_resultado_otimizacao(self, composicao: List[Dict], metricas: Dict):
-        """
-        Apresenta os resultados da otimização de forma formatada e profissional.
-
-        Args:
-            composicao: Lista com composição da carteira
-            metricas: Dicionário com métricas calculadas
-        """
-        print(f"\n{'='*80}")
-        print(f"📊 RESULTADO DA OTIMIZAÇÃO")
-        print(f"{'='*80}")
-
-        # 1. Composição da Carteira (Tabela)
-        print(f"\n💼 COMPOSIÇÃO DA CARTEIRA ({len(composicao)} ativos):")
-        print(f"{'─'*80}")
-        print(f"{'#':<4} {'Ticker':<10} {'Nome':<35} {'Peso':>10} {'Barra':>15}")
-        print(f"{'─'*80}")
-
-        # Ordena por peso (maior para menor)
-        composicao_ordenada = sorted(composicao, key=lambda x: x['peso'], reverse=True)
-
-        for i, ativo in enumerate(composicao_ordenada, 1):
-            ticker = ativo['ticker']
-            nome = ativo['nome'][:32] + '...' if len(ativo['nome']) > 35 else ativo['nome']
-            peso = ativo['peso']
-            peso_pct = peso * 100
-
-            # Barra visual
-            barra_size = int(peso * 50)  # Máximo 50 caracteres
-            barra = '█' * barra_size
-
-            print(f"{i:<4} {ticker:<10} {nome:<35} {peso_pct:>9.2f}% {barra:>15}")
-
-        print(f"{'─'*80}")
-        print(f"{'TOTAL':<50} {100.0:>9.2f}%")
-        print(f"{'─'*80}")
-
-        # 2. Métricas de Performance
-        print(f"\n📈 MÉTRICAS DE PERFORMANCE:")
-        print(f"{'─'*80}")
-
-        ret_mensal = metricas['retorno_esperado_mensal'] * 100
-        ret_anual = metricas['retorno_esperado_anual'] * 100
-        vol_mensal = metricas['volatilidade_mensal'] * 100
-        vol_anual = metricas['volatilidade_anual'] * 100
-        sharpe = metricas['sharpe_ratio']
-
-        print(f"   Retorno Esperado (mensal):  {ret_mensal:>8.2f}%")
-        print(f"   Retorno Esperado (anual):   {ret_anual:>8.2f}%")
-        print(f"   Volatilidade (mensal):      {vol_mensal:>8.2f}%")
-        print(f"   Volatilidade (anual):       {vol_anual:>8.2f}%")
-        print(f"   Índice de Sharpe:           {sharpe:>8.2f}")
-
-        print(f"{'─'*80}")
-
-        # 3. Concentração
-        print(f"\n🎯 ANÁLISE DE CONCENTRAÇÃO:")
-        print(f"{'─'*80}")
-
-        top_3_peso = sum(a['peso'] for a in composicao_ordenada[:3]) * 100
-        max_peso = composicao_ordenada[0]['peso'] * 100
-        min_peso = composicao_ordenada[-1]['peso'] * 100
-
-        print(f"   Top 3 ativos concentram:    {top_3_peso:>8.2f}%")
-        print(f"   Maior alocação individual:  {max_peso:>8.2f}% ({composicao_ordenada[0]['ticker']})")
-        print(f"   Menor alocação individual:  {min_peso:>8.2f}% ({composicao_ordenada[-1]['ticker']})")
-
-        # Avaliação de diversificação
-        if top_3_peso > 70:
-            print(f"   ⚠️  Alta concentração - Considere diversificar")
-        elif top_3_peso < 40:
-            print(f"   ✅ Boa diversificação")
-        else:
-            print(f"   ℹ️  Diversificação moderada")
-
-        print(f"{'─'*80}")
-
-        print(f"\n✅ Otimização concluída com sucesso!")
-        print(f"{'='*80}\n")
 
 
 def _calcular_retorno_carteira(app, carteira: List[Dict],
@@ -614,13 +518,10 @@ def otimizar_carteira_atual(app):
     print("=" * 80)
     service = Nsga2OtimizacaoService(app, [1], "conservador", 2)
     resultado = service.otimizar()
-
-    # Informações adicionais
-    print(f"\n📅 INFORMAÇÕES DO PERÍODO:")
-    print(f"   Dados históricos: {resultado['periodo_inicio']} até {resultado['periodo_fim']}")
-    print(f"   Total de meses: {resultado['num_meses']}")
-    print(f"   Hiperparâmetros: Pop={resultado['hyperparameters_used']['population_size']}, "
-          f"Gen={resultado['hyperparameters_used']['generations']}")
+    print(f"\n✅ Resultado:")
+    print(f"   Composição: {resultado['composicao']}")
+    print(f"   Período: {resultado['periodo_inicio']} até {resultado['periodo_fim']}")
+    print(f"   Meses: {resultado['num_meses']}")
 
 def backtest(app):
     from datetime import date
@@ -630,14 +531,12 @@ def backtest(app):
     data_backtest = date(2023, 1, 1)
     service_backtest = Nsga2OtimizacaoService(app, [1], "moderado", 2, data_referencia=data_backtest)
     carteira_backtest = service_backtest.otimizar()
-
-    # Informações do backtest
-    print(f"\n📅 INFORMAÇÕES DO BACKTEST:")
+    print(f"\n✅ Resultado do Backtest:")
+    print(f"   Composição: {carteira_backtest['composicao']}")
     print(f"   Data de referência: {carteira_backtest['data_referencia']}")
-    print(f"   Dados históricos: {carteira_backtest['periodo_inicio']} até {carteira_backtest['periodo_fim']}")
-    print(f"   Total de meses: {carteira_backtest['num_meses']}")
-    print(f"   Hiperparâmetros: Pop={carteira_backtest['hyperparameters_used']['population_size']}, "
-          f"Gen={carteira_backtest['hyperparameters_used']['generations']}")
+    print(f"   Período: {carteira_backtest['periodo_inicio']} até {carteira_backtest['periodo_fim']}")
+    print(f"   Meses: {carteira_backtest['num_meses']}")
+    print(f"   Modo Backtest: {carteira_backtest['modo_backtest']}")
 
     dataFim = date(2025, 10, 20)
     retorno_periodo, retornos_mensais = _calcular_retorno_carteira(
