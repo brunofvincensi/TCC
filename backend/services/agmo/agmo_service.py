@@ -227,15 +227,105 @@ class Nsga2OtimizacaoService:
             if df_historico.empty:
                 raise ValueError("Sem histórico para os ativos selecionados.")
 
-            # Limita os históricos para o ativo que tem o histórico mais curto
-            df_retornos = df_historico.pivot(index='data', columns='ticker', values='variacao_mensal').dropna()
+            # ✅ FILTRO INTELIGENTE DE ATIVOS POR HISTÓRICO MÍNIMO
+            # Problema: ações com histórico curto fazem .dropna() eliminar dados de ações com histórico longo
+            # Solução: Filtrar ações antes do pivot baseado no horizonte de investimento
+
+            # Calcula histórico mínimo necessário
+            # Usa margem de 1.5x o prazo para ter mais dados de qualidade
+            MARGEM_SEGURANCA = 1.5
+            MINIMO_ABSOLUTO_MESES = 24  # Mínimo de 2 anos mesmo para prazos curtos
+
+            historico_minimo_meses = max(
+                int(self.prazo_anos * 12 * MARGEM_SEGURANCA),
+                MINIMO_ABSOLUTO_MESES
+            )
+
+            print(f"\n{'=' * 70}")
+            print(f"🔍 FILTRANDO ATIVOS POR HISTÓRICO MÍNIMO")
+            print(f"{'=' * 70}")
+            print(f"  Prazo de investimento: {self.prazo_anos} anos")
+            print(f"  Histórico mínimo requerido: {historico_minimo_meses} meses ({historico_minimo_meses/12:.1f} anos)")
+            print(f"  Margem de segurança: {MARGEM_SEGURANCA}x")
+
+            # Pivot sem dropna para analisar cada ativo
+            df_retornos_completo = df_historico.pivot(
+                index='data',
+                columns='ticker',
+                values='variacao_mensal'
+            )
+
+            # Analisa quantidade de dados por ativo
+            ativos_disponiveis = df_retornos_completo.columns.tolist()
+            contagem_dados = df_retornos_completo.count()
+
+            print(f"\n  📊 Análise de histórico por ativo:")
+            print(f"  {'Ticker':<12} {'Meses':>8} {'Status':<20}")
+            print(f"  {'-'*40}")
+
+            ativos_validos = []
+            ativos_excluidos = []
+
+            for ticker in ativos_disponiveis:
+                meses_disponiveis = contagem_dados[ticker]
+
+                if meses_disponiveis >= historico_minimo_meses:
+                    status = "✅ Incluído"
+                    ativos_validos.append(ticker)
+                else:
+                    status = f"❌ Excluído ({meses_disponiveis}/{historico_minimo_meses})"
+                    ativos_excluidos.append(ticker)
+
+                print(f"  {ticker:<12} {meses_disponiveis:>8} {status:<20}")
+
+            # Validação: precisamos de pelo menos 3 ativos
+            if len(ativos_validos) < 3:
+                raise ValueError(
+                    f"Ativos insuficientes após filtro de histórico!\n"
+                    f"  Requerido: 3 ativos\n"
+                    f"  Disponível: {len(ativos_validos)} ativos\n"
+                    f"  Histórico mínimo: {historico_minimo_meses} meses\n\n"
+                    f"Sugestões:\n"
+                    f"  1. Reduza o prazo de investimento (atual: {self.prazo_anos} anos)\n"
+                    f"  2. Adicione ativos com mais histórico ao universo\n"
+                    f"  3. Use um período de análise mais recente (data_inicio)"
+                )
+
+            print(f"\n  ✅ Resultado do filtro:")
+            print(f"     Ativos incluídos: {len(ativos_validos)}")
+            print(f"     Ativos excluídos: {len(ativos_excluidos)}")
+
+            if ativos_excluidos:
+                print(f"     Excluídos: {', '.join(ativos_excluidos)}")
+
+            # Filtra o DataFrame original para incluir apenas ativos válidos
+            df_historico_filtrado = df_historico[df_historico['ticker'].isin(ativos_validos)]
+
+            # Agora faz o pivot e dropna com segurança
+            # Todos os ativos têm histórico >= mínimo, então dropna é consistente
+            df_retornos = df_historico_filtrado.pivot(
+                index='data',
+                columns='ticker',
+                values='variacao_mensal'
+            ).dropna()
 
             self.tickers = df_retornos.columns.tolist()
 
+            # Atualiza lista de ativos para otimizar (remove os excluídos)
+            self.ativos_para_otimizar = [
+                a for a in self.ativos_para_otimizar
+                if a.ticker in self.tickers
+            ]
+
             # ✅ Validação de dados suficientes
-            if len(df_retornos) < 12:  # Mínimo de 12 meses para análise
-                raise ValueError(f"Dados históricos insuficientes para análise. "
-                               f"Encontrados {len(df_retornos)} meses, mínimo necessário: 12 meses.")
+            if len(df_retornos) < historico_minimo_meses:
+                raise ValueError(
+                    f"Dados históricos insuficientes após alinhamento!\n"
+                    f"  Encontrados: {len(df_retornos)} meses\n"
+                    f"  Necessário: {historico_minimo_meses} meses\n\n"
+                    f"Isso geralmente acontece quando o período de sobreposição entre "
+                    f"os ativos é muito curto."
+                )
 
             if self.data_referencia is not None:
                 print(f"\n{'=' * 70}")
