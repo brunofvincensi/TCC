@@ -1,7 +1,22 @@
 ticker,nome,tipo,setor
+PRIO3,PetroRio,ACAO,Petroleo e Gás
+ENEV3,Eneva,ACAO,Energia
+SUZB3,Suzano,ACAO,Papel e Celulose
+RENT3,Localiza,ACAO,Transportes
+RDOR3,Rede D'Or,ACAO,Saúde
+EQTL3,Equatorial,ACAO,Energia
+ABEV3,Ambev,ACAO,Consumo não Cíclico
+WEGE3,WEG,ACAO,Indústria
+EMBR3,Embraer,ACAO,Indústria
 BBAS3,Banco do Brasil,ACAO,Banco
-ITUB4,Itaú,ACAO,Banco
+ITSA4,Itaúsa,ACAO,Financeiro
+BPAC11,BTG Pactual,ACAO,Banco
+B3SA3,B3,ACAO,Financeiro
+SBSP3,Sabesp,ACAO,Saneamento
+BBDC4,Bradesco,ACAO,Banco
+ELET3,Eletrobras,ACAO,Energia
+PETR3,Petrobras,ACAO,Petroleo e Gás
+PETR4,Petrobras,ACAO,Petroleo e Gás
+ITUB4,Itaú Unibanco,ACAO,Banco
 VALE3,Vale,ACAO,Mineração
 IMA-S,IMA-S,RENDA_FIXA,
-ABEV3,Ambev,ACAO,Consumo não Cíclico
-MGLU3,Magalu,ACAO,Consumo Cíclico

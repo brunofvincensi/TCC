@@ -8,3 +8,4 @@ db = SQLAlchemy()
 from .usuario import Usuario
 from .ativo import Ativo, HistoricoPrecos
 from .carteira import Carteira, CarteiraAtivo, ParametrosOtimizacao, ParametrosRestricaoAtivo
+from .hyperparameter_config import HyperparameterConfig

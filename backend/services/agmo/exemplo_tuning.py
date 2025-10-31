@@ -275,6 +275,150 @@ def exemplo_4_quick_test():
         raise
 
 
+def exemplo_6_tuning_adaptativo():
+    """
+    Exemplo 6: Tuning Adaptativo por Quantidade de Ativos
+
+    Este é o exemplo MAIS IMPORTANTE para otimização de performance!
+    Determina automaticamente a melhor configuração para cada quantidade
+    de ativos, salvando no banco para uso futuro.
+    """
+    print("\n" + "=" * 80)
+    print("EXEMPLO 6: TUNING ADAPTATIVO POR QUANTIDADE DE ATIVOS")
+    print("=" * 80)
+    print("\nObjetivo: Determinar configuração ótima para diferentes números de ativos\n")
+    print("⚡ ESTE EXEMPLO OTIMIZA O TEMPO DE EXECUÇÃO FUTURO!")
+    print("   Depois de executar, o sistema automaticamente usará a")
+    print("   configuração ótima baseada no número de ativos.\n")
+
+    app = create_app()
+
+    tuning_service = HyperparameterTuningService(app)
+
+    # Configurações do tuning
+    asset_ranges = [5, 10, 15, 20]  # Quantidades de ativos a testar
+    population_sizes = [50, 100, 150, 200, 300]
+    generation_counts = [25, 50, 75, 100, 150, 200]
+    n_runs = 5  # Para análise estatística robusta
+
+    print("📋 Configuração do Tuning Adaptativo:")
+    print(f"   - Quantidades de ativos: {asset_ranges}")
+    print(f"   - Populações: {population_sizes}")
+    print(f"   - Gerações: {generation_counts}")
+    print(f"   - Execuções por configuração: {n_runs}")
+    print(f"\n   Total de otimizações:")
+    print(f"   {len(asset_ranges)} ativos × {len(population_sizes)} pop × "
+          f"{len(generation_counts)} gen × {n_runs} runs")
+    print(f"   = {len(asset_ranges) * len(population_sizes) * len(generation_counts) * n_runs} execuções")
+    print(f"\n⏱️  Estimativa de tempo: 4-8 HORAS")
+    print(f"   Recomendação: Execute durante a noite ou fim de semana\n")
+
+    resposta = input("Deseja continuar? (s/n): ")
+    if resposta.lower() != 's':
+        print("Operação cancelada.")
+        return
+
+    try:
+        print("\n🚀 Iniciando Tuning Adaptativo...\n")
+
+        df_optimal = tuning_service.adaptive_tuning_by_num_assets(
+            asset_ranges=asset_ranges,
+            nivel_risco='neutro',  # Neutro serve para todos os perfis
+            population_sizes=population_sizes,
+            generation_counts=generation_counts,
+            n_runs=n_runs,
+            save_to_db=True  # ✅ SALVA NO BANCO!
+        )
+
+        print("\n" + "=" * 80)
+        print("✅ TUNING ADAPTATIVO CONCLUÍDO COM SUCESSO!")
+        print("=" * 80)
+
+        if not df_optimal.empty:
+            print("\n📊 Configurações Ótimas Encontradas:\n")
+            print(df_optimal[[
+                'num_ativos', 'population_size', 'generations',
+                'hypervolume_mean', 'execution_time_mean'
+            ]].to_string(index=False))
+
+            print("\n💡 Próximos Passos:")
+            print("   1. Essas configurações foram salvas no banco de dados")
+            print("   2. Quando você otimizar carteiras, o sistema automaticamente")
+            print("      usará a melhor configuração baseada no número de ativos")
+            print("   3. Exemplo:")
+            print("      - 5 ativos → usa config ótima para 5 ativos")
+            print("      - 12 ativos → usa config ótima para 10 ativos (mais próxima)")
+            print("      - 18 ativos → usa config ótima para 20 ativos (mais próxima)")
+
+            print("\n🎯 Benefícios:")
+            print("   - Otimizações mais rápidas para poucos ativos")
+            print("   - Melhor qualidade para muitos ativos")
+            print("   - Zero configuração manual necessária!")
+
+        print(f"\n📁 Arquivos gerados:")
+        print(f"   - CSV: tuning_results/adaptive_tuning_*.csv")
+        print(f"   - Gráfico: tuning_results/adaptive_tuning_plot_*.png")
+        print(f"   - Banco de dados: hyperparameter_configs (tabela)")
+
+    except Exception as e:
+        logger.error(f"Erro no tuning adaptativo: {e}")
+        raise
+
+
+def exemplo_7_testar_auto_lookup():
+    """
+    Exemplo 7: Testar Auto-Lookup de Configurações
+
+    Demonstra como o sistema busca automaticamente a melhor configuração.
+    """
+    print("\n" + "=" * 80)
+    print("EXEMPLO 7: TESTE DE AUTO-LOOKUP")
+    print("=" * 80)
+    print("\nObjetivo: Demonstrar busca automática de configurações ótimas\n")
+
+    app = create_app()
+
+    # Testa com diferentes quantidades de ativos
+    test_quantities = [5, 8, 12, 18, 22]
+
+    print("🔍 Testando auto-lookup para diferentes quantidades de ativos:\n")
+
+    for num_ativos in test_quantities:
+        print(f"\n{'='*60}")
+        print(f"Testando com {num_ativos} ativos:")
+        print(f"{'='*60}")
+
+        # Busca configuração do banco
+        with app.app_context():
+            from models import HyperparameterConfig
+
+            config = HyperparameterConfig.get_optimal_config(
+                num_ativos=num_ativos,
+                nivel_risco='neutro'
+            )
+
+            if config:
+                print(f"✅ Configuração encontrada!")
+                print(f"   📊 População: {config.population_size}")
+                print(f"   📊 Gerações: {config.generations}")
+                print(f"   🎯 Configuração baseada em: {config.num_ativos} ativos")
+                print(f"   📅 Tuning realizado em: {config.tuning_date.strftime('%Y-%m-%d')}")
+                print(f"   ⏱️  Tempo esperado: {config.execution_time_mean:.2f}s")
+            else:
+                print(f"⚠️  Configuração não encontrada")
+                print(f"   Será usado: População=100, Gerações=50 (padrão)")
+
+    print("\n" + "=" * 80)
+    print("💡 Como funciona o Auto-Lookup:")
+    print("=" * 80)
+    print("1. Sistema recebe pedido de otimização com N ativos")
+    print("2. Busca no banco configuração para N ativos")
+    print("3. Se não encontrar exata, busca a mais próxima (±2 ativos)")
+    print("4. Se ainda não encontrar, usa configuração padrão")
+    print("5. Otimização executa com parâmetros ótimos automaticamente!")
+    print("\n✅ ZERO configuração manual necessária!")
+
+
 def menu_principal():
     """Menu principal para escolher qual exemplo executar."""
     print("\n" + "=" * 80)
@@ -284,8 +428,9 @@ def menu_principal():
     print("1. Análise de Convergência (recomendado para começar)")
     print("2. Grid Search Básico")
     print("3. Grid Search Completo (para TCC - DEMORADO)")
-    print("4. Análise por Perfil de Risco")
-    print("5. Teste Rápido (validação)")
+    print("4. Teste Rápido (validação)")
+    print("6. Tuning Adaptativo por Quantidade de Ativos ⚡ RECOMENDADO!")
+    print("7. Testar Auto-Lookup de Configurações")
     print("0. Sair")
 
     escolha = input("\nDigite o número do exemplo: ")
@@ -295,6 +440,8 @@ def menu_principal():
         '2': exemplo_2_grid_search_basico,
         '3': exemplo_3_grid_search_completo,
         '4': exemplo_4_quick_test,
+        '6': exemplo_6_tuning_adaptativo,
+        '7': exemplo_7_testar_auto_lookup,
     }
 
     if escolha in exemplos:

@@ -358,18 +358,19 @@ class Nsga2OtimizacaoService:
         idx_melhor = np.argmax(scores)
         return solucoes[idx_melhor]
 
-    def otimizar(self, population_size: int = 100, generations: int = 50,
+    def otimizar(self, population_size: int = None, generations: int = None,
                  crossover_eta: float = 15.0, mutation_eta: float = 20.0,
-                 convergence_tracker=None):
+                 convergence_tracker=None, use_optimal_config: bool = True):
         """
         Orquestra o processo completo de otimização personalizada.
 
         Args:
-            population_size: Tamanho da população para o NSGA-II
-            generations: Número de gerações
+            population_size: Tamanho da população para o NSGA-II (None = auto-lookup)
+            generations: Número de gerações (None = auto-lookup)
             crossover_eta: Parâmetro eta do crossover
             mutation_eta: Parâmetro eta da mutação
             convergence_tracker: Instância de ConvergenceTracker para rastrear convergência (opcional)
+            use_optimal_config: Se True, tenta buscar configuração ótima do banco de dados
 
         Returns:
             dict: Dicionário contendo:
@@ -378,8 +379,67 @@ class Nsga2OtimizacaoService:
                 - periodo_inicio: Data inicial dos dados históricos usados
                 - periodo_fim: Data final dos dados históricos usados
                 - num_meses: Número de meses de dados históricos utilizados
+                - hyperparameters_used: Hiperparâmetros utilizados
         """
         self._preparar_dados()
+
+        # ✅ AUTO-LOOKUP de hiperparâmetros ótimos baseado na quantidade de ativos
+        num_ativos = len(self.ativos_para_otimizar)
+
+        if use_optimal_config and (population_size is None or generations is None):
+            print(f"\n{'='*70}")
+            print(f"🔍 BUSCANDO CONFIGURAÇÃO ÓTIMA PARA {num_ativos} ATIVOS")
+            print(f"{'='*70}")
+
+            try:
+                from models import HyperparameterConfig
+
+                with self.app.app_context():
+                    optimal_config = HyperparameterConfig.get_optimal_config(
+                        num_ativos=num_ativos,
+                        nivel_risco=self.nivel_risco
+                    )
+
+                    if optimal_config:
+                        if population_size is None:
+                            population_size = optimal_config.population_size
+                        if generations is None:
+                            generations = optimal_config.generations
+
+                        print(f"  ✅ Configuração ótima encontrada no banco!")
+                        print(f"  📊 População: {population_size}")
+                        print(f"  📊 Gerações: {generations}")
+                        print(f"  📅 Tuning realizado em: {optimal_config.tuning_date.strftime('%Y-%m-%d')}")
+                        print(f"  🎯 Hypervolume médio: {optimal_config.hypervolume_mean:.6f}")
+                        print(f"  ⏱️  Tempo médio esperado: {optimal_config.execution_time_mean:.2f}s")
+                    else:
+                        print(f"  ⚠️  Configuração não encontrada. Usando valores padrão.")
+                        if population_size is None:
+                            population_size = 100
+                        if generations is None:
+                            generations = 50
+
+            except Exception as e:
+                print(f"  ⚠️  Erro ao buscar configuração: {e}")
+                if population_size is None:
+                    population_size = 100
+                if generations is None:
+                    generations = 50
+
+        # Garante valores padrão se ainda None
+        if population_size is None:
+            population_size = 100
+        if generations is None:
+            generations = 50
+
+        print(f"\n{'='*70}")
+        print(f"🚀 EXECUTANDO OTIMIZAÇÃO")
+        print(f"{'='*70}")
+        print(f"  População: {population_size}")
+        print(f"  Gerações: {generations}")
+        print(f"  Perfil de risco: {self.nivel_risco}")
+        print(f"  Número de ativos: {num_ativos}")
+        print(f"{'='*70}\n")
 
         problema = PersonalizedPortfolioProblem(
             retornos_medios=self.retornos_medios.values,
@@ -400,6 +460,8 @@ class Nsga2OtimizacaoService:
         callback = None
         if convergence_tracker is not None:
             callback = ConvergenceCallback(convergence_tracker)
+        else:
+            callback = ConvergenceCallback(None)
 
         resultado = minimize(problema, algoritmo, ('n_gen', generations),
                            callback=callback, verbose=True)
@@ -444,7 +506,14 @@ class Nsga2OtimizacaoService:
             'periodo_inicio': self.historico_retornos.index.min(),
             'periodo_fim': self.historico_retornos.index.max(),
             'num_meses': len(self.historico_retornos),
-            'modo_backtest': self.data_referencia is not None
+            'modo_backtest': self.data_referencia is not None,
+            'hyperparameters_used': {
+                'population_size': population_size,
+                'generations': generations,
+                'crossover_eta': crossover_eta,
+                'mutation_eta': mutation_eta,
+                'num_ativos': num_ativos
+            }
         }
 
         return resultado
@@ -554,10 +623,10 @@ def main():
     app = create_app()
 
     # Exemplo 1: Otimização normal (sem backtest)
-   # otimizar_carteira_atual(app)
+    otimizar_carteira_atual(app)
 
     # Exemplo 2: Otimização com backtest (usando dados até uma data específica)
-    backtest(app)
+  #  backtest(app)
 
 
 if __name__ == "__main__":
