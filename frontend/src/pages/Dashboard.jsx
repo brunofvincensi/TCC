@@ -31,6 +31,8 @@ export default function Dashboard() {
   const [error, setError] = useState('')
   const [carteiras, setCarteiras] = useState([])
   const [previews, setPreviews] = useState([])
+  const [mainPreview, setMainPreview] = useState(null)
+  const [detailsCache, setDetailsCache] = useState({})
   const navigate = useNavigate()
 
   const fetchCarteiras = async () => {
@@ -41,10 +43,16 @@ export default function Dashboard() {
       const list = res.data || []
       setCarteiras(list)
 
-      const firstIds = list.slice(0, 3).map((c) => c.id)
-      const detailPromises = firstIds.map((id) => api.get(`/api/carteiras/${id}`).then(r => r.data).catch(() => null))
-      const details = await Promise.all(detailPromises)
-      setPreviews(details.filter(Boolean))
+  const firstIds = list.slice(0, 3).map((c) => c.id)
+  const detailPromises = firstIds.map((id) => api.get(`/api/carteiras/${id}`).then(r => r.data).catch(() => null))
+  const details = await Promise.all(detailPromises)
+  const filt = details.filter(Boolean)
+  setPreviews(filt)
+  setMainPreview(filt[0] || null)
+  // cache the details
+  const cache = {}
+  filt.forEach(d => { if (d && d.id) cache[d.id] = d })
+  setDetailsCache(cache)
     } catch (err) {
       setError(err?.response?.data?.erro || err.message || 'Erro ao carregar carteiras')
     } finally {
@@ -65,7 +73,7 @@ export default function Dashboard() {
     return { totalCarteiras, totalAtivos, topExposure }
   }, [carteiras, previews])
 
-  const mainPreview = previews[0]
+  // mainPreview state is managed above
 
   return (
     <div>
@@ -121,6 +129,38 @@ export default function Dashboard() {
                 {mainPreview.data_criacao && <div className='muted text-xs mt-2'>Criada em: {new Date(mainPreview.data_criacao).toLocaleDateString()}</div>}
               </div>
               <div className='text-xs muted text-right'>Ativos: <strong>{mainPreview.composicao ? mainPreview.composicao.length : 0}</strong></div>
+            </div>
+
+            <div className='mt-3'>
+              <label className='block text-sm muted mb-2'>Mostrar carteira</label>
+              <select
+                className='w-full p-2 bg-white/3 rounded border border-white/5 focus:border-teal-300 text-black'
+                value={mainPreview?.id || ''}
+                onChange={async (e) => {
+                  const id = Number(e.target.value)
+                  if (!id) return
+                  // if cached, use it
+                  if (detailsCache[id]) {
+                    setMainPreview(detailsCache[id])
+                    return
+                  }
+                  setLoading(true)
+                  try {
+                    const res = await api.get(`/api/carteiras/${id}`)
+                    const data = res.data
+                    setMainPreview(data)
+                    setDetailsCache(prev => ({ ...prev, [id]: data }))
+                  } catch (err) {
+                    setError('Erro ao carregar carteira selecionada')
+                  } finally {
+                    setLoading(false)
+                  }
+                }}
+              >
+                {carteiras.map(c => (
+                  <option key={c.id} value={c.id}>{c.nome}</option>
+                ))}
+              </select>
             </div>
 
             <div className='mt-4'>

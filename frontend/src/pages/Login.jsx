@@ -37,16 +37,21 @@ export default function Login() {
   };
 
   return (
-    <div className='flex items-center justify-center min-h-screen'>
-      <form onSubmit={handleLogin} className='w-96'>
+    <div className='relative min-h-screen flex items-center justify-center overflow-hidden'>
+      {/* background image blurred */}
+      <div className='absolute inset-0 -z-10'>
+        <img src={logo} alt='' className='w-full h-full object-cover filter blur-lg opacity-60 scale-110' />
+        <div className='absolute inset-0 bg-black/60'></div>
+      </div>
+
+      <form onSubmit={handleLogin} className='w-96 relative z-10'>
         <div className='flex flex-col items-center mb-4'>
-          <img src={logo} alt='Logo' className='w-20 h-20 object-cover rounded-full ring-2 ring-blue-600/40 shadow-md' />
+          <img src={logo} alt='Logo' className='w-20 h-20 object-cover rounded-full ring-2 ring-blue-600/40 shadow-md bg-white/5' />
           <div className='mt-2 text-center'>
             <div className='text-white font-semibold text-lg'>WalletAI</div>
-            <div className='text-xs muted'>Otimização de carteiras com IA</div>
           </div>
         </div>
-        <Card className='p-6'>
+        <Card className='p-6 backdrop-blur-sm bg-white/5'>
           <div className='space-y-3'>
             <Input label='Email' name='email' type='email' value={email} onChange={(e) => setEmail(e.target.value)} required />
             <Input label='Senha' name='senha' type='password' value={password} onChange={(e) => setPassword(e.target.value)} required />

@@ -4,6 +4,7 @@ import api from '../services/api.js';
 import Input from '../components/ui/Input.jsx'
 import Button from '../components/ui/Button.jsx'
 import Card from '../components/ui/Card.jsx'
+import logo from '../assets/walletai.png'
 
 export default function Register() {
   const navigate = useNavigate();
@@ -35,10 +36,22 @@ export default function Register() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <form onSubmit={handleSubmit} className="w-96">
-        <h1 className="text-2xl font-bold text-center mb-6">Criar conta</h1>
-        <Card className='p-6'>
+    <div className='relative min-h-screen flex items-center justify-center overflow-hidden'>
+      <div className='absolute inset-0 -z-10'>
+        <img src={logo} alt='' className='w-full h-full object-cover filter blur-lg opacity-60 scale-110' />
+        <div className='absolute inset-0 bg-black/60'></div>
+      </div>
+
+      <form onSubmit={handleSubmit} className='w-96 relative z-10'>
+        <div className='flex flex-col items-center mb-4'>
+          <img src={logo} alt='Logo' className='w-20 h-20 object-cover rounded-full ring-2 ring-blue-600/40 shadow-md bg-white/5' />
+          <div className='mt-2 text-center'>
+            <div className='text-white font-semibold text-lg'>Criar conta</div>
+            <div className='text-xs muted'>Bem-vindo(a)! Crie sua conta para começar</div>
+          </div>
+        </div>
+
+        <Card className='p-6 backdrop-blur-sm bg-white/5'>
           <div className='space-y-3'>
             <Input label='Nome' name='nome' value={formData.nome} onChange={handleChange} required />
             <Input label='Email' name='email' type='email' value={formData.email} onChange={handleChange} required />
