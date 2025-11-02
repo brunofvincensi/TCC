@@ -1,12 +1,158 @@
+import React, { useEffect, useMemo, useState } from 'react'
+import api from '../services/api'
+import Card from '../components/ui/Card.jsx'
+import Button from '../components/ui/Button.jsx'
+import Spinner from '../components/Spinner.jsx'
+import { useNavigate } from 'react-router-dom'
+
+function HorizontalBars({ items = [] }) {
+  const max = Math.max(...items.map(i => Number(i.value) || 0), 1)
+  return (
+    <div className='space-y-2'>
+      {items.map((it, idx) => {
+        const pct = Math.round((Number(it.value) || 0) / max * 100)
+        const color = `hsl(${(idx * 65) % 360} 70% 55%)`
+        return (
+          <div key={idx} className='flex items-center gap-3'>
+            <div className='w-24 text-sm muted'>{it.label}</div>
+            <div className='flex-1 bg-white/5 rounded overflow-hidden h-4'>
+              <div style={{ width: `${pct}%`, background: color }} className='h-4'></div>
+            </div>
+            <div className='w-16 text-right text-sm font-medium'>{(Number(it.value) * 100).toFixed(1)}%</div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function Dashboard() {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [carteiras, setCarteiras] = useState([])
+  const [previews, setPreviews] = useState([])
+  const navigate = useNavigate()
+
+  const fetchCarteiras = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await api.get('/api/carteiras')
+      const list = res.data || []
+      setCarteiras(list)
+
+      const firstIds = list.slice(0, 3).map((c) => c.id)
+      const detailPromises = firstIds.map((id) => api.get(`/api/carteiras/${id}`).then(r => r.data).catch(() => null))
+      const details = await Promise.all(detailPromises)
+      setPreviews(details.filter(Boolean))
+    } catch (err) {
+      setError(err?.response?.data?.erro || err.message || 'Erro ao carregar carteiras')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { fetchCarteiras() }, [])
+
+  const totals = useMemo(() => {
+    const totalCarteiras = carteiras.length
+    const totalAtivos = previews.reduce((acc, p) => acc + (p.composicao ? p.composicao.length : 0), 0)
+    const topExposure = previews.reduce((acc, p) => {
+      if (!p.composicao || p.composicao.length === 0) return acc
+      const maxPeso = Math.max(...p.composicao.map(a => Number(a.peso) || 0))
+      return Math.max(acc, maxPeso)
+    }, 0)
+    return { totalCarteiras, totalAtivos, topExposure }
+  }, [carteiras, previews])
+
+  const mainPreview = previews[0]
+
   return (
     <div>
-      <h2 className='text-2xl font-semibold mb-4'>Bem-vindo ao painel</h2>
-      <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-        <div className='bg-gray-800 p-4 rounded-lg shadow'>📈 Retorno esperado</div>
-        <div className='bg-gray-800 p-4 rounded-lg shadow'>⚖️ Risco total</div>
-        <div className='bg-gray-800 p-4 rounded-lg shadow'>💼 Diversificação</div>
+      <div className='flex items-center justify-end mb-6'>
+        <div className='flex items-center gap-3'>
+          <Button variant='ghost' onClick={() => fetchCarteiras()}>
+            {loading ? <Spinner size={0.8} /> : 'Atualizar'}
+          </Button>
+          <Button onClick={() => navigate('/carteiras')}>Gerenciar carteiras</Button>
+        </div>
       </div>
+
+      {error && <p className='text-red-400 mb-4'>{error}</p>}
+
+      <div className='grid grid-cols-1 md:grid-cols-3 gap-4 mb-6'>
+        <Card className='p-4'>
+          <div className='text-sm muted'>Carteiras</div>
+          <div className='text-2xl font-semibold mt-2'>{totals.totalCarteiras}</div>
+          <div className='muted text-sm mt-1'>Carteiras ativas na sua conta</div>
+        </Card>
+
+        <Card className='p-4'>
+          <div className='text-sm muted'>Ativos preview</div>
+          <div className='text-2xl font-semibold mt-2'>{totals.totalAtivos}</div>
+          <div className='muted text-sm mt-1'>Ativos nas carteiras visualizadas</div>
+        </Card>
+
+        <Card className='p-4'>
+          <div className='text-sm muted'>Maior exposição</div>
+          <div className='text-2xl font-semibold mt-2'>{(totals.topExposure * 100).toFixed(1)}%</div>
+          <div className='muted text-sm mt-1'>Maior peso de um ativo nas carteiras</div>
+        </Card>
+      </div>
+
+      {loading && <div className='p-6'><Spinner /></div>}
+
+      {!loading && !mainPreview && (
+        <Card className='p-6'>
+          <p className='muted'>Nenhuma carteira disponível para pré-visualização.</p>
+          <div className='mt-4 flex gap-2'>
+            <Button onClick={() => navigate('/carteiras')}>Criar carteira</Button>
+          </div>
+        </Card>
+      )}
+
+      {!loading && mainPreview && (
+        <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+          <Card className='p-4'>
+            <div className='flex items-center justify-between'>
+              <div>
+                <div className='font-semibold text-lg'>{mainPreview.nome}</div>
+                {mainPreview.descricao && <div className='muted text-sm'>{mainPreview.descricao}</div>}
+                {mainPreview.data_criacao && <div className='muted text-xs mt-2'>Criada em: {new Date(mainPreview.data_criacao).toLocaleDateString()}</div>}
+              </div>
+              <div className='text-xs muted text-right'>Ativos: <strong>{mainPreview.composicao ? mainPreview.composicao.length : 0}</strong></div>
+            </div>
+
+            <div className='mt-4'>
+              <div className='text-sm font-medium mb-2'>Composição (Top ativos)</div>
+              {mainPreview.composicao && mainPreview.composicao.length > 0 ? (
+                <HorizontalBars items={mainPreview.composicao.slice(0,6).map(a => ({ label: a.ticker || a.codigo || a.nome, value: Number(a.peso) || 0 }))} />
+              ) : (
+                <div className='muted text-sm'>Sem composição disponível</div>
+              )}
+            </div>
+
+            <div className='mt-4 flex justify-end'>
+              <Button onClick={() => navigate('/carteiras')}>Ver detalhes</Button>
+            </div>
+          </Card>
+
+          <Card className='p-4'>
+            <div className='text-sm muted'>Outras carteiras</div>
+            <div className='mt-3 space-y-3'>
+              {previews.slice(1).map(p => (
+                <div key={p.id} className='flex items-center justify-between'>
+                  <div>
+                    <div className='font-medium'>{p.nome}</div>
+                    {p.descricao && <div className='muted text-sm'>{p.descricao}</div>}
+                  </div>
+                  <div className='muted text-sm'>{p.composicao ? p.composicao.length : 0} ativos</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

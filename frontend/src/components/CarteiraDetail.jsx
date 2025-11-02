@@ -23,20 +23,20 @@ export default function CarteiraDetail({ id }) {
     fetch()
   }, [id])
 
-  if (loading) return <p className='text-gray-300'>Carregando carteira...</p>
+  if (loading) return <p className='muted'>Carregando carteira...</p>
   if (error) return <p className='text-red-400'>{error}</p>
   if (!carteira) return null
 
   return (
-    <div className='bg-gray-800 p-4 rounded text-gray-200'>
-      <h4 className='text-lg font-semibold text-white'>{carteira.nome}</h4>
-      {carteira.descricao && <p className='text-sm text-gray-300'>{carteira.descricao}</p>}
-      <p className='text-xs text-gray-400 mt-1'>Criada em: {new Date(carteira.data_criacao).toLocaleString()}</p>
+    <div className='card p-4'>
+      <h4 className='text-lg font-semibold'>{carteira.nome}</h4>
+      {carteira.descricao && <p className='text-sm muted'>{carteira.descricao}</p>}
+      <p className='text-xs muted mt-1'>Criada em: {new Date(carteira.data_criacao).toLocaleString()}</p>
 
       {carteira.parametros && (
         <div className='mt-4'>
-          <h5 className='font-semibold text-white'>Parâmetros</h5>
-          <ul className='text-sm text-gray-300'>
+          <h5 className='font-semibold'>Parâmetros</h5>
+          <ul className='text-sm muted'>
             <li>Perfil de risco: {carteira.parametros.perfil_risco_usado}</li>
             <li>Horizonte (dias): {carteira.parametros.horizonte_tempo_usado}</li>
             <li>Capital: {carteira.parametros.capital_usado}</li>
@@ -49,11 +49,11 @@ export default function CarteiraDetail({ id }) {
       )}
 
       <div className='mt-4'>
-        <h5 className='font-semibold text-white'>Composição</h5>
+        <h5 className='font-semibold'>Composição</h5>
         {carteira.composicao && carteira.composicao.length > 0 ? (
           <table className='w-full text-sm mt-2'>
             <thead>
-              <tr className='text-left text-gray-400'>
+              <tr className='text-left muted'>
                 <th>Ticker</th>
                 <th>Nome</th>
                 <th>Peso</th>
@@ -61,7 +61,7 @@ export default function CarteiraDetail({ id }) {
             </thead>
             <tbody>
               {carteira.composicao.map((item, idx) => (
-                <tr key={idx} className='border-t border-gray-700'>
+                <tr key={idx} className='border-t border-white/5'>
                   <td className='py-2'>{item.ticker}</td>
                   <td className='py-2'>{item.nome_ativo}</td>
                   <td className='py-2'>{(parseFloat(item.peso) * 100).toFixed(2)}%</td>
@@ -70,7 +70,7 @@ export default function CarteiraDetail({ id }) {
             </tbody>
           </table>
         ) : (
-          <p className='text-gray-300'>Sem composição disponível.</p>
+          <p className='muted'>Sem composição disponível.</p>
         )}
       </div>
     </div>

@@ -4,6 +4,7 @@ import Register from './pages/Register.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Carteiras from './pages/Carteiras.jsx'
 import Layout from './layouts/Layout.jsx'
+import RequireAuth from './components/RequireAuth.jsx'
 
 export default function App() {
   return (
@@ -14,7 +15,7 @@ export default function App() {
         <Route path='/register' element={<Register />} />
 
         {/* Protected / app routes inside Layout */}
-        <Route element={<Layout /> }>
+        <Route element={<RequireAuth><Layout /></RequireAuth> }>
           <Route path='/dashboard' element={<Dashboard />} />
           <Route path='/carteiras' element={<Carteiras />} />
         </Route>

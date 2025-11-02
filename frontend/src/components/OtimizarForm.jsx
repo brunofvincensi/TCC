@@ -2,6 +2,8 @@ import React, { useEffect, useState, useRef } from 'react'
 import api from '../services/api.js'
 import AssetSelector from './AssetSelector.jsx'
 import Spinner from './Spinner.jsx'
+import Input from './ui/Input.jsx'
+import Button from './ui/Button.jsx'
 
 export default function OtimizarForm({ onCreated }) {
   const [ativos, setAtivos] = useState([])
@@ -9,9 +11,9 @@ export default function OtimizarForm({ onCreated }) {
   const [form, setForm] = useState({
     nome: '',
     descricao: '',
-    perfil_risco: 'medio',
-    horizonte_tempo: 365,
-    capital: 10000,
+    perfil_risco: '',
+    horizonte_tempo: '',
+    capital: '',
     objetivos: '',
     restricoes_ativos: []
   })
@@ -44,7 +46,11 @@ export default function OtimizarForm({ onCreated }) {
 
   const handleChange = (e) => {
     const { name, value, type } = e.target
-    setForm({ ...form, [name]: type === 'number' ? Number(value) : value })
+    if (type === 'number') {
+      setForm({ ...form, [name]: value === '' ? '' : Number(value) })
+    } else {
+      setForm({ ...form, [name]: value })
+    }
   }
 
   const handleAssetChange = (selected) => {
@@ -82,10 +88,11 @@ export default function OtimizarForm({ onCreated }) {
         }
       }
 
-      const res = await api.post('/api/carteiras/otimizar', payload)
-      setSuccess(res.data.mensagem || 'Carteira criada')
-      setForm({ nome: '', descricao: '', perfil_risco: 'medio', horizonte_tempo: 365, capital: 10000, objetivos: '', restricoes_ativos: [] })
-      if (onCreated) onCreated()
+  const res = await api.post('/api/carteiras/otimizar', payload)
+  setSuccess(res.data.mensagem || 'Carteira criada')
+  const created = res.data.carteira
+  setForm({ nome: '', descricao: '', perfil_risco: 'medio', horizonte_tempo: 365, capital: 10000, objetivos: '', restricoes_ativos: [] })
+  if (onCreated) onCreated(created)
       // limpa mensagem de sucesso após 4s
       timeoutRef.current = setTimeout(() => setSuccess(''), 4000)
     } catch (err) {
@@ -96,26 +103,16 @@ export default function OtimizarForm({ onCreated }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className='bg-gray-800 p-6 rounded text-gray-200 shadow'>
+    <form onSubmit={handleSubmit} className='card p-6'>
       <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-        <div>
-          <label className='block text-sm text-gray-300 mb-1'>Nome da carteira</label>
-          <input name='nome' value={form.nome} onChange={handleChange} className='w-full p-2 bg-gray-700 rounded border border-gray-700 focus:border-blue-500' required />
-        </div>
+        <Input label='Nome da carteira' name='nome' value={form.nome} onChange={handleChange} placeholder='Ex: Carteira Conservadora' />
+        <Input label='Capital (R$)' name='capital' type='number' value={form.capital} onChange={handleChange} />
+        <Input label='Horizonte (dias)' name='horizonte_tempo' type='number' value={form.horizonte_tempo} onChange={handleChange} />
 
         <div>
-          <label className='block text-sm text-gray-300 mb-1'>Capital (R$)</label>
-          <input name='capital' type='number' value={form.capital} onChange={handleChange} className='w-full p-2 bg-gray-700 rounded border border-gray-700 focus:border-blue-500' />
-        </div>
-
-        <div>
-          <label className='block text-sm text-gray-300 mb-1'>Horizonte (dias)</label>
-          <input name='horizonte_tempo' type='number' value={form.horizonte_tempo} onChange={handleChange} className='w-full p-2 bg-gray-700 rounded border border-gray-700 focus:border-blue-500' />
-        </div>
-
-        <div>
-          <label className='block text-sm text-gray-300 mb-1'>Perfil de risco</label>
-          <select name='perfil_risco' value={form.perfil_risco} onChange={handleChange} className='w-full p-2 bg-gray-700 rounded border border-gray-700 focus:border-blue-500'>
+          <label className='block muted mb-1'>Perfil de risco</label>
+          <select name='perfil_risco' value={form.perfil_risco} onChange={handleChange} className='w-full p-2 bg-white/3 rounded border border-white/5 focus:border-teal-300 text-black'>
+            <option value=''>Selecione...</option>
             <option value='baixo'>Baixo</option>
             <option value='medio'>Médio</option>
             <option value='alto'>Alto</option>
@@ -123,18 +120,17 @@ export default function OtimizarForm({ onCreated }) {
         </div>
       </div>
 
-      <div className='mt-4'>
-        <label className='block text-sm text-gray-300 mb-1'>Objetivos (opcional)</label>
-        <textarea name='objetivos' value={form.objetivos} onChange={handleChange} className='w-full p-2 bg-gray-700 rounded border border-gray-700 focus:border-blue-500' rows={3} />
+      <div className='mt-4 grid grid-cols-1 md:grid-cols-2 gap-4'>
+        <div>
+          <label className='block text-sm muted mb-1'>Objetivos (opcional)</label>
+          <textarea name='objetivos' value={form.objetivos} onChange={handleChange} className='w-full p-2 bg-white/3 rounded border border-white/5 focus:border-teal-300 text-black placeholder:muted' rows={3} />
+        </div>
+
+        <Input label='Descrição (opcional)' name='descricao' value={form.descricao} onChange={handleChange} />
       </div>
 
       <div className='mt-4'>
-        <label className='block text-sm text-gray-300 mb-1'>Descrição (opcional)</label>
-        <input name='descricao' value={form.descricao} onChange={handleChange} className='w-full p-2 bg-gray-700 rounded border border-gray-700 focus:border-blue-500' />
-      </div>
-
-      <div className='mt-4'>
-        <div className='text-sm font-semibold text-gray-300 mb-2'>Restringir ativos (opcional)</div>
+        <div className='text-sm font-semibold muted mb-2'>Restringir ativos (opcional)</div>
         <AssetSelector assets={ativos} selected={form.restricoes_ativos} onChange={handleAssetChange} loading={loadingAtivos} />
       </div>
 
@@ -144,10 +140,9 @@ export default function OtimizarForm({ onCreated }) {
           {success && <p className='text-green-400'>{success}</p>}
         </div>
         <div>
-          <button type='submit' disabled={submitting} className='bg-blue-600 hover:bg-blue-700 p-2 rounded flex items-center gap-2'>
-            {submitting && <Spinner size={1} />}
-            <span>{submitting ? 'Otimizando...' : 'Otimizar e Criar'}</span>
-          </button>
+          <Button type='submit' disabled={submitting} loading={submitting} className='flex items-center gap-2'>
+            {submitting ? 'Otimizando...' : 'Otimizar e Criar'}
+          </Button>
         </div>
       </div>
     </form>

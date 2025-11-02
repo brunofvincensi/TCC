@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api.js';
+import logo from '../assets/walletai.png'
+import Button from '../components/ui/Button.jsx'
+import Input from '../components/ui/Input.jsx'
+import Card from '../components/ui/Card.jsx'
 
 export default function Login() {
   const navigate = useNavigate();
@@ -15,7 +19,7 @@ export default function Login() {
     setError('');
     try {
       // O backend espera { email, senha } (campo 'senha' em PT-BR)
-      const res = await api.post('http://localhost:5000/api/login', { email, senha: password });
+  const res = await api.post('/api/login', { email, senha: password });
       localStorage.setItem('token', res.data.token);
       // Salva também os dados do usuário retornados pelo backend
       if (res.data.usuario) {
@@ -33,38 +37,30 @@ export default function Login() {
   };
 
   return (
-    <div className='flex items-center justify-center min-h-screen bg-gray-900'>
-      <form onSubmit={handleLogin} className='bg-gray-800 p-8 rounded-lg shadow-md w-96'>
-        <h1 className='text-2xl font-bold text-center mb-6 text-white'>Login</h1>
-        <input
-          type='email'
-          placeholder='Email'
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className='w-full p-2 mb-4 bg-gray-700 text-white rounded focus:outline-none'
-          required
-        />
-        <input
-          type='password'
-          placeholder='Senha'
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className='w-full p-2 mb-4 bg-gray-700 text-white rounded focus:outline-none'
-          required
-        />
+    <div className='flex items-center justify-center min-h-screen'>
+      <form onSubmit={handleLogin} className='w-96'>
+        <div className='flex flex-col items-center mb-4'>
+          <img src={logo} alt='Logo' className='w-20 h-20 object-cover rounded-full ring-2 ring-blue-600/40 shadow-md' />
+          <div className='mt-2 text-center'>
+            <div className='text-white font-semibold text-lg'>WalletAI</div>
+            <div className='text-xs muted'>Otimização de carteiras com IA</div>
+          </div>
+        </div>
+        <Card className='p-6'>
+          <div className='space-y-3'>
+            <Input label='Email' name='email' type='email' value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <Input label='Senha' name='senha' type='password' value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </div>
+        </Card>
         {error && <p className='text-red-400 text-sm mb-2'>{error}</p>}
-        <button
-          type='submit'
-          className='w-full bg-blue-600 hover:bg-blue-700 p-2 rounded text-white flex items-center justify-center'
-          disabled={loading}
-        >
-          {loading ? 'Entrando...' : 'Entrar'}
-        </button>
+        <div className='mt-4'>
+          <Button type='submit' className='w-full py-2' loading={loading} disabled={loading}>Entrar</Button>
+        </div>
         <div className='mt-4 text-center'>
           <button
             type='button'
             onClick={() => navigate('/register')}
-            className='text-sm text-blue-400 hover:underline'
+            className='text-sm muted hover:underline'
           >
             Cadastre-se
           </button>
