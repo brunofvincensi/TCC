@@ -83,9 +83,8 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         # n_ieq_constr=numero de restrições / n_eq_constr=numero de restrições de soma
         super().__init__(n_var=n_ativos,
                          n_obj=3,
-                         n_ieq_constr=1,
-                         n_eq_constr=0,
-                         xl=0.01, xu=1)
+                         n_ieq_constr=0,
+                         n_eq_constr=0, xl=xl, xu=xu)
         self.mu = retornos_medios
         self.cov = matriz_covariancia
         self.hist = historico_retornos
@@ -95,26 +94,69 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         self.peso_min = peso_min
         self.peso_max = peso_max
 
+    # def _calcular_cvar(self, pesos):
+    #     """Calcula o Conditional Value-at-Risk para uma dada carteira."""
+    #     retornos_portfolio = self.hist @ pesos
+    #     perdas = -retornos_portfolio
+    #     perdas_validas = perdas[np.isfinite(perdas)]
+    #
+    #     if len(perdas_validas) < 20:  # ✅ Mínimo de dados
+    #         return np.std(perdas_validas)  # Fallback para desvio padrão
+    #
+    #     perdas_ordenadas = np.sort(perdas_validas)
+    #     k = max(1, int(self.alpha * len(perdas_ordenadas)))  # ✅ Mínimo de 1
+    #
+    #     # CVaR = média das perdas acima do VaR
+    #     cvar = perdas_ordenadas[-k:].mean()
+    #     return cvar
+
     def _calcular_cvar(self, pesos):
-        """Calcula o Conditional Value-at-Risk para uma dada carteira."""
+        """Calcula o Conditional Value-at-Risk (CVaR) usando:
+           ✅ VaR por quantil
+           ✅ CVaR = média das perdas >= VaR
+           ✅ Cauda com ceil(alpha * n) para não subestimar
+        """
+
+        # 1) Retornos e perdas (perdas positivas = prejuízo, negativas = ganho)
         retornos_portfolio = self.hist @ pesos
         perdas = -retornos_portfolio
-        perdas_validas = perdas[np.isfinite(perdas)]
 
-        if len(perdas_validas) < 20:  # ✅ Mínimo de dados
-            return np.std(perdas_validas)  # Fallback para desvio padrão
+        # 2) Sanidade dos dados
+        perdas = perdas[np.isfinite(perdas)]
+        n = len(perdas)
 
-        perdas_ordenadas = np.sort(perdas_validas)
-        k = max(1, int(self.alpha * len(perdas_ordenadas)))  # ✅ Mínimo de 1
+        # 3) Proteção: amostras muito pequenas
+        if n < 20:
+            return np.std(perdas)
 
-        # CVaR = média das perdas acima do VaR
-        cvar = perdas_ordenadas[-k:].mean()
-        return cvar
+        # 4) Ordenar perdas
+        perdas_ordenadas = np.sort(perdas)
+
+        # 5) Tamanho da cauda com CEIL (não arredonda para menos)
+        k = int(np.ceil(self.alpha * n))  # ✅ Melhor 1
+        k = max(1, k)  # Segurança
+
+        # 6) VaR via quantil (percentil)
+        #    VaR é o menor valor tal que P(perda <= VaR) >= (1 - alpha)
+        nivel_var = 1.0 - self.alpha
+        VaR = np.percentile(perdas_ordenadas, nivel_var * 100.0)
+
+        # 7) Selecionar TODAS as perdas maiores ou iguais ao VaR  ✅ Melhor 2
+        cauda = perdas_ordenadas[perdas_ordenadas >= VaR]
+
+        # 8) Se houver menos observações que k por empates, usar os k maiores
+        if len(cauda) < k:
+            cauda = perdas_ordenadas[-k:]
+
+        # 9) CVaR é média da cauda
+        cvar = cauda.mean()
+
+        return float(cvar)
 
     def _evaluate(self, x, out, *args, **kwargs):
         """Avalia uma única carteira"""
 
-        # # ========== DEBUG ==========
+        # ========== DEBUG ==========
         # print(f"\n{'=' * 70}")
         # print(f"🔍 DEBUG _evaluate")
         # print(f"{'=' * 70}")
@@ -154,11 +196,7 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
             cvar *= 0.8
         # Para 'moderado', não fazemos nada (peso 1.0)
 
-        # ✅ Diversificação: nenhum ativo deve ter mais que peso_max
-        restricao_concentracao = np.max(pesos) - self.peso_max
-
         out["F"] = [retorno, variancia, cvar]
-        out["G"] =  [restricao_concentracao] # ✅ Restrição de concentração
 
 # --------------------------------------------------------------------------
 # 2. SERVIÇO PRINCIPAL DE OTIMIZAÇÃO
