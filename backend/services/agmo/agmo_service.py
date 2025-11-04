@@ -1,5 +1,10 @@
 from pymoo.config import Config
 from services.agmo.custom_crossover import SimplexCrossover, SimplexMutation, SimplexSampling
+from services.agmo.cardinality_operators import (
+    SimplexSamplingCardConstraint,
+    SimplexCrossoverCardConstraint,
+    SimplexMutationCardConstraint
+)
 
 Config.warnings['not_compiled'] = False
 
@@ -499,7 +504,8 @@ class Nsga2OtimizacaoService:
 
     def otimizar(self, population_size: int = None, generations: int = None,
                  crossover_eta: float = 15.0, mutation_eta: float = 20.0,
-                 convergence_tracker=None, use_optimal_config: bool = True, enable_early_stopping=False):
+                 convergence_tracker=None, use_optimal_config: bool = True,
+                 enable_early_stopping=False, max_ativos: int = None):
         """
         Orquestra o processo completo de otimização personalizada.
 
@@ -511,6 +517,8 @@ class Nsga2OtimizacaoService:
             convergence_tracker: Instância de ConvergenceTracker para rastrear convergência (opcional)
             use_optimal_config: Se True, tenta buscar configuração ótima do banco de dados
             enable_early_stopping: Se True, cria um critério de parada complementar ao numero máximo de gerações
+            max_ativos: Número máximo de ativos na carteira (None = sem restrição).
+                       Quando especificado, usa operadores genéticos com restrição de cardinalidade.
 
         Returns:
             dict: Dicionário contendo:
@@ -520,6 +528,14 @@ class Nsga2OtimizacaoService:
                 - periodo_fim: Data final dos dados históricos usados
                 - num_meses: Número de meses de dados históricos utilizados
                 - hyperparameters_used: Hiperparâmetros utilizados
+                - max_ativos_enforced: Se restrição de cardinalidade foi aplicada
+
+        Referências (restrição de cardinalidade):
+            - Chang et al. (2000). "Heuristics for cardinality constrained portfolio optimisation".
+              Computers & Operations Research, 27(13), 1271-1302.
+            - Ruiz-Torrubiano & Suárez (2010). "Hybrid approaches and dimensionality reduction
+              for portfolio selection with cardinality constraints".
+              IEEE Computational Intelligence Magazine, 5(2), 92-107.
         """
         self._preparar_dados()
 
@@ -529,7 +545,7 @@ class Nsga2OtimizacaoService:
 
         problema = self.get_problema()
 
-        algoritmo = self.get_algoritmo(crossover_eta, mutation_eta, population_size)
+        algoritmo = self.get_algoritmo(crossover_eta, mutation_eta, population_size, max_ativos)
 
         callback = self.get_callback(convergence_tracker)
 
@@ -541,7 +557,10 @@ class Nsga2OtimizacaoService:
         print(f"  População: {population_size}")
         print(f"  Gerações: {generations}")
         print(f"  Perfil de risco: {self.nivel_risco}")
-        print(f"  Número de ativos: {num_ativos}")
+        print(f"  Número de ativos disponíveis: {num_ativos}")
+        if max_ativos:
+            print(f"  ⚠️  RESTRIÇÃO DE CARDINALIDADE: máx. {max_ativos} ativos na carteira")
+            print(f"     Usando operadores genéticos com card-constraint")
         print(f"{'='*70}\n")
 
         resultado = minimize(problema, algoritmo, termination,
@@ -604,12 +623,15 @@ class Nsga2OtimizacaoService:
             'periodo_fim': self.historico_retornos.index.max(),
             'num_meses': len(self.historico_retornos),
             'modo_backtest': self.data_referencia is not None,
+            'max_ativos_enforced': max_ativos is not None,
+            'max_ativos': max_ativos,
             'hyperparameters_used': {
                 'population_size': population_size,
                 'generations': generations,
                 'crossover_eta': crossover_eta,
                 'mutation_eta': mutation_eta,
-                'num_ativos': num_ativos
+                'num_ativos': num_ativos,
+                'max_ativos': max_ativos
             }
         }
 
@@ -625,10 +647,35 @@ class Nsga2OtimizacaoService:
         )
         return problema
 
-    def get_algoritmo(self, crossover_eta: float, mutation_eta: float, population_size: int) -> NSGA2:
-        sampling = SimplexSampling()
-        crossover = SimplexCrossover(eta=crossover_eta)
-        mutation = SimplexMutation(eta=mutation_eta)
+    def get_algoritmo(self, crossover_eta: float, mutation_eta: float,
+                     population_size: int, max_ativos: int = None) -> NSGA2:
+        """
+        Cria algoritmo NSGA-II com operadores apropriados.
+
+        Se max_ativos for especificado, usa operadores com restrição de cardinalidade.
+        Caso contrário, usa operadores simplex padrão.
+
+        Args:
+            crossover_eta: Parâmetro eta do crossover
+            mutation_eta: Parâmetro eta da mutação
+            population_size: Tamanho da população
+            max_ativos: Número máximo de ativos (None = sem restrição)
+
+        Returns:
+            Instância do NSGA2 configurada
+        """
+        if max_ativos is not None:
+            # ✅ OPERADORES COM RESTRIÇÃO DE CARDINALIDADE
+            sampling = SimplexSamplingCardConstraint(max_assets=max_ativos)
+            crossover = SimplexCrossoverCardConstraint(max_assets=max_ativos, eta=crossover_eta)
+            mutation = SimplexMutationCardConstraint(max_assets=max_ativos, eta=mutation_eta)
+            print(f"  🔧 Usando operadores com RESTRIÇÃO DE CARDINALIDADE (max={max_ativos})")
+        else:
+            # ✅ OPERADORES SIMPLEX PADRÃO (sem restrição de cardinalidade)
+            sampling = SimplexSampling()
+            crossover = SimplexCrossover(eta=crossover_eta)
+            mutation = SimplexMutation(eta=mutation_eta)
+            print(f"  🔧 Usando operadores simplex PADRÃO (sem restrição de cardinalidade)")
 
         algoritmo = NSGA2(pop_size=population_size, crossover=crossover,
                           mutation=mutation, sampling=sampling)
