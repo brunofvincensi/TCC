@@ -107,64 +107,38 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         self.peso_max = peso_max
         self.hhi_max = self.hhi_thresholds.get(nivel_risco, 0.15)  # Default: moderado
 
-    # def _calcular_cvar(self, pesos):
-    #     """Calcula o Conditional Value-at-Risk para uma dada carteira."""
-    #     retornos_portfolio = self.hist @ pesos
-    #     perdas = -retornos_portfolio
-    #     perdas_validas = perdas[np.isfinite(perdas)]
-    #
-    #     if len(perdas_validas) < 20:  # ✅ Mínimo de dados
-    #         return np.std(perdas_validas)  # Fallback para desvio padrão
-    #
-    #     perdas_ordenadas = np.sort(perdas_validas)
-    #     k = max(1, int(self.alpha * len(perdas_ordenadas)))  # ✅ Mínimo de 1
-    #
-    #     # CVaR = média das perdas acima do VaR
-    #     cvar = perdas_ordenadas[-k:].mean()
-    #     return cvar
-
     def _calcular_cvar(self, pesos):
-        """Calcula o Conditional Value-at-Risk (CVaR) usando:
-           ✅ VaR por quantil
-           ✅ CVaR = média das perdas >= VaR
-           ✅ Cauda com ceil(alpha * n) para não subestimar
         """
+        Calcula o Conditional Value-at-Risk (CVaR) usando método empírico.
 
-        # 1) Retornos e perdas (perdas positivas = prejuízo, negativas = ganho)
+        CVaR_α = E[Perda | Perda ≥ VaR_α] ≈ média dos ⌈α·n⌉ piores retornos
+
+        Referências:
+            - Rockafellar & Uryasev (2000). "Optimization of conditional value-at-risk"
+            - Acerbi & Tasche (2002). "On the coherence of expected shortfall"
+        """
+        # 1. Calcular retornos e perdas do portfolio
         retornos_portfolio = self.hist @ pesos
         perdas = -retornos_portfolio
 
-        # 2) Sanidade dos dados
-        perdas = perdas[np.isfinite(perdas)]
-        n = len(perdas)
+        # 2. Filtrar valores inválidos
+        perdas_validas = perdas[np.isfinite(perdas)]
+        n = len(perdas_validas)
 
-        # 3) Proteção: amostras muito pequenas
+        # 3. Proteção para amostras pequenas
         if n < 20:
-            return np.std(perdas)
+            return float(np.std(perdas_validas))
 
-        # 4) Ordenar perdas
-        perdas_ordenadas = np.sort(perdas)
+        # 4. Calcular número de observações na cauda
+        k = max(1, int(np.ceil(self.alpha * n)))
 
-        # 5) Tamanho da cauda com CEIL (não arredonda para menos)
-        k = int(np.ceil(self.alpha * n))  # ✅ Melhor 1
-        k = max(1, k)  # Segurança
+        # 5. CVaR = média dos k piores retornos (maiores perdas)
+        perdas_ordenadas = np.sort(perdas_validas)
+        cauda = perdas_ordenadas[-k:]  # Sempre exatamente k observações
 
-        # 6) VaR via quantil (percentil)
-        #    VaR é o menor valor tal que P(perda <= VaR) >= (1 - alpha)
-        nivel_var = 1.0 - self.alpha
-        VaR = np.percentile(perdas_ordenadas, nivel_var * 100.0)
+        cvar = float(np.mean(cauda))
 
-        # 7) Selecionar TODAS as perdas maiores ou iguais ao VaR  ✅ Melhor 2
-        cauda = perdas_ordenadas[perdas_ordenadas >= VaR]
-
-        # 8) Se houver menos observações que k por empates, usar os k maiores
-        if len(cauda) < k:
-            cauda = perdas_ordenadas[-k:]
-
-        # 9) CVaR é média da cauda
-        cvar = cauda.mean()
-
-        return float(cvar)
+        return cvar
 
     def _evaluate(self, x, out, *args, **kwargs):
         """Avalia uma única carteira"""
@@ -926,7 +900,7 @@ def backtest(app):
     print("EXEMPLO 2: Otimização com BACKTEST (dados até 2023-12-31)")
     print("=" * 80)
     data_backtest = date(2019, 1, 1)
-    service_backtest = Nsga2OtimizacaoService(app, [1], "moderado", 6, data_referencia=data_backtest)
+    service_backtest = Nsga2OtimizacaoService(app, [1], "conservador", 6, data_referencia=data_backtest)
     carteira_backtest = service_backtest.otimizar()
 
     # Informações do backtest
