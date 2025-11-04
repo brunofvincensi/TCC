@@ -95,8 +95,8 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         }
         super().__init__(n_var=n_ativos,
                          n_obj=3,
-                         n_ieq_constr=0,
-                         n_eq_constr=1, xl=xl, xu=xu)
+                         n_ieq_constr=1,
+                         n_eq_constr=0, xl=xl, xu=xu)
         self.mu = retornos_medios
         self.cov = matriz_covariancia
         self.hist = historico_retornos
@@ -495,8 +495,8 @@ class Nsga2OtimizacaoService:
 
         # Calcula um "score" para cada carteira.
         # Queremos maximizar o retorno (objetivo 0) e minimizar os outros (1 e 2).
-        scores = ((objetivos_norm[:, 0] * pesos[0]) - (objetivos_norm[:, 1] * pesos[1]))
-              #    - (objetivos_norm[:, 2] * pesos[2]))
+        scores = ((objetivos_norm[:, 0] * pesos[0]) - (objetivos_norm[:, 1] * pesos[1])
+                  - (objetivos_norm[:, 2] * pesos[2]))
 
         # O índice da carteira com o maior score é a nossa escolha.
         idx_melhor = np.argmax(scores)
