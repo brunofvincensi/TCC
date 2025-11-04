@@ -47,5 +47,5 @@ wheels/
 *.egg
 *.pyc
 .idea/
-backend/.env
+.env
 backend/.idea/workspace.xml

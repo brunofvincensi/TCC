@@ -80,11 +80,18 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         # ✅ Limites por ativo
         xl = np.full(n_ativos, peso_min)
         xu = np.full(n_ativos, peso_max)
-        # n_ieq_constr=numero de restrições / n_eq_constr=numero de restrições de soma
+        # ✅ HHI (Herfindahl-Hirschman Index) Thresholds por Perfil de Risco
+        # HHI = Σ(wi²), onde N_eff = 1/HHI (número efetivo de ativos)
+        # Valores baseados em literatura de concentração de mercado e diversificação
+        self.hhi_thresholds = {
+            'conservador': 0.12,  # N_eff ≈ 8.3 ativos (baixa concentração)
+            'moderado': 0.15,     # N_eff ≈ 6.7 ativos (concentração moderada)
+            'arrojado': 0.20      # N_eff ≈ 5.0 ativos (concentração aceitável)
+        }
         super().__init__(n_var=n_ativos,
                          n_obj=3,
                          n_ieq_constr=0,
-                         n_eq_constr=0, xl=xl, xu=xu)
+                         n_eq_constr=1, xl=xl, xu=xu)
         self.mu = retornos_medios
         self.cov = matriz_covariancia
         self.hist = historico_retornos
@@ -93,6 +100,7 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         self.alpha = alpha
         self.peso_min = peso_min
         self.peso_max = peso_max
+        self.hhi_max = self.hhi_thresholds.get(nivel_risco, 0.15)  # Default: moderado
 
     # def _calcular_cvar(self, pesos):
     #     """Calcula o Conditional Value-at-Risk para uma dada carteira."""
@@ -197,6 +205,10 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         # Para 'moderado', não fazemos nada (peso 1.0)
 
         out["F"] = [retorno, variancia, cvar]
+
+        hhi = np.sum(pesos ** 2)
+        restricao_hhi = hhi - self.hhi_max
+        out["G"] = [restricao_hhi]
 
 # --------------------------------------------------------------------------
 # 2. SERVIÇO PRINCIPAL DE OTIMIZAÇÃO
