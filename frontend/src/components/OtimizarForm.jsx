@@ -14,6 +14,7 @@ export default function OtimizarForm({ onCreated }) {
     perfil_risco: '',
     horizonte_tempo: '',
     capital: '',
+    quantidade_ativos: '',
     objetivos: '',
     restricoes_ativos: []
   })
@@ -63,36 +64,51 @@ export default function OtimizarForm({ onCreated }) {
     setError('')
     setSuccess('')
     try {
-      // validação básica
+      // validação básica: apenas nome, perfil e horizonte são obrigatórios
       if (!form.nome || form.nome.trim().length < 3) {
         setError('Nome da carteira precisa ter ao menos 3 caracteres')
         setSubmitting(false)
         return
       }
-      if (!form.capital || Number(form.capital) <= 0) {
-        setError('Capital deve ser maior que 0')
+      if (!form.perfil_risco) {
+        setError('Selecione o perfil de risco')
         setSubmitting(false)
         return
       }
+      if (!form.horizonte_tempo || Number(form.horizonte_tempo) <= 0) {
+        setError('Informe um horizonte (prazo) válido em anos')
+        setSubmitting(false)
+        return
+      }
+      // quantidade_ativos é opcional, mas se preenchida precisa ser inteiro > 0
+      if (form.quantidade_ativos !== '' && (Number(form.quantidade_ativos) <= 0 || !Number.isInteger(Number(form.quantidade_ativos)))) {
+        setError('Quantidade de ativos deve ser um número inteiro maior que 0')
+        setSubmitting(false)
+        return
+      }
+
+      const parametros = {
+        perfil_risco: form.perfil_risco,
+        horizonte_tempo: form.horizonte_tempo,
+        capital: form.capital || undefined,
+        objetivos: form.objetivos,
+        restricoes_ativos: form.restricoes_ativos
+      }
+      if (form.quantidade_ativos !== '') parametros.quantidade_ativos = form.quantidade_ativos
+
       const payload = {
-        parametros: {
-          perfil_risco: form.perfil_risco,
-          horizonte_tempo: form.horizonte_tempo,
-          capital: form.capital,
-          objetivos: form.objetivos,
-          restricoes_ativos: form.restricoes_ativos
-        },
+        parametros,
         info_carteira: {
           nome: form.nome,
           descricao: form.descricao
         }
       }
 
-  const res = await api.post('/api/carteiras/otimizar', payload)
-  setSuccess(res.data.mensagem || 'Carteira criada')
-  const created = res.data.carteira
-  setForm({ nome: '', descricao: '', perfil_risco: 'medio', horizonte_tempo: 365, capital: 10000, objetivos: '', restricoes_ativos: [] })
-  if (onCreated) onCreated(created)
+      const res = await api.post('/api/carteiras/otimizar', payload)
+      setSuccess(res.data.mensagem || 'Carteira criada')
+      const created = res.data.carteira
+      setForm({ nome: '', descricao: '', perfil_risco: 'medio', horizonte_tempo: 365, capital: 10000, quantidade_ativos: '', objetivos: '', restricoes_ativos: [] })
+      if (onCreated) onCreated(created)
       // limpa mensagem de sucesso após 4s
       timeoutRef.current = setTimeout(() => setSuccess(''), 4000)
     } catch (err) {
@@ -104,29 +120,39 @@ export default function OtimizarForm({ onCreated }) {
 
   return (
     <form onSubmit={handleSubmit} className='card p-6'>
-      <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-        <Input label='Nome da carteira' name='nome' value={form.nome} onChange={handleChange} placeholder='Ex: Carteira Conservadora' />
-        <Input label='Capital (R$)' name='capital' type='number' value={form.capital} onChange={handleChange} />
-        <Input label='Horizonte (dias)' name='horizonte_tempo' type='number' value={form.horizonte_tempo} onChange={handleChange} />
+      <p className='muted text-sm mb-4'>Campos obrigatórios: <span className='font-medium'>Nome</span>, <span className='font-medium'>Perfil de risco</span> e <span className='font-medium'>Horizonte (prazo)</span>.</p>
+
+      <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+        <Input label={'Nome da carteira *'} name='nome' value={form.nome} onChange={handleChange} placeholder='Ex: Carteira Conservadora' />
 
         <div>
-          <label className='block muted mb-1'>Perfil de risco</label>
+          <label className='block muted mb-1'>Perfil de risco *</label>
           <select name='perfil_risco' value={form.perfil_risco} onChange={handleChange} className='w-full p-2 bg-white/3 rounded border border-white/5 focus:border-teal-300 text-black'>
             <option value=''>Selecione...</option>
-            <option value='baixo'>Baixo</option>
-            <option value='medio'>Médio</option>
-            <option value='alto'>Alto</option>
+            <option value='Conservador'>Conservador</option>
+            <option value='moderado'>Moderado</option>
+            <option value='arrojado'>Arrojado</option>
           </select>
         </div>
+
+        <Input label={'Horizonte (anos) *'} name='horizonte_tempo' type='number' value={form.horizonte_tempo} onChange={handleChange} />
+      </div>
+
+      <div className='mt-4 grid grid-cols-1 md:grid-cols-2 gap-4'>
+        <Input label='Capital (R$) (opcional)' name='capital' type='number' value={form.capital} onChange={handleChange} />
+        <Input label='Quantidade de ativos (opcional)' name='quantidade_ativos' type='number' value={form.quantidade_ativos} onChange={handleChange} placeholder='Ex: 10' />
       </div>
 
       <div className='mt-4 grid grid-cols-1 md:grid-cols-2 gap-4'>
         <div>
           <label className='block text-sm muted mb-1'>Objetivos (opcional)</label>
-          <textarea name='objetivos' value={form.objetivos} onChange={handleChange} className='w-full p-2 bg-white/3 rounded border border-white/5 focus:border-teal-300 text-black placeholder:muted' rows={3} />
+          <textarea name='objetivos' value={form.objetivos} onChange={handleChange} className='w-full p-2 h-10 bg-white/3 rounded border border-white/5 focus:border-teal-300 text-black placeholder:muted' rows={1} />
         </div>
 
-        <Input label='Descrição (opcional)' name='descricao' value={form.descricao} onChange={handleChange} />
+        <div>
+          <label className='block text-sm muted mb-1'>Descrição (opcional)</label>
+          <textarea name='descricao' value={form.descricao} onChange={handleChange} className='w-full p-2 h-10 bg-white/3 rounded border border-white/5 focus:border-teal-300 text-black placeholder:muted' rows={1} />
+        </div>
       </div>
 
       <div className='mt-4'>

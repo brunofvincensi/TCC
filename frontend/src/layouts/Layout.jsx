@@ -1,5 +1,6 @@
 import { Link, Outlet, useNavigate } from 'react-router-dom'
 import logo from '../assets/walletai.png'
+// User popover replaced by dedicated profile page
 
 export default function Layout() {
   const navigate = useNavigate()
@@ -31,12 +32,16 @@ export default function Layout() {
           </nav>
           <div className='mt-4 border-t border-white/5 pt-4'>
             <div className='text-sm text-gray-300'>Conectado como</div>
-            <div className='font-semibold mt-1'>{usuario?.nome ?? 'Usuário'}</div>
-            <button
-              onClick={handleLogout}
-              className='mt-3 w-full py-2 rounded-md btn-accent text-sm font-medium'>
-              Logout
-            </button>
+            <div className='mt-1'>
+              <button onClick={() => navigate('/perfil')} className='font-semibold'>{usuario?.nome ?? 'Usuário'}</button>
+            </div>
+            <div className='mt-3'>
+              <button
+                onClick={handleLogout}
+                className='w-full py-2 rounded-md btn-accent text-sm font-medium'>
+                Logout
+              </button>
+            </div>
           </div>
         </div>
       </aside>
@@ -46,13 +51,6 @@ export default function Layout() {
           <div className='container-max'>
             <div className='flex items-center justify-between'>
               <h1 className='text-2xl font-semibold'>Painel</h1>
-              <div className='flex items-center gap-3'>
-                <input
-                  type='search'
-                  placeholder='Pesquisar...'
-                  className='px-3 py-2 rounded-md bg-white/3 text-sm text-gray-100 placeholder:muted focus:outline-none focus:ring-2 focus:ring-teal-300'
-                />
-              </div>
             </div>
           </div>
         </header>

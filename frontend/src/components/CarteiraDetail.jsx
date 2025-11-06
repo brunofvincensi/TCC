@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import api from '../services/api.js'
+import PieChart from './PieChart.jsx'
 
 export default function CarteiraDetail({ id }) {
   const [carteira, setCarteira] = useState(null)
@@ -51,7 +52,8 @@ export default function CarteiraDetail({ id }) {
       <div className='mt-4'>
         <h5 className='font-semibold'>Composição</h5>
         {carteira.composicao && carteira.composicao.length > 0 ? (
-          <table className='w-full text-sm mt-2'>
+          <>
+            <table className='w-full text-sm mt-2'>
             <thead>
               <tr className='text-left muted'>
                 <th>Ticker</th>
@@ -60,15 +62,29 @@ export default function CarteiraDetail({ id }) {
               </tr>
             </thead>
             <tbody>
-              {carteira.composicao.map((item, idx) => (
-                <tr key={idx} className='border-t border-white/5'>
-                  <td className='py-2'>{item.ticker}</td>
-                  <td className='py-2'>{item.nome_ativo}</td>
-                  <td className='py-2'>{(parseFloat(item.peso) * 100).toFixed(2)}%</td>
-                </tr>
-              ))}
+              {carteira.composicao.map((item, idx) => {
+                const raw = item.peso
+                let n = Number(String(raw).replace(',', '.')) || 0
+                if (n > 1) n = n / 100
+                return (
+                  <tr key={idx} className='border-t border-white/5'>
+                    <td className='py-2'>{item.ticker}</td>
+                    <td className='py-2'>{item.nome_ativo}</td>
+                    <td className='py-2'>{(n * 100).toFixed(2)}%</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
+            <div className='mt-4'>
+              <PieChart items={carteira.composicao.map(a => {
+                const raw = a.peso
+                let n = Number(String(raw).replace(',', '.')) || 0
+                if (n > 1) n = n / 100
+                return { label: a.ticker || a.codigo || a.nome_ativo || a.nome, value: n }
+              })} />
+            </div>
+          </>
         ) : (
           <p className='muted'>Sem composição disponível.</p>
         )}

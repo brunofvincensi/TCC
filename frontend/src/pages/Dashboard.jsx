@@ -5,23 +5,50 @@ import Button from '../components/ui/Button.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { useNavigate } from 'react-router-dom'
 
-function HorizontalBars({ items = [] }) {
-  const max = Math.max(...items.map(i => Number(i.value) || 0), 1)
+function PieChart({ items = [], size = 180 }) {
+  const totalRaw = items.reduce((s, i) => s + (Number(i.value) || 0), 0)
+  if (!items || items.length === 0 || totalRaw === 0) {
+    return <div className='muted text-sm'>Sem dados suficientes para gerar o gráfico.</div>
+  }
+  const total = totalRaw || 1
+  const cx = size / 2
+  const cy = size / 2
+  const radius = Math.min(cx, cy) - 4
+
+  let cumulative = 0
+  const slices = items.map((it, idx) => {
+    const value = Number(it.value) || 0
+    const start = cumulative / total * Math.PI * 2
+    cumulative += value
+    const end = cumulative / total * Math.PI * 2
+    const largeArc = end - start > Math.PI ? 1 : 0
+    const startX = cx + radius * Math.cos(start - Math.PI / 2)
+    const startY = cy + radius * Math.sin(start - Math.PI / 2)
+    const endX = cx + radius * Math.cos(end - Math.PI / 2)
+    const endY = cy + radius * Math.sin(end - Math.PI / 2)
+    const color = `hsl(${(idx * 65) % 360} 70% 55%)`
+    const path = `M ${cx} ${cy} L ${startX} ${startY} A ${radius} ${radius} 0 ${largeArc} 1 ${endX} ${endY} Z`
+    return { path, color, label: it.label, pct: total ? (value / total) : 0 }
+  })
+
   return (
-    <div className='space-y-2'>
-      {items.map((it, idx) => {
-        const pct = Math.round((Number(it.value) || 0) / max * 100)
-        const color = `hsl(${(idx * 65) % 360} 70% 55%)`
-        return (
-          <div key={idx} className='flex items-center gap-3'>
-            <div className='w-24 text-sm muted'>{it.label}</div>
-            <div className='flex-1 bg-white/5 rounded overflow-hidden h-4'>
-              <div style={{ width: `${pct}%`, background: color }} className='h-4'></div>
-            </div>
-            <div className='w-16 text-right text-sm font-medium'>{(Number(it.value) * 100).toFixed(1)}%</div>
+    <div className='flex items-center gap-4'>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className='rounded'>
+        {slices.map((s, i) => (
+          <path key={i} d={s.path} fill={s.color} stroke='rgba(255,255,255,0.03)' strokeWidth={1} />
+        ))}
+        {/* removed inner circle to show full pie (no donut hole) */}
+      </svg>
+
+      <div className='text-sm'>
+        {slices.map((s, i) => (
+          <div key={i} className='flex items-center gap-2 mb-2'>
+            <span style={{ width: 12, height: 12, background: s.color }} className='inline-block rounded-sm' />
+            <span className='muted'>{s.label}</span>
+            <span className='ml-2 font-medium'>{(s.pct * 100).toFixed(1)}%</span>
           </div>
-        )
-      })}
+        ))}
+      </div>
     </div>
   )
 }
@@ -42,17 +69,18 @@ export default function Dashboard() {
       const res = await api.get('/api/carteiras')
       const list = res.data || []
       setCarteiras(list)
-
-  const firstIds = list.slice(0, 3).map((c) => c.id)
-  const detailPromises = firstIds.map((id) => api.get(`/api/carteiras/${id}`).then(r => r.data).catch(() => null))
-  const details = await Promise.all(detailPromises)
-  const filt = details.filter(Boolean)
-  setPreviews(filt)
-  setMainPreview(filt[0] || null)
-  // cache the details
-  const cache = {}
-  filt.forEach(d => { if (d && d.id) cache[d.id] = d })
-  setDetailsCache(cache)
+      // fetch details for first few carteiras to build previews and metrics
+      // increase to first 6 to make 'Ativos preview' and topExposure more representative
+      const firstIds = list.slice(0, 6).map((c) => c.id)
+      const detailPromises = firstIds.map((id) => api.get(`/api/carteiras/${id}`).then(r => r.data).catch(() => null))
+      const details = await Promise.all(detailPromises)
+      const filt = details.filter(Boolean)
+      setPreviews(filt)
+      setMainPreview((prev) => prev || filt[0] || null)
+      // cache the details
+      const cache = {}
+      filt.forEach(d => { if (d && d.id) cache[d.id] = d })
+      setDetailsCache(cache)
     } catch (err) {
       setError(err?.response?.data?.erro || err.message || 'Erro ao carregar carteiras')
     } finally {
@@ -65,9 +93,14 @@ export default function Dashboard() {
   const totals = useMemo(() => {
     const totalCarteiras = carteiras.length
     const totalAtivos = previews.reduce((acc, p) => acc + (p.composicao ? p.composicao.length : 0), 0)
+    const parsePeso = (raw) => {
+      if (raw == null) return 0
+      const n = Number(String(raw).replace(',', '.')) || 0
+      return n > 1 ? n / 100 : n
+    }
     const topExposure = previews.reduce((acc, p) => {
       if (!p.composicao || p.composicao.length === 0) return acc
-      const maxPeso = Math.max(...p.composicao.map(a => Number(a.peso) || 0))
+      const maxPeso = Math.max(...p.composicao.map(a => parsePeso(a.peso)))
       return Math.max(acc, maxPeso)
     }, 0)
     return { totalCarteiras, totalAtivos, topExposure }
@@ -166,7 +199,12 @@ export default function Dashboard() {
             <div className='mt-4'>
               <div className='text-sm font-medium mb-2'>Composição (Top ativos)</div>
               {mainPreview.composicao && mainPreview.composicao.length > 0 ? (
-                <HorizontalBars items={mainPreview.composicao.slice(0,6).map(a => ({ label: a.ticker || a.codigo || a.nome, value: Number(a.peso) || 0 }))} />
+                <PieChart items={mainPreview.composicao.slice(0,8).map(a => {
+                  const raw = a.peso
+                  const n = Number(String(raw).replace(',', '.')) || 0
+                  const value = n > 1 ? n / 100 : n
+                  return { label: a.ticker || a.codigo || a.nome_ativo || a.nome, value }
+                })} />
               ) : (
                 <div className='muted text-sm'>Sem composição disponível</div>
               )}

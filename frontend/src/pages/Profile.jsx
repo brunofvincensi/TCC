@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom'
 import api from '../services/api';
 
 export default function Profile() {
@@ -50,6 +51,25 @@ export default function Profile() {
     }
   }
 
+  const navigate = useNavigate()
+
+  const handleDelete = async () => {
+    if (!confirm('Tem certeza que deseja deletar sua conta? Esta ação não pode ser desfeita.')) return
+    setLoading(true)
+    setError('')
+    try {
+      await api.delete('/api/usuarios')
+      // clear local auth and redirect to login
+      localStorage.removeItem('token')
+      localStorage.removeItem('usuario')
+      navigate('/login', { replace: true })
+    } catch (err) {
+      setError(err?.response?.data?.erro || 'Erro ao deletar usuário')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen p-8">
       <div className='container-max'>
@@ -62,31 +82,33 @@ export default function Profile() {
         {user ? (
           <div className='space-y-4'>
             {!editing ? (
-              <div className='card p-6'>
+                <div className='card p-6'>
                 <h2 className='text-2xl font-bold mb-2'>{user.nome}</h2>
                 <p><strong>Email:</strong> {user.email}</p>
                 <p className='muted'><strong>Ativo:</strong> {user.ativo ? 'Sim' : 'Não'}</p>
-                <div className='mt-4'>
-                  <button className='btn-accent py-2 px-3 rounded mr-2' onClick={() => setEditing(true)}>Editar perfil</button>
+                <div className='mt-4 flex gap-2'>
+                  <button className='btn-accent py-2 px-3 rounded' onClick={() => { setForm({ nome: user.nome || '', email: user.email || '', senha: '' }); setEditing(true) }}>Editar perfil</button>
+                  <button className='py-2 px-3 rounded bg-red-600 text-white' onClick={handleDelete}>Deletar minha conta</button>
                 </div>
               </div>
             ) : (
-              <form onSubmit={handleSave} className='card p-6'>
+              <form onSubmit={handleSave} className='card p-6' autoComplete='off'>
                 <div className='mb-3'>
                   <label className='block muted mb-1'>Nome</label>
-                  <input name='nome' value={form.nome} onChange={handleChange} className='w-full p-2 bg-white/3 rounded' />
+                  <input name='nome' value={form.nome} onChange={handleChange} className='w-full p-2 bg-white/3 rounded text-black' />
                 </div>
                 <div className='mb-3'>
                   <label className='block muted mb-1'>Email</label>
-                  <input name='email' type='email' value={form.email} onChange={handleChange} className='w-full p-2 bg-white/3 rounded' />
+                  <input name='email' type='email' value={form.email} onChange={handleChange} className='w-full p-2 bg-white/3 rounded text-black' />
                 </div>
                 <div className='mb-3'>
                   <label className='block muted mb-1'>Senha (deixe em branco para manter)</label>
-                  <input name='senha' type='password' value={form.senha} onChange={handleChange} className='w-full p-2 bg-white/3 rounded' />
+                  <input name='senha' type='password' value={form.senha} onChange={handleChange} className='w-full p-2 bg-white/3 rounded text-black' autoComplete='new-password' />
                 </div>
                 <div className='flex gap-2'>
                   <button type='submit' disabled={loading} className='btn-accent py-2 px-3 rounded'>Salvar</button>
                   <button type='button' className='py-2 px-3 rounded bg-white/5' onClick={() => setEditing(false)}>Cancelar</button>
+                  <button type='button' className='py-2 px-3 rounded bg-red-600 text-white' onClick={handleDelete}>Deletar minha conta</button>
                 </div>
               </form>
             )}
