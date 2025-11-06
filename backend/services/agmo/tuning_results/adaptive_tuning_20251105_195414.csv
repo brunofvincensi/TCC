@@ -1,0 +1,2 @@
+num_ativos,nivel_risco,population_size,generations,crossover_eta,mutation_eta,hypervolume_mean,hypervolume_std,spread_mean,spread_std,spacing_mean,spacing_std,pareto_size_mean,execution_time_mean,execution_time_std,convergence_generation_mean,n_runs,n_configurations_tested
+10,neutro,50,25,15.0,20.0,9.487772834901037e-09,1.1498261379629422e-08,0.8729993415365721,0.10418429025837464,9.486274124054608e-05,3.1511338789615106e-05,48.2,16.034430742263794,6.89023544232933,11.0,5,1

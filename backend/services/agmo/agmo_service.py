@@ -1,3 +1,4 @@
+from matplotlib import pyplot as plt
 from pymoo.config import Config
 from services.agmo.custom_crossover import SimplexCrossover, SimplexMutation, SimplexSampling
 from services.agmo.cardinality_operators import (
@@ -10,7 +11,7 @@ Config.warnings['not_compiled'] = False
 
 import numpy as np
 import pandas as pd
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple
 from pymoo.core.problem import ElementwiseProblem
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
@@ -21,10 +22,10 @@ from app import create_app
 from models import db, Ativo, HistoricoPrecos
 from models.ativo import TipoAtivo
 
-import matplotlib.pyplot as plt
+DEFAULT_GEN_SIZE = 100
+DEFAULT_POPULATION_SIZE = 200
 
-DEFAULT_GEN_SIZE = 200
-DEFAULT_POPULATION_SIZE = 300
+MIN_ATIVOS = 10
 
 # --------------------------------------------------------------------------
 # 0. CALLBACK PARA RASTREAMENTO DE CONVERGÊNCIA
@@ -194,7 +195,7 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
 #    Ele agora orquestra o processo usando os parâmetros do usuário.
 # --------------------------------------------------------------------------
 class Nsga2OtimizacaoService:
-    def __init__(self, app, ids_ativos_restringidos, nivel_risco, prazo_anos, data_referencia=None, data_inicio=None):
+    def __init__(self, app, ids_ativos_restringidos, nivel_risco, prazo_anos=2, data_referencia=None, data_inicio=None, ids_ativos: List[int] = None):
         """
         Serviço de otimização de carteira usando NSGA-II.
 
@@ -208,6 +209,7 @@ class Nsga2OtimizacaoService:
         """
         self.app = app
         self.ids_ativos_restringidos = ids_ativos_restringidos
+        self.ids_ativos = ids_ativos
         self.nivel_risco = nivel_risco
         self.prazo_anos = prazo_anos
         self.data_referencia = data_referencia
@@ -220,15 +222,19 @@ class Nsga2OtimizacaoService:
         self.tickers = None
 
     def _preparar_dados(self):
+
         """Busca dados e aplica o ajuste de risco pelo prazo."""
         with self.app.app_context():
             query_ativos = db.session.query(Ativo).filter(
                 ~Ativo.id.in_(self.ids_ativos_restringidos),
                 Ativo.tipo == TipoAtivo.ACAO
             )
+            if self.ids_ativos:
+                query_ativos = query_ativos.filter(Ativo.id.in_(self.ids_ativos))
+
             self.ativos_para_otimizar = query_ativos.all()
-            if len(self.ativos_para_otimizar) < 3:  # Mínimo para 3 objetivos
-                raise ValueError("São necessários pelo menos 3 ativos do tipo 'Ação' para a otimização.")
+            if len(self.ativos_para_otimizar) < MIN_ATIVOS:  # Mínimo para 3 objetivos
+                raise ValueError(f"São necessários pelo menos {MIN_ATIVOS} ativos do tipo 'Ação' para a otimização.")
 
             ids_para_otimizar = [a.id for a in self.ativos_para_otimizar]
             query_historico = db.session.query(
@@ -306,11 +312,10 @@ class Nsga2OtimizacaoService:
 
                 print(f"  {ticker:<12} {meses_disponiveis:>8} {status:<20}")
 
-            # Validação: precisamos de pelo menos 3 ativos
-            if len(ativos_validos) < 3:
+            if len(ativos_validos) < MIN_ATIVOS:
                 raise ValueError(
                     f"Ativos insuficientes após filtro de histórico!\n"
-                    f"  Requerido: 3 ativos\n"
+                    f"  Requerido: {MIN_ATIVOS} ativos\n"
                     f"  Disponível: {len(ativos_validos)} ativos\n"
                     f"  Histórico mínimo: {historico_minimo_meses} meses\n\n"
                     f"Sugestões:\n"
@@ -511,6 +516,10 @@ class Nsga2OtimizacaoService:
               for portfolio selection with cardinality constraints".
               IEEE Computational Intelligence Magazine, 5(2), 92-107.
         """
+
+        if max_ativos is not None and max_ativos > MIN_ATIVOS:
+            raise ValueError(f"São necessários pelo menos {MIN_ATIVOS} ativos do tipo 'Ação' para a otimização.")
+
         self._preparar_dados()
 
         num_ativos = len(self.ativos_para_otimizar)
@@ -885,7 +894,7 @@ def otimizar_carteira_atual(app):
     print("EXEMPLO 1: Otimização normal (usando todos os dados disponíveis)")
     print("=" * 80)
     service = Nsga2OtimizacaoService(app, [1], "conservador", 10)
-    resultado = service.otimizar()
+    resultado = service.otimizar(max_ativos=10, use_optimal_config=False)
 
     # Informações adicionais
     print(f"\n📅 INFORMAÇÕES DO PERÍODO:")
@@ -901,7 +910,7 @@ def backtest(app):
     print("=" * 80)
     data_backtest = date(2019, 1, 1)
     service_backtest = Nsga2OtimizacaoService(app, [1], "conservador", 6, data_referencia=data_backtest)
-    carteira_backtest = service_backtest.otimizar()
+    carteira_backtest = service_backtest.otimizar(max_ativos=10)
 
     # Informações do backtest
     print(f"\n📅 INFORMAÇÕES DO BACKTEST:")
@@ -927,10 +936,10 @@ def main():
     app = create_app()
 
     # Exemplo 1: Otimização normal (sem backtest)
-   # otimizar_carteira_atual(app)
+    otimizar_carteira_atual(app)
 
     # Exemplo 2: Otimização com backtest (usando dados até uma data específica)
-    backtest(app)
+    # backtest(app)
 
 
 if __name__ == "__main__":

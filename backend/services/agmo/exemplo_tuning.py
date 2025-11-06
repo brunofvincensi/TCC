@@ -66,9 +66,9 @@ def exemplo_1_analise_convergencia():
         resultados = tuning_service.convergence_analysis(
             ids_ativos=ids_ativos,
             nivel_risco='moderado',
-            max_generations=200,
+            max_generations=50,
             population_size=100,
-            n_runs=5
+            n_runs=1
         )
 
         print("\n✅ Análise concluída!")
@@ -83,72 +83,9 @@ def exemplo_1_analise_convergencia():
         logger.error(f"Erro na análise de convergência: {e}")
         raise
 
-
-def exemplo_2_grid_search_basico():
+def exemplo_2_grid_search_completo():
     """
-    Exemplo 2: Grid Search Básico
-
-    Testa diferentes combinações de população e gerações.
-    Útil para encontrar o melhor trade-off qualidade vs tempo.
-    """
-    print("\n" + "=" * 80)
-    print("EXEMPLO 2: GRID SEARCH BÁSICO")
-    print("=" * 80)
-    print("\nObjetivo: Encontrar a melhor combinação de população × gerações\n")
-
-    app = create_app()
-
-    # Busca ativos
-    with app.app_context():
-        ativos = db.session.query(Ativo).limit(10).all()
-        ids_ativos = [a.id for a in ativos]
-        print(f"Usando {len(ids_ativos)} ativos: {[a.ticker for a in ativos]}\n")
-
-    # Cria o serviço
-    tuning_service = HyperparameterTuningService(app)
-
-    # Configurações para testar
-    population_sizes = [50, 100, 200]
-    generation_counts = [25, 50, 100]
-
-    print("Configurações a testar:")
-    print(f"   - Tamanhos de população: {population_sizes}")
-    print(f"   - Números de gerações: {generation_counts}")
-    print(f"   - Execuções por configuração: 3")
-    print(f"   - Total de execuções: {len(population_sizes) * len(generation_counts) * 3}")
-    print("\nIsso pode levar vários minutos...\n")
-
-    try:
-        summary = tuning_service.grid_search(
-            ids_ativos=ids_ativos,
-            nivel_risco='moderado',
-            population_sizes=population_sizes,
-            generation_counts=generation_counts,
-            n_runs=3
-        )
-
-        print("\n✅ Grid Search concluído!")
-        print(f"\n📊 Top 5 Configurações (por Hypervolume):")
-        print(summary.head(5).to_string())
-
-        # Melhor configuração
-        best = summary.iloc[0]
-        print(f"\n🏆 Melhor Configuração:")
-        print(f"   - População: {int(best['population_size'])}")
-        print(f"   - Gerações: {int(best['generations'])}")
-        print(f"   - Hypervolume: {best['final_hypervolume_mean']:.6f} (±{best['final_hypervolume_std']:.6f})")
-        print(f"   - Tempo médio: {best['execution_time_mean']:.2f}s (±{best['execution_time_std']:.2f}s)")
-
-        print(f"\n📁 Resultados salvos em: tuning_results/")
-
-    except Exception as e:
-        logger.error(f"Erro no grid search: {e}")
-        raise
-
-
-def exemplo_3_grid_search_completo():
-    """
-    Exemplo 3: Grid Search Completo (para TCC)
+    Exemplo 2: Grid Search Completo (para TCC)
 
     Teste abrangente para inclusão no TCC.
     Testa mais configurações e executa mais vezes para resultados robustos.
@@ -189,7 +126,6 @@ def exemplo_3_grid_search_completo():
     try:
         summary = tuning_service.grid_search(
             ids_ativos=ids_ativos,
-            nivel_risco='moderado',
             population_sizes=population_sizes,
             generation_counts=generation_counts,
             n_runs=10,
@@ -226,9 +162,9 @@ def exemplo_3_grid_search_completo():
         logger.error(f"Erro no grid search completo: {e}")
         raise
 
-def exemplo_4_quick_test():
+def exemplo_3_quick_test():
     """
-    Exemplo 5: Teste Rápido
+    Exemplo 3: Teste Rápido
 
     Teste rápido apenas para validar que tudo está funcionando.
     Ideal para desenvolvimento e debugging.
@@ -257,7 +193,6 @@ def exemplo_4_quick_test():
     try:
         summary = tuning_service.grid_search(
             ids_ativos=ids_ativos,
-            nivel_risco='moderado',
             population_sizes=[50, 100],
             generation_counts=[25, 50],
             n_runs=2
@@ -275,9 +210,9 @@ def exemplo_4_quick_test():
         raise
 
 
-def exemplo_6_tuning_adaptativo():
+def exemplo_4_tuning_adaptativo():
     """
-    Exemplo 6: Tuning Adaptativo por Quantidade de Ativos
+    Exemplo 4: Tuning Adaptativo por Quantidade de Ativos
 
     Este é o exemplo MAIS IMPORTANTE para otimização de performance!
     Determina automaticamente a melhor configuração para cada quantidade
@@ -296,10 +231,15 @@ def exemplo_6_tuning_adaptativo():
     tuning_service = HyperparameterTuningService(app)
 
     # Configurações do tuning
-    asset_ranges = [5, 10, 15, 20]  # Quantidades de ativos a testar
-    population_sizes = [50, 100, 150, 200, 300]
-    generation_counts = [25, 50, 75, 100, 150, 200]
-    n_runs = 5  # Para análise estatística robusta
+    # asset_ranges = [5, 10, 15, 20]  # Quantidades de ativos a testar
+    # population_sizes = [50, 100, 150, 200, 300]
+    # generation_counts = [25, 50, 75, 100, 150, 200]
+
+    asset_ranges = [10]  # Quantidades de ativos a testar
+    population_sizes = [50, 100]
+    generation_counts = [25, 50]
+
+    n_runs = 3  # Para análise estatística robusta
 
     print("📋 Configuração do Tuning Adaptativo:")
     print(f"   - Quantidades de ativos: {asset_ranges}")
@@ -365,9 +305,9 @@ def exemplo_6_tuning_adaptativo():
         raise
 
 
-def exemplo_7_testar_auto_lookup():
+def exemplo_5_testar_auto_lookup():
     """
-    Exemplo 7: Testar Auto-Lookup de Configurações
+    Exemplo 5: Testar Auto-Lookup de Configurações
 
     Demonstra como o sistema busca automaticamente a melhor configuração.
     """
@@ -426,22 +366,20 @@ def menu_principal():
     print("=" * 80)
     print("\nEscolha o exemplo que deseja executar:\n")
     print("1. Análise de Convergência (recomendado para começar)")
-    print("2. Grid Search Básico")
-    print("3. Grid Search Completo (para TCC - DEMORADO)")
-    print("4. Teste Rápido (validação)")
-    print("6. Tuning Adaptativo por Quantidade de Ativos ⚡ RECOMENDADO!")
-    print("7. Testar Auto-Lookup de Configurações")
+    print("2. Grid Search Completo (para TCC - DEMORADO)")
+    print("3. Teste Rápido (validação)")
+    print("4. Tuning Adaptativo por Quantidade de Ativos ⚡ RECOMENDADO!")
+    print("5. Testar Auto-Lookup de Configurações")
     print("0. Sair")
 
     escolha = input("\nDigite o número do exemplo: ")
 
     exemplos = {
         '1': exemplo_1_analise_convergencia,
-        '2': exemplo_2_grid_search_basico,
-        '3': exemplo_3_grid_search_completo,
-        '4': exemplo_4_quick_test,
-        '6': exemplo_6_tuning_adaptativo,
-        '7': exemplo_7_testar_auto_lookup,
+        '2': exemplo_2_grid_search_completo,
+        '3': exemplo_3_quick_test,
+        '4': exemplo_4_tuning_adaptativo,
+        '5': exemplo_5_testar_auto_lookup,
     }
 
     if escolha in exemplos:

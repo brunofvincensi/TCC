@@ -88,8 +88,6 @@ class HyperparameterTuningService:
         nivel_risco: str = 'moderado',
         max_generations: int = 200,
         population_size: int = 100,
-        data_inicio: Optional[datetime] = None,
-        data_fim: Optional[datetime] = None,
         n_runs: int = 5
     ) -> Dict:
         """
@@ -100,8 +98,6 @@ class HyperparameterTuningService:
             nivel_risco: Perfil de risco ('conservador', 'moderado', 'arrojado')
             max_generations: Número máximo de gerações para análise
             population_size: Tamanho da população
-            data_inicio: Data inicial para dados históricos
-            data_fim: Data final para dados históricos
             n_runs: Número de execuções independentes
 
         Returns:
@@ -111,19 +107,7 @@ class HyperparameterTuningService:
                    f"{max_generations} gerações, população {population_size}")
 
         # Prepara dados para otimização
-        service = Nsga2OtimizacaoService(self.app, [], "moderado", 10)
-
-        if data_inicio and data_fim:
-            # Busca dados históricos do período especificado
-            historico_precos = service._buscar_dados_historicos(
-                ids_ativos, data_inicio, data_fim
-            )
-        else:
-            # Usa dados disponíveis
-            historico_precos = service._buscar_dados_historicos(ids_ativos)
-
-        if historico_precos.empty:
-            raise ValueError("Sem dados históricos disponíveis para os ativos selecionados")
+        service = Nsga2OtimizacaoService(self.app, [], nivel_risco, 10)
 
         # Múltiplas execuções para análise estatística
         all_runs = []
@@ -135,7 +119,6 @@ class HyperparameterTuningService:
 
             result = service.otimizar(
                 ids_ativos=ids_ativos,
-                nivel_risco=nivel_risco,
                 population_size=population_size,
                 generations=max_generations,
                 convergence_tracker=convergence_tracker
@@ -158,24 +141,19 @@ class HyperparameterTuningService:
     def grid_search(
         self,
         ids_ativos: List[int],
-        nivel_risco: str = 'moderado',
         population_sizes: List[int] = None,
         generation_counts: List[int] = None,
-        data_inicio: Optional[datetime] = None,
-        data_fim: Optional[datetime] = None,
         n_runs: int = 3,
-        time_limit: Optional[float] = None
+        time_limit: Optional[float] = None,
+        max_ativos: int = None
     ) -> pd.DataFrame:
         """
         Realiza grid search para encontrar os melhores hiperparâmetros.
 
         Args:
             ids_ativos: IDs dos ativos para otimização
-            nivel_risco: Perfil de risco
             population_sizes: Lista de tamanhos de população para testar
             generation_counts: Lista de números de gerações para testar
-            data_inicio: Data inicial para dados históricos
-            data_fim: Data final para dados históricos
             n_runs: Número de execuções por configuração
             time_limit: Tempo máximo total em segundos (opcional)
 
@@ -217,10 +195,8 @@ class HyperparameterTuningService:
                     result = self._run_single_optimization(
                         config=config,
                         ids_ativos=ids_ativos,
-                        nivel_risco=nivel_risco,
                         run_number=run + 1,
-                        data_inicio=data_inicio,
-                        data_fim=data_fim
+                        max_ativos=max_ativos
                     )
                     results.append(result)
                     self.results.append(result)
@@ -244,10 +220,8 @@ class HyperparameterTuningService:
         self,
         config: HyperparameterConfig,
         ids_ativos: List[int],
-        nivel_risco: str,
         run_number: int,
-        data_inicio: Optional[datetime] = None,
-        data_fim: Optional[datetime] = None
+        max_ativos: int = None
     ) -> TuningResult:
         """
         Executa uma única otimização com uma configuração específica.
@@ -257,13 +231,11 @@ class HyperparameterTuningService:
             ids_ativos: IDs dos ativos
             nivel_risco: Perfil de risco
             run_number: Número da execução
-            data_inicio: Data inicial
-            data_fim: Data final
 
         Returns:
             TuningResult com resultados da execução
         """
-        service = Nsga2OtimizacaoService(self.app, [], "moderado", 10)
+        service = Nsga2OtimizacaoService(self.app, [], "moderado", ids_ativos=ids_ativos)
         convergence_tracker = ConvergenceTracker()
 
         start_time = time.time()
@@ -272,7 +244,8 @@ class HyperparameterTuningService:
         result = service.otimizar(
             population_size=config.population_size,
             generations=config.generations,
-            convergence_tracker=convergence_tracker
+            convergence_tracker=convergence_tracker,
+            max_ativos=max_ativos
         )
 
         execution_time = time.time() - start_time
@@ -612,7 +585,7 @@ class HyperparameterTuningService:
         nivel_risco: str = 'neutro',
         population_sizes: List[int] = None,
         generation_counts: List[int] = None,
-        n_runs: int = 5,
+        n_runs: int = 3,
         save_to_db: bool = True
     ) -> pd.DataFrame:
         """
@@ -638,7 +611,7 @@ class HyperparameterTuningService:
             DataFrame com configurações ótimas por quantidade de ativos
         """
         if asset_ranges is None:
-            asset_ranges = [5, 10, 15, 20]
+            asset_ranges = [10, 15, 20]
 
         if population_sizes is None:
             population_sizes = [50, 100, 150, 200, 300]
@@ -676,7 +649,6 @@ class HyperparameterTuningService:
             try:
                 summary = self.grid_search(
                     ids_ativos=ids_ativos,
-                    nivel_risco=nivel_risco,
                     population_sizes=population_sizes,
                     generation_counts=generation_counts,
                     n_runs=n_runs

@@ -1,5 +1,3 @@
-from pymoo.termination.default import DefaultMultiObjectiveTermination
-
 
 def _printar_matriz(matriz, formato=".3f"):
     """
@@ -36,48 +34,3 @@ def _printar_matriz(matriz, formato=".3f"):
         print(linha)
 
     print()
-
-def calcular_geracoes_maximas(n_ativos: int, pop_size: int) -> int:
-    """
-    Calcula número máximo de gerações baseado na complexidade.
-
-    Regras:
-    - Mais ativos = mais gerações necessárias
-    - Total de avaliações ≈ 5000-15000 é um bom alvo
-    """
-    # Alvos de avaliações baseados na complexidade
-    if n_ativos < 10:
-        alvo_avaliacoes = 5000
-    elif n_ativos < 20:
-        alvo_avaliacoes = 8000
-    else:
-        alvo_avaliacoes = 12000
-
-    n_gen = max(100, int(alvo_avaliacoes / pop_size))
-
-    print(f"  🔄 Gerações máximas: {n_gen} (≈ {n_gen * pop_size} avaliações)")
-    return n_gen
-
-def criar_criterio_parada(n_gen_max: int, n_objetivos: int = 3):
-    """
-    Cria critério de parada multi-objetivo adaptativo.
-
-    Para de executar quando:
-    1. Atingir n_gen_max gerações, OU
-    2. Não houver melhoria significativa por N gerações consecutivas
-    """
-    # Para 3 objetivos, usamos tolerância mais relaxada
-    termination = DefaultMultiObjectiveTermination(
-        xtol=1e-8,  # Tolerância nas variáveis
-        cvtol=1e-6,  # Tolerância nas restrições
-        ftol=0.0025,  # Tolerância nos objetivos (0.25%)
-        period=30,  # Avaliar convergência a cada 30 gerações
-        n_max_gen=n_gen_max,  # Máximo de gerações
-        n_max_evals=None  # Sem limite de avaliações (controlado por n_gen)
-    )
-
-    print(f"  ⏱️  Critério de parada configurado:")
-    print(f"      - Máximo: {n_gen_max} gerações")
-    print(f"      - Parada antecipada: se melhoria < 0.25% por 30 gerações")
-
-    return termination

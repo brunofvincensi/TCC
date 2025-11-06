@@ -1,0 +1,2 @@
+population_size,generations,final_hypervolume_mean,final_hypervolume_std,final_hypervolume_min,final_hypervolume_max,final_spread_mean,final_spread_std,final_spacing_mean,final_spacing_std,pareto_size_mean,pareto_size_std,execution_time_mean,execution_time_std,convergence_generation_mean,convergence_generation_std,convergence_generation_<lambda_0>
+50,25,9.487772834901037e-09,1.1498261379629422e-08,-0.0,2.930675524258795e-08,0.8729993415365721,0.10418429025837464,9.486274124054608e-05,3.1511338789615106e-05,48.2,4.024922359499621,16.034430742263794,6.89023544232933,11.0,,1
