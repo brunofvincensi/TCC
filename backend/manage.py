@@ -13,7 +13,6 @@ def print_help():
     print("\nComandos disponíveis:")
     print("  setup      - 🚀 Configura o ambiente pela primeira vez.")
     print("  run        - ▶️  Inicia a API Flask em modo de desenvolvimento.")
-    print("  update     - 🔄 Atualiza os preços dos ativos (último ano).")
     print("----------------------------------------------------")
 
 
@@ -25,20 +24,18 @@ def main():
     command = sys.argv[1] if len(sys.argv) > 1 else "help"
 
     if command == "setup":
-        print("🚀 Configurando o ambiente pela primeira vez...")
+        print("🚀 Populando os ativos do arquivo .csv...")
         seed_assets(app)
-      #  update_prices(app, full_history=True)
-        print("\n✅ Ambiente configurado com sucesso!")
+        print("\n✅ Ativos populados!")
+
+        print("🔄 Atualizando os preços dos ativos...")
+        update_prices(app)
+        print("\n✅ Preços atualizados.")
 
     elif command == "run":
         print("▶️  Iniciando a API em http://127.0.0.1:5000 ...")
         # Para rodar o servidor, usamos o método run do próprio app
         app.run(debug=True)
-
-    elif command == "update":
-        print("🔄 Atualizando os preços dos ativos (último ano)...")
-        update_prices(app, full_history=False)
-        print("\n✅ Preços atualizados.")
 
     elif command == "help":
         print_help()

@@ -1,22 +1,27 @@
 ticker,nome,tipo,setor
-PRIO3,PetroRio,ACAO,Petroleo e Gás
-ENEV3,Eneva,ACAO,Energia
-SUZB3,Suzano,ACAO,Papel e Celulose
-RENT3,Localiza,ACAO,Transportes
-RDOR3,Rede D'Or,ACAO,Saúde
-EQTL3,Equatorial,ACAO,Energia
-ABEV3,Ambev,ACAO,Consumo não Cíclico
-WEGE3,WEG,ACAO,Indústria
-EMBR3,Embraer,ACAO,Indústria
-BBAS3,Banco do Brasil,ACAO,Banco
-ITSA4,Itaúsa,ACAO,Financeiro
-BPAC11,BTG Pactual,ACAO,Banco
+VALE3,VALE,ACAO,Mineração
+ITUB4,ITAUUNIBANCO,ACAO,Financeiro
+PETR4,PETROBRAS,ACAO,Petroleo e Gás
+ELET3,ELETROBRAS,ACAO,Energia
+BBDC4,BRADESCO,ACAO,Financeiro
+SBSP3,SABESP,ACAO,Saneamento
 B3SA3,B3,ACAO,Financeiro
-SBSP3,Sabesp,ACAO,Saneamento
-BBDC4,Bradesco,ACAO,Banco
-ELET3,Eletrobras,ACAO,Energia
-PETR3,Petrobras,ACAO,Petroleo e Gás
-PETR4,Petrobras,ACAO,Petroleo e Gás
-ITUB4,Itaú Unibanco,ACAO,Banco
-VALE3,Vale,ACAO,Mineração
+BPAC11,BTGP BANCO,ACAO,Financeiro
+ITSA4,ITAUSA,ACAO,Holdings
+BBAS3,BRASIL,ACAO,Financeiro
+EMBR3,EMBRAER,ACAO,Aeronáutica e Defesa
+WEGE3,WEG,ACAO,Industriais
+ABEV3,AMBEV S/A,ACAO,Bebidas
+EQTL3,EQUATORIAL,ACAO,Energia
+RDOR3,REDE D OR,ACAO,Saúde
+RENT3,LOCALIZA,ACAO,Transportes
+SUZB3,SUZANO S.A.,ACAO,Papel e Celulose
+ENEV3,ENEVA,ACAO,Energia
+PRIO3,PETRORIO,ACAO,Petroleo e Gás
+VBBR3,VIBRA,ACAO,Petroleo e Gás
+VIVT3,TELEF BRASIL,ACAO,Telecomunicações
+TOTS3,TOTVS,ACAO,Tecnologia
+RADL3,RAIADROGASIL,ACAO,Varejo Farmacêutico
+UGPA3,ULTRAPAR,ACAO,Logística e Distribuição
+CMIG4,CEMIG,ACAO,Energia
 IMA-S,IMA-S,RENDA_FIXA,

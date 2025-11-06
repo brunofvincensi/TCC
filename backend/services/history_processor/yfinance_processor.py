@@ -5,7 +5,7 @@ from models.ativo import HistoricoPrecos
 
 class YFinanceProcessor:
 
-    def process(self, ativo, app, full_history=False):
+    def process(self, ativo):
         periodo = "max"  # if full_history else "1y"
         print(f"\nIniciando atualização de preços MENSAIS (período: {periodo})...")
 

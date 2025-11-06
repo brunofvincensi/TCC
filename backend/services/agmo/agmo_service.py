@@ -16,7 +16,6 @@ from pymoo.core.problem import ElementwiseProblem
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
 from pymoo.core.callback import Callback
-from otimizacao_utils import _printar_matriz
 
 from app import create_app
 from models import db, Ativo, HistoricoPrecos
@@ -25,7 +24,7 @@ from models.ativo import TipoAtivo
 DEFAULT_GEN_SIZE = 100
 DEFAULT_POPULATION_SIZE = 200
 
-MIN_ATIVOS = 10
+MIN_ATIVOS = 5
 
 # --------------------------------------------------------------------------
 # 0. CALLBACK PARA RASTREAMENTO DE CONVERGÊNCIA
@@ -86,6 +85,9 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         # ✅ Limites por ativo
         xl = np.full(n_ativos, peso_min)
         xu = np.full(n_ativos, peso_max)
+
+        n_ieq_constr = 1 if n_ativos >= 10 else 0
+
         # ✅ HHI (Herfindahl-Hirschman Index) Thresholds por Perfil de Risco
         # HHI = Σ(wi²), onde N_eff = 1/HHI (número efetivo de ativos)
         # Valores baseados em literatura de concentração de mercado e diversificação
@@ -96,8 +98,9 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         }
         super().__init__(n_var=n_ativos,
                          n_obj=3,
-                         n_ieq_constr=1,
+                         n_ieq_constr=n_ieq_constr,
                          n_eq_constr=0, xl=xl, xu=xu)
+        self.n_ativos = n_ativos
         self.mu = retornos_medios
         self.cov = matriz_covariancia
         self.hist = historico_retornos
@@ -186,9 +189,10 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
 
         out["F"] = [retorno, variancia, cvar]
 
-        hhi = np.sum(pesos ** 2)
-        restricao_hhi = hhi - self.hhi_max
-        out["G"] = [restricao_hhi]
+        if self.n_ativos >= 10:
+            hhi = np.sum(pesos ** 2)
+            restricao_hhi = hhi - self.hhi_max
+            out["G"] = [restricao_hhi]
 
 # --------------------------------------------------------------------------
 # 2. SERVIÇO PRINCIPAL DE OTIMIZAÇÃO
@@ -379,7 +383,7 @@ class Nsga2OtimizacaoService:
             print(f"\n{'=' * 70}")
             print(f"📊 MATRIZ DE CORRELAÇÃO")
             print(f"{'=' * 70}")
-            _printar_matriz(matriz_corr, formato=".3f")
+            self._printar_matriz(matriz_corr, formato=".3f")
 
             # Análise da correlação
             self._analisar_correlacao(matriz_corr)
@@ -388,7 +392,7 @@ class Nsga2OtimizacaoService:
             print(f"\n{'=' * 70}")
             print(f"📊 MATRIZ DE COVARIÂNCIA (Mensal)")
             print(f"{'=' * 70}")
-            _printar_matriz(self.matriz_covariancia, formato=".6f")
+            self._printar_matriz(self.matriz_covariancia, formato=".6f")
 
             self.historico_retornos = df_retornos
 
@@ -481,6 +485,42 @@ class Nsga2OtimizacaoService:
         idx_melhor = np.argmax(scores)
         return solucoes[idx_melhor]
 
+    def _printar_matriz(self, matriz, formato=".3f"):
+        """
+        Printa matriz formatada com cores
+
+        Args:
+            matriz: DataFrame pandas com a matriz
+            titulo: Título da matriz
+            formato: Formato dos números (ex: ".3f")
+        """
+        tickers = matriz.columns.tolist()
+        n = len(tickers)
+
+        # Cabeçalho
+        header = "        "
+        for ticker in tickers:
+            header += f"{ticker:>10s} "
+        print(header)
+        print("  " + "-" * (11 * n + 8))
+
+        # Linhas
+        for i, ticker_linha in enumerate(tickers):
+            linha = f"  {ticker_linha:6s} |"
+
+            for j, ticker_coluna in enumerate(tickers):
+                valor = matriz.iloc[i, j]
+
+                # Colorir diagonal
+                if i == j:
+                    linha += f" {valor:>9{formato}}*"  # Asterisco na diagonal
+                else:
+                    linha += f" {valor:>9{formato}} "
+
+            print(linha)
+
+        print()
+
     def otimizar(self, population_size: int = None, generations: int = None,
                  crossover_eta: float = 15.0, mutation_eta: float = 20.0,
                  convergence_tracker=None, use_optimal_config: bool = True,
@@ -556,13 +596,13 @@ class Nsga2OtimizacaoService:
         # Seleciona a melhor carteira da fronteira de Pareto
         pesos_otimos = self._escolher_melhor_carteira(resultado.F, resultado.X)
 
-        F = resultado.F
-        plt.scatter(F[:, 1], -F[:, 0], c=F[:, 2], cmap='viridis')
-        plt.xlabel("Risco (variância)")
-        plt.ylabel("Retorno esperado")
-        plt.colorbar(label="CVaR")
-        plt.title("Fronteira de Pareto - NSGA-II")
-        plt.show()
+        # F = resultado.F
+        # plt.scatter(F[:, 1], -F[:, 0], c=F[:, 2], cmap='viridis')
+        # plt.xlabel("Risco (variância)")
+        # plt.ylabel("Retorno esperado")
+        # plt.colorbar(label="CVaR")
+        # plt.title("Fronteira de Pareto - NSGA-II")
+        # plt.show()
 
         composicao_final = []
         for i, ativo in enumerate(self.ativos_para_otimizar):

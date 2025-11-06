@@ -14,8 +14,8 @@ Autor: Sistema de Otimização de Portfólio - TCC
 
 import sys
 import os
-from datetime import datetime, timedelta
 import logging
+from datetime import datetime
 
 # Adiciona o diretório raiz ao path para importações
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -231,13 +231,13 @@ def exemplo_4_tuning_adaptativo():
     tuning_service = HyperparameterTuningService(app)
 
     # Configurações do tuning
-    # asset_ranges = [5, 10, 15, 20]  # Quantidades de ativos a testar
-    # population_sizes = [50, 100, 150, 200, 300]
-    # generation_counts = [25, 50, 75, 100, 150, 200]
+    asset_ranges = [5, 10, 15, 20]  # Quantidades de ativos a testar
+    population_sizes = [50, 100, 150, 200, 300]
+    generation_counts = [25, 50, 75, 100, 150, 200]
 
-    asset_ranges = [10]  # Quantidades de ativos a testar
-    population_sizes = [50, 100]
-    generation_counts = [25, 50]
+    # asset_ranges = [5, 10]  # Quantidades de ativos a testar
+    # population_sizes = [50, 100]
+    # generation_counts = [25, 50]
 
     n_runs = 3  # Para análise estatística robusta
 
@@ -260,18 +260,20 @@ def exemplo_4_tuning_adaptativo():
 
     try:
         print("\n🚀 Iniciando Tuning Adaptativo...\n")
+        print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
 
         df_optimal = tuning_service.adaptive_tuning_by_num_assets(
             asset_ranges=asset_ranges,
-            nivel_risco='neutro',  # Neutro serve para todos os perfis
+            nivel_risco='moderado',
             population_sizes=population_sizes,
             generation_counts=generation_counts,
             n_runs=n_runs,
-            save_to_db=True  # ✅ SALVA NO BANCO!
+            save_to_db=True
         )
 
         print("\n" + "=" * 80)
         print("✅ TUNING ADAPTATIVO CONCLUÍDO COM SUCESSO!")
+        print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
         print("=" * 80)
 
         if not df_optimal.empty:

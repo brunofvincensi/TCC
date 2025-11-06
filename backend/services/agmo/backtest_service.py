@@ -4,13 +4,11 @@ import numpy as np
 import pandas as pd
 from typing import List, Dict, Tuple, Optional
 import matplotlib.pyplot as plt
-from matplotlib.dates import DateFormatter
 import seaborn as sns
 
 from app import create_app
 from models import db, Ativo, HistoricoPrecos
 from models.ativo import TipoAtivo
-from services.agmo.teste_final import Nsga2OtimizacaoService, PersonalizedPortfolioProblem
 from services.agmo.custom_crossover import SimplexCrossover, SimplexMutation, SimplexSampling
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize

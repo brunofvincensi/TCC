@@ -32,14 +32,13 @@ def seed_assets(app):
             db.session.rollback()
             print(f"\n❌ Ocorreu um erro inesperado: {e}")
 
-def update_prices(app, full_history=False):
+def update_prices(app):
     """
     Busca o histórico MENSAL de preços, escolhendo o processador correto para cada tipo de ativo.
     """
     with app.app_context():
         # Instancia as classes de processadores dos preços históricos
         yfinanceProcessor = YFinanceProcessor()
-        anbimaProcessor = AnbimaProcessor()
 
         ativos = Ativo.query.all()
         if not ativos:
@@ -50,11 +49,6 @@ def update_prices(app, full_history=False):
 
         for ativo in ativos:
             if ativo.tipo == TipoAtivo.ACAO:
-                yfinanceProcessor.process(ativo, app, full_history)
-            elif ativo.tipo == TipoAtivo.RENDA_FIXA:
-                print("oi")
-                # anbimaProcessor.process(ativo, app, full_history)
-            else:
-                print(f"Pulando {ativo.ticker} (tipo: {ativo.tipo.value}). Lógica de processamento não implementada.")
+                yfinanceProcessor.process(ativo)
 
         print("\n✅ Atualização de preços mensais concluída!")

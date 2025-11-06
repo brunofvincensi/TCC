@@ -13,8 +13,8 @@ Autor: Sistema de Otimização de Portfólio - TCC
 
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Tuple, Optional, Callable
-from datetime import datetime, timedelta
+from typing import Dict, List, Optional
+from datetime import datetime
 import logging
 import time
 import json
@@ -23,6 +23,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from dataclasses import dataclass, asdict
 
+from models.ativo import TipoAtivo
 from .quality_metrics import QualityMetrics, ConvergenceTracker
 from .agmo_service import Nsga2OtimizacaoService, PersonalizedPortfolioProblem
 
@@ -144,8 +145,7 @@ class HyperparameterTuningService:
         population_sizes: List[int] = None,
         generation_counts: List[int] = None,
         n_runs: int = 3,
-        time_limit: Optional[float] = None,
-        max_ativos: int = None
+        time_limit: Optional[float] = None
     ) -> pd.DataFrame:
         """
         Realiza grid search para encontrar os melhores hiperparâmetros.
@@ -195,8 +195,7 @@ class HyperparameterTuningService:
                     result = self._run_single_optimization(
                         config=config,
                         ids_ativos=ids_ativos,
-                        run_number=run + 1,
-                        max_ativos=max_ativos
+                        run_number=run + 1
                     )
                     results.append(result)
                     self.results.append(result)
@@ -223,17 +222,9 @@ class HyperparameterTuningService:
         run_number: int,
         max_ativos: int = None
     ) -> TuningResult:
+
         """
         Executa uma única otimização com uma configuração específica.
-
-        Args:
-            config: Configuração de hiperparâmetros
-            ids_ativos: IDs dos ativos
-            nivel_risco: Perfil de risco
-            run_number: Número da execução
-
-        Returns:
-            TuningResult com resultados da execução
         """
         service = Nsga2OtimizacaoService(self.app, [], "moderado", ids_ativos=ids_ativos)
         convergence_tracker = ConvergenceTracker()
@@ -582,7 +573,7 @@ class HyperparameterTuningService:
     def adaptive_tuning_by_num_assets(
         self,
         asset_ranges: List[int] = None,
-        nivel_risco: str = 'neutro',
+        nivel_risco: str = 'moderado',
         population_sizes: List[int] = None,
         generation_counts: List[int] = None,
         n_runs: int = 3,
@@ -636,7 +627,9 @@ class HyperparameterTuningService:
             # Busca ativos do banco para teste
             with self.app.app_context():
                 from models import db, Ativo
-                ativos = db.session.query(Ativo).limit(num_ativos).all()
+                from models.ativo import TipoAtivo
+
+                ativos = db.session.query(Ativo).filter(Ativo.tipo == TipoAtivo.ACAO).limit(num_ativos).all()
 
                 if len(ativos) < num_ativos:
                     logger.warning(f"Apenas {len(ativos)} ativos disponíveis. "
