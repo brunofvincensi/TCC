@@ -192,6 +192,7 @@ class HyperparameterTuningService:
 
             for run in range(n_runs):
                 try:
+                    print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
                     result = self._run_single_optimization(
                         config=config,
                         ids_ativos=ids_ativos,

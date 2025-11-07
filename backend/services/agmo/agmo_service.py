@@ -199,7 +199,7 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
 #    Ele agora orquestra o processo usando os parâmetros do usuário.
 # --------------------------------------------------------------------------
 class Nsga2OtimizacaoService:
-    def __init__(self, app, ids_ativos_restringidos, nivel_risco, prazo_anos=2, data_referencia=None, data_inicio=None, ids_ativos: List[int] = None):
+    def __init__(self, app, ids_ativos_restringidos, nivel_risco, prazo_anos=5, data_referencia=None, data_inicio=None, ids_ativos: List[int] = None):
         """
         Serviço de otimização de carteira usando NSGA-II.
 
@@ -557,7 +557,7 @@ class Nsga2OtimizacaoService:
               IEEE Computational Intelligence Magazine, 5(2), 92-107.
         """
 
-        if max_ativos is not None and max_ativos > MIN_ATIVOS:
+        if max_ativos is not None and max_ativos < MIN_ATIVOS:
             raise ValueError(f"São necessários pelo menos {MIN_ATIVOS} ativos do tipo 'Ação' para a otimização.")
 
         self._preparar_dados()
@@ -594,7 +594,7 @@ class Nsga2OtimizacaoService:
             raise ValueError("O algoritmo não conseguiu encontrar nenhuma solução.")
 
         # Seleciona a melhor carteira da fronteira de Pareto
-        pesos_otimos = self._escolher_melhor_carteira(resultado.F, resultado.X)
+        pesos_otimos = self._escolher_melhor_carteira(resultado.opt.get("F"), resultado.opt.get("X"))
 
         # F = resultado.F
         # plt.scatter(F[:, 1], -F[:, 0], c=F[:, 2], cmap='viridis')
@@ -933,7 +933,7 @@ def otimizar_carteira_atual(app):
     print("\n" + "=" * 80)
     print("EXEMPLO 1: Otimização normal (usando todos os dados disponíveis)")
     print("=" * 80)
-    service = Nsga2OtimizacaoService(app, [1], "conservador", 10)
+    service = Nsga2OtimizacaoService(app, [1], "moderado", 5)
     resultado = service.otimizar(max_ativos=10, use_optimal_config=False)
 
     # Informações adicionais

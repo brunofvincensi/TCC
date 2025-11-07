@@ -7,35 +7,9 @@
     <list default="true" id="f5574c18-72f1-49e3-9514-a88c6c842f55" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.env" beforeDir="false" afterPath="$PROJECT_DIR$/.env" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ativos.csv" beforeDir="false" afterPath="$PROJECT_DIR$/ativos.csv" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/commands.py" beforeDir="false" afterPath="$PROJECT_DIR$/commands.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/manage.py" beforeDir="false" afterPath="$PROJECT_DIR$/manage.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/services/agmo/agmo_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agmo/agmo_service.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/backtest_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agmo/backtest_service.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/services/agmo/exemplo_tuning.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agmo/exemplo_tuning.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/services/agmo/hyperparameter_tuning_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agmo/hyperparameter_tuning_service.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/otimizacao_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agmo/otimizacao_utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/tuning_results/adaptive_tuning_20251105_195414.csv" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/tuning_results/adaptive_tuning_20251105_201951.csv" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/tuning_results/adaptive_tuning_plot_20251105_195414.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/tuning_results/adaptive_tuning_plot_20251105_201951.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/tuning_results/convergence_analysis_20251104_210311.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/tuning_results/convergence_analysis_20251104_211551.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/tuning_results/convergence_analysis_20251104_221839.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/tuning_results/convergence_histogram_20251104_221839.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/tuning_results/grid_search_heatmap_20251027_202517.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/tuning_results/grid_search_heatmap_20251105_195411.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/tuning_results/grid_search_heatmap_20251105_200628.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/tuning_results/grid_search_heatmap_20251105_201950.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/tuning_results/grid_search_summary_20251027_202517.csv" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/tuning_results/grid_search_summary_20251105_195411.csv" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/tuning_results/grid_search_summary_20251105_200628.csv" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/tuning_results/grid_search_summary_20251105_201950.csv" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/tuning_results/quality_vs_time_20251027_202517.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/tuning_results/quality_vs_time_20251105_195411.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/tuning_results/quality_vs_time_20251105_200628.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/tuning_results/quality_vs_time_20251105_201950.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/history_processor/yfinance_processor.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/history_processor/yfinance_processor.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -94,7 +68,7 @@
       <recent name="C:\bruno.ferrari\TCC\backend\services\agmo" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.exemplo_tuning">
+  <component name="RunManager" selected="Python.agmo_service (1)">
     <configuration name="agmo_service (1)" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="dev" />
       <option name="ENV_FILES" value="" />
@@ -265,8 +239,8 @@
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.exemplo_tuning" />
         <item itemvalue="Python.agmo_service (1)" />
+        <item itemvalue="Python.exemplo_tuning" />
         <item itemvalue="Python.teste" />
         <item itemvalue="Python.test_cardinality_operators" />
         <item itemvalue="Python.agmo_service" />
@@ -301,9 +275,14 @@
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/services/agmo/hyperparameter_tuning_service.py</url>
+          <line>193</line>
+          <option name="timeStamp" value="53" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/services/agmo/agmo_service.py</url>
-          <line>559</line>
-          <option name="timeStamp" value="52" />
+          <line>189</line>
+          <option name="timeStamp" value="55" />
         </line-breakpoint>
       </breakpoints>
       <default-breakpoints>
