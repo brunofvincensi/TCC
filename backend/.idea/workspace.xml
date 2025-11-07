@@ -8,8 +8,6 @@
       <change beforePath="$PROJECT_DIR$/.env" beforeDir="false" afterPath="$PROJECT_DIR$/.env" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/services/agmo/agmo_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agmo/agmo_service.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/exemplo_tuning.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agmo/exemplo_tuning.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/agmo/hyperparameter_tuning_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/agmo/hyperparameter_tuning_service.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

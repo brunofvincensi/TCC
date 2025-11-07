@@ -22,7 +22,7 @@ from models import db, Ativo, HistoricoPrecos
 from models.ativo import TipoAtivo
 
 DEFAULT_GEN_SIZE = 100
-DEFAULT_POPULATION_SIZE = 200
+DEFAULT_POPULATION_SIZE = 100
 
 MIN_ATIVOS = 5
 
@@ -98,7 +98,7 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         }
         super().__init__(n_var=n_ativos,
                          n_obj=3,
-                         n_ieq_constr=n_ieq_constr,
+                         n_ieq_constr=0,
                          n_eq_constr=0, xl=xl, xu=xu)
         self.n_ativos = n_ativos
         self.mu = retornos_medios
@@ -189,10 +189,10 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
 
         out["F"] = [retorno, variancia, cvar]
 
-        if self.n_ativos >= 10:
-            hhi = np.sum(pesos ** 2)
-            restricao_hhi = hhi - self.hhi_max
-            out["G"] = [restricao_hhi]
+        # if self.n_ativos >= 10:
+        #     hhi = np.sum(pesos ** 2)
+        #     restricao_hhi = hhi - self.hhi_max
+        #     out["G"] = [restricao_hhi]
 
 # --------------------------------------------------------------------------
 # 2. SERVIÇO PRINCIPAL DE OTIMIZAÇÃO
@@ -522,7 +522,7 @@ class Nsga2OtimizacaoService:
         print()
 
     def otimizar(self, population_size: int = None, generations: int = None,
-                 crossover_eta: float = 15.0, mutation_eta: float = 20.0,
+                 crossover_eta: float = 10.0, mutation_eta: float = 10.0,
                  convergence_tracker=None, use_optimal_config: bool = True,
                  enable_early_stopping=False, max_ativos: int = None):
         """
