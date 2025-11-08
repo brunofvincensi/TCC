@@ -354,6 +354,21 @@ class Nsga2OtimizacaoService:
                 if a.ticker in self.tickers
             ]
 
+            # ✅ VALIDAÇÃO: Garante que todos os tickers em self.tickers têm um ativo correspondente
+            tickers_ativos = {a.ticker for a in self.ativos_para_otimizar}
+            tickers_faltantes = set(self.tickers) - tickers_ativos
+            if tickers_faltantes:
+                raise ValueError(
+                    f"Inconsistência detectada: Tickers no DataFrame sem ativo correspondente: {tickers_faltantes}"
+                )
+
+            # ✅ VALIDAÇÃO: Garante que os tamanhos correspondem
+            if len(self.ativos_para_otimizar) != len(self.tickers):
+                raise ValueError(
+                    f"Inconsistência detectada: {len(self.ativos_para_otimizar)} ativos, "
+                    f"mas {len(self.tickers)} tickers no DataFrame!"
+                )
+
             # ✅ Validação de dados suficientes
             if len(df_retornos) < historico_minimo_meses:
                 raise ValueError(
@@ -596,6 +611,13 @@ class Nsga2OtimizacaoService:
         # Seleciona a melhor carteira da fronteira de Pareto
         pesos_otimos = self._escolher_melhor_carteira(resultado.opt.get("F"), resultado.opt.get("X"))
 
+        # ✅ VALIDAÇÃO: Garante que os tamanhos correspondem
+        if len(pesos_otimos) != len(self.tickers):
+            raise ValueError(
+                f"Inconsistência detectada: pesos_otimos tem {len(pesos_otimos)} elementos, "
+                f"mas self.tickers tem {len(self.tickers)} elementos!"
+            )
+
         # F = resultado.F
         # plt.scatter(F[:, 1], -F[:, 0], c=F[:, 2], cmap='viridis')
         # plt.xlabel("Risco (variância)")
@@ -604,15 +626,32 @@ class Nsga2OtimizacaoService:
         # plt.title("Fronteira de Pareto - NSGA-II")
         # plt.show()
 
-        composicao_final = []
+        # ✅ CORREÇÃO: Mapeia pesos usando tickers como chave
+        # Os pesos_otimos estão na ordem de self.tickers (colunas do DataFrame)
+        # Mas self.ativos_para_otimizar pode estar em ordem diferente
+        pesos_por_ticker = {ticker: float(peso) for ticker, peso in zip(self.tickers, pesos_otimos)}
+
+        print(f"\n{'='*70}")
+        print(f"🔗 MAPEAMENTO PESOS → ATIVOS")
+        print(f"{'='*70}")
+        print(f"  Ordem self.tickers (usado na otimização):")
+        for i, ticker in enumerate(self.tickers):
+            print(f"    [{i}] {ticker:8s} → peso: {pesos_otimos[i]:.6f}")
+        print(f"\n  Ordem self.ativos_para_otimizar (usado no resultado):")
         for i, ativo in enumerate(self.ativos_para_otimizar):
-            peso = pesos_otimos[i]
+            peso = pesos_por_ticker.get(ativo.ticker, 0)
+            print(f"    [{i}] {ativo.ticker:8s} → peso: {peso:.6f}")
+        print(f"{'='*70}\n")
+
+        composicao_final = []
+        for ativo in self.ativos_para_otimizar:
+            peso = pesos_por_ticker.get(ativo.ticker, 0)
             if peso > 0.001:  # Ignora pesos insignificantes
                 composicao_final.append({
                     'id_ativo': ativo.id,
                     'ticker': ativo.ticker,
                     'nome': ativo.nome,
-                    'peso': float(peso)
+                    'peso': peso
                 })
 
         # Normalizar pesos para soma = 1
@@ -933,7 +972,7 @@ def otimizar_carteira_atual(app):
     print("\n" + "=" * 80)
     print("EXEMPLO 1: Otimização normal (usando todos os dados disponíveis)")
     print("=" * 80)
-    service = Nsga2OtimizacaoService(app, [1], "moderado", 5)
+    service = Nsga2OtimizacaoService(app, [1], "arrojado", 5)
     resultado = service.otimizar(max_ativos=10, use_optimal_config=False)
 
     # Informações adicionais
