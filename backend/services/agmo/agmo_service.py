@@ -98,7 +98,7 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         }
         super().__init__(n_var=n_ativos,
                          n_obj=3,
-                         n_ieq_constr=0,
+                         n_ieq_constr=n_ieq_constr,
                          n_eq_constr=0, xl=xl, xu=xu)
         self.n_ativos = n_ativos
         self.mu = retornos_medios
@@ -179,20 +179,20 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         # --- AJUSTE DOS OBJETIVOS PELO PERFIL DE RISCO ---
         # Penaliza mais o risco para perfis conservadores e menos para arrojados.
         # Isso "empurra" o algoritmo para as regiões da Fronteira de Pareto desejadas.
-        if self.nivel_risco == 'conservador':
-            variancia *= 1.5
-            cvar *= 2.0
-        elif self.nivel_risco == 'arrojado':
-            variancia *= 0.8
-            cvar *= 0.8
+        # if self.nivel_risco == 'conservador':
+        #     variancia *= 1.5
+        #     cvar *= 2.0
+        # elif self.nivel_risco == 'arrojado':
+        #     variancia *= 0.8
+        #     cvar *= 0.8
         # Para 'moderado', não fazemos nada (peso 1.0)
 
         out["F"] = [retorno, variancia, cvar]
 
-        # if self.n_ativos >= 10:
-        #     hhi = np.sum(pesos ** 2)
-        #     restricao_hhi = hhi - self.hhi_max
-        #     out["G"] = [restricao_hhi]
+        if self.n_ativos >= 10:
+            hhi = np.sum(pesos ** 2)
+            restricao_hhi = hhi - self.hhi_max
+            out["G"] = [restricao_hhi]
 
 # --------------------------------------------------------------------------
 # 2. SERVIÇO PRINCIPAL DE OTIMIZAÇÃO
@@ -324,8 +324,6 @@ class Nsga2OtimizacaoService:
                     f"  Histórico mínimo: {historico_minimo_meses} meses\n\n"
                     f"Sugestões:\n"
                     f"  1. Reduza o prazo de investimento (atual: {self.prazo_anos} anos)\n"
-                    f"  2. Adicione ativos com mais histórico ao universo\n"
-                    f"  3. Use um período de análise mais recente (data_inicio)"
                 )
 
             print(f"\n  ✅ Resultado do filtro:")
@@ -972,7 +970,7 @@ def otimizar_carteira_atual(app):
     print("\n" + "=" * 80)
     print("EXEMPLO 1: Otimização normal (usando todos os dados disponíveis)")
     print("=" * 80)
-    service = Nsga2OtimizacaoService(app, [1], "arrojado", 5)
+    service = Nsga2OtimizacaoService(app, [1], "conservador", 5)
     resultado = service.otimizar(max_ativos=10, use_optimal_config=False)
 
     # Informações adicionais

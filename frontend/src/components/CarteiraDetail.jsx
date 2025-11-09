@@ -39,7 +39,7 @@ export default function CarteiraDetail({ id }) {
           <h5 className='font-semibold'>Parâmetros</h5>
           <ul className='text-sm muted'>
             <li>Perfil de risco: {carteira.parametros.perfil_risco_usado}</li>
-            <li>Horizonte (dias): {carteira.parametros.horizonte_tempo_usado}</li>
+            <li>Horizonte (anos): {carteira.parametros.horizonte_tempo_usado}</li>
             <li>Capital: {carteira.parametros.capital_usado}</li>
             <li>Objetivos: {carteira.parametros.objetivos_usados}</li>
             {carteira.parametros.restricoes_ativos_ids && (

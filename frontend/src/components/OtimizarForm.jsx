@@ -94,7 +94,7 @@ export default function OtimizarForm({ onCreated }) {
         objetivos: form.objetivos,
         restricoes_ativos: form.restricoes_ativos
       }
-      if (form.quantidade_ativos !== '') parametros.quantidade_ativos = form.quantidade_ativos
+      if (form.quantidade_ativos !== '') parametros.max_ativos = form.quantidade_ativos
 
       const payload = {
         parametros,
