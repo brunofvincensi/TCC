@@ -18,13 +18,7 @@ def otimizar_e_criar_carteira():
     if not parametros or not info_carteira or not info_carteira.get('nome'):
         return jsonify({'erro': 'A estrutura da requisição é inválida. Forneça `parametros` e `info_carteira`.'}), 400
 
-    ativos_disponiveis = Ativo.query.all()
-    if not ativos_disponiveis:
-        return jsonify({'erro': 'Não há ativos cadastrados no sistema para otimização.'}), 500
-
-    ativos_dict = [ativo.to_dict() for ativo in ativos_disponiveis]
-
-    composicao_otimizada, mensagem = OtimizacaoService.otimizar_carteira(parametros, ativos_dict)
+    composicao_otimizada, mensagem = OtimizacaoService.otimizar_carteira(parametros)
 
     if not composicao_otimizada:
         return jsonify({'erro': mensagem}), 500
@@ -44,7 +38,7 @@ def otimizar_e_criar_carteira():
             objetivos_usados=parametros.get('objetivos')
         )
 
-        # --- LÓGICA ATUALIZADA PARA SALVAR RESTRIÇÕES ---
+        # Salvar as restrições
         ids_restritos = parametros.get('restricoes_ativos', [])
         if ids_restritos:
             # Validação: Garante que todos os IDs fornecidos realmente existem no banco.

@@ -30,7 +30,7 @@ class OtimizacaoService:
     """
 
     @staticmethod
-    def otimizar_carteira(parametros: dict, ativos_disponiveis: list) -> Tuple[Optional[List[Dict]], str]:
+    def otimizar_carteira(parametros: dict) -> Tuple[Optional[List[Dict]], str]:
         """
         Otimiza uma carteira de investimentos usando AGMO (NSGA-II).
 
@@ -45,9 +45,6 @@ class OtimizacaoService:
                 - use_optimal_config (bool, opcional): Se deve usar configuração ótima do banco
                 - population_size (int, opcional): Tamanho da população do AG
                 - generations (int, opcional): Número de gerações do AG
-
-            ativos_disponiveis: Lista de dicionários com ativos disponíveis.
-                Cada dicionário deve conter ao menos 'id' do ativo.
 
         Returns:
             Tupla contendo:
@@ -80,13 +77,6 @@ class OtimizacaoService:
             prazo_anos = int(horizonte_tempo)
             if prazo_anos < 1 or prazo_anos > 30:
                 return None, f"Horizonte de tempo inválido: {prazo_anos} anos. Use valores entre 1 e 30 anos."
-
-            # Valida ativos disponíveis
-            if not ativos_disponiveis or len(ativos_disponiveis) < MIN_ATIVOS:
-                return None, (
-                    f"São necessários pelo menos {MIN_ATIVOS} ativos disponíveis para otimização. "
-                    f"Atualmente há {len(ativos_disponiveis)} ativos."
-                )
 
             # ========== 2. MAPEAMENTO DE PARÂMETROS ==========
 
