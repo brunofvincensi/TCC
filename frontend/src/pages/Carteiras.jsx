@@ -3,6 +3,8 @@ import CarteiraList from '../components/CarteiraList.jsx'
 import CarteiraDetail from '../components/CarteiraDetail.jsx'
 import OtimizarForm from '../components/OtimizarForm.jsx'
 import api from '../services/api.js'
+import ConfirmDialog from '../components/ui/ConfirmDialog.jsx'
+import { useLocation } from 'react-router-dom'
 
 export default function Carteiras() {
   const [carteiras, setCarteiras] = useState([])
@@ -10,8 +12,11 @@ export default function Carteiras() {
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [deletingId, setDeletingId] = useState(null)
+  const location = useLocation()
 
-  const fetchCarteiras = async () => {
+  const fetchCarteiras = async (preferredId = null) => {
     setLoading(true)
     setError('')
     try {
@@ -19,7 +24,13 @@ export default function Carteiras() {
       setCarteiras(res.data)
       // if there are carteiras and none selected, select the first
       if (res.data && res.data.length > 0) {
-        if (!selectedId) {
+        if (preferredId) {
+          // prefer the id passed via URL/navigation
+          const asNum = Number(preferredId)
+          const exists = res.data.find(c => Number(c.id) === asNum)
+          if (exists) setSelectedId(asNum)
+          else setSelectedId(res.data[0].id)
+        } else if (!selectedId) {
           setSelectedId(res.data[0].id)
         }
         // keep form hidden by default when there are carteiras
@@ -36,20 +47,31 @@ export default function Carteiras() {
   }
 
   useEffect(() => {
-    fetchCarteiras()
-  }, [])
+    // check url param for selected id and pass it to fetch
+    const params = new URLSearchParams(location.search)
+    const idParam = params.get('id')
+    fetchCarteiras(idParam)
+  }, [location.search])
 
   const handleSelect = (id) => setSelectedId(id)
 
-  const handleDelete = async (id) => {
-    if (!confirm('Deseja realmente deletar esta carteira?')) return
+  const handleDelete = (id) => {
+    setDeletingId(id)
+    setConfirmOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!deletingId) return
     try {
-      await api.delete(`/api/carteiras/${id}`)
+      await api.delete(`/api/carteiras/${deletingId}`)
       // refresh
       fetchCarteiras()
       setSelectedId(null)
     } catch (err) {
-      alert(err?.response?.data?.erro || err.message || 'Erro ao deletar')
+      setError(err?.response?.data?.erro || err.message || 'Erro ao deletar')
+    } finally {
+      setConfirmOpen(false)
+      setDeletingId(null)
     }
   }
 
@@ -69,8 +91,24 @@ export default function Carteiras() {
         {loading && <p className='muted'>Carregando...</p>}
         {error && <p className='text-red-400'>{error}</p>}
         <div className='card p-3'>
-          <CarteiraList carteiras={carteiras} onSelect={handleSelect} onDelete={handleDelete} />
+            <CarteiraList carteiras={carteiras} onSelect={handleSelect} onDelete={handleDelete} />
         </div>
+          <ConfirmDialog open={confirmOpen} title='Confirmação' message='Deseja realmente deletar esta carteira?' onCancel={() => setConfirmOpen(false)} onConfirm={confirmDelete} confirmLabel='Deletar' dark={true} />
+
+          {/* Add new-carteira button placed below the list */}
+          <div className='mt-4'>
+            <button
+              aria-label='Adicionar carteira'
+              title='Adicionar carteira'
+              onClick={() => setShowForm(true)}
+              className='w-full py-2 rounded btn-accent flex items-center justify-center gap-2'
+            >
+              <svg xmlns='http://www.w3.org/2000/svg' className='h-4 w-4' viewBox='0 0 20 20' fill='currentColor'>
+                <path fillRule='evenodd' d='M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z' clipRule='evenodd' />
+              </svg>
+              <span>Adicionar carteira</span>
+            </button>
+          </div>
       </div>
 
       <div className='flex-1'>
@@ -96,18 +134,7 @@ export default function Carteiras() {
           <div className='space-y-4'>
             <CarteiraDetail id={selectedId} />
 
-            <div className='flex justify-end'>
-              <button
-                aria-label='Adicionar nova carteira'
-                className='p-2 rounded btn-accent'
-                onClick={() => setShowForm(true)}
-                title='Adicionar nova carteira'
-              >
-                <svg xmlns='http://www.w3.org/2000/svg' className='h-5 w-5' viewBox='0 0 20 20' fill='currentColor'>
-                  <path fillRule='evenodd' d='M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z' clipRule='evenodd' />
-                </svg>
-              </button>
-            </div>
+            {/* Button removed: use the 'Adicionar carteira' button in the left column instead */}
           </div>
         ) : (
           <div className='card p-4'>
@@ -118,13 +145,10 @@ export default function Carteiras() {
                 <OtimizarForm onCreated={(created) => { handleOptimizedCreated(created); setShowForm(false) }} />
               </div>
             )}
-            {!showForm && carteiras.length === 0 && (
-              <div className='mt-4 flex justify-center'>
-                <button aria-label='Criar primeira carteira' className='btn-accent p-3 rounded-full' onClick={() => setShowForm(true)}>
-                  <svg xmlns='http://www.w3.org/2000/svg' className='h-5 w-5' viewBox='0 0 20 20' fill='currentColor'>
-                    <path fillRule='evenodd' d='M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z' clipRule='evenodd' />
-                  </svg>
-                </button>
+            {/* Empty state: creation button removed from right column; use left column button */}
+            { !showForm && carteiras.length === 0 && (
+              <div className='mt-4'>
+                <p className='muted'>Crie sua primeira carteira usando o botão à esquerda.</p>
               </div>
             )}
           </div>

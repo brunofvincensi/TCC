@@ -21,13 +21,23 @@ api.interceptors.response.use(
     const status = err?.response?.status
     if (status === 401) {
       try {
+        // don't auto-redirect when we're already on the login route or
+        // when the failing request was the login attempt itself. This
+        // prevents the global handler from performing a hard reload and
+        // clearing local error messages shown on the login page.
+        const reqUrl = err?.config?.url || ''
+        const isLoginAttempt = reqUrl.includes('/login') || window.location.pathname === '/login'
+
         localStorage.removeItem('token')
         localStorage.removeItem('usuario')
+
+        if (!isLoginAttempt) {
+          // redirect to login (hard reload ensures cleaned state)
+          window.location.href = '/login'
+        }
       } catch (e) {
         // ignore
       }
-      // redirect to login (hard reload ensures cleaned state)
-      window.location.href = '/login'
     }
     return Promise.reject(err)
   }

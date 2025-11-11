@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom'
 import api from '../services/api';
+import ConfirmDialog from '../components/ui/ConfirmDialog.jsx'
 
 export default function Profile() {
   const [user, setUser] = useState(null);
@@ -53,9 +54,15 @@ export default function Profile() {
 
   const navigate = useNavigate()
 
-  const handleDelete = async () => {
-    if (!confirm('Tem certeza que deseja deletar sua conta? Esta ação não pode ser desfeita.')) return
-    setLoading(true)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  const handleDelete = () => {
+    setConfirmOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    setDeleting(true)
     setError('')
     try {
       await api.delete('/api/usuarios')
@@ -66,7 +73,8 @@ export default function Profile() {
     } catch (err) {
       setError(err?.response?.data?.erro || 'Erro ao deletar usuário')
     } finally {
-      setLoading(false)
+      setDeleting(false)
+      setConfirmOpen(false)
     }
   }
 
@@ -116,6 +124,7 @@ export default function Profile() {
         ) : (
           <p className='muted'>Sem dados do usuário.</p>
         )}
+        <ConfirmDialog open={confirmOpen} title='Confirmação' message='Tem certeza que deseja deletar sua conta? Esta ação não pode ser desfeita.' onCancel={() => setConfirmOpen(false)} onConfirm={confirmDelete} confirmLabel='Deletar' />
       </div>
     </div>
   )

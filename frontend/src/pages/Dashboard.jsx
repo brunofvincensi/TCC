@@ -199,7 +199,13 @@ export default function Dashboard() {
             <div className='mt-4'>
               <div className='text-sm font-medium mb-2'>Composição (Top ativos)</div>
               {mainPreview.composicao && mainPreview.composicao.length > 0 ? (
-                <PieChart items={mainPreview.composicao.slice(0,8).map(a => {
+                <PieChart items={mainPreview.composicao.slice().sort((x,y) => {
+                  const pa = Number(String(x.peso).replace(',', '.')) || 0
+                  const pb = Number(String(y.peso).replace(',', '.')) || 0
+                  const na = pa > 1 ? pa/100 : pa
+                  const nb = pb > 1 ? pb/100 : pb
+                  return nb - na
+                }).slice(0,8).map(a => {
                   const raw = a.peso
                   const n = Number(String(raw).replace(',', '.')) || 0
                   const value = n > 1 ? n / 100 : n
@@ -211,7 +217,7 @@ export default function Dashboard() {
             </div>
 
             <div className='mt-4 flex justify-end'>
-              <Button onClick={() => navigate('/carteiras')}>Ver detalhes</Button>
+              <Button onClick={() => navigate(`/carteiras?id=${mainPreview.id}`)}>Ver detalhes</Button>
             </div>
           </Card>
 

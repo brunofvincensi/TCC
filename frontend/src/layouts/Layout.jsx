@@ -46,13 +46,13 @@ export default function Layout() {
         </div>
       </aside>
 
-      <div className='flex-1 p-6 bg-transparent'>
+  <div className='flex-1 p-6 bg-transparent pb-20'>
         <header className='mb-6'>
           <div className='container-max'>
-            <div className='flex items-center justify-between'>
-              <h1 className='text-2xl font-semibold'>Painel</h1>
+              <div className='flex items-center justify-between'>
+                {/* Header removed: each page should render its own title */}
+              </div>
             </div>
-          </div>
         </header>
 
         <div className='container-max'>

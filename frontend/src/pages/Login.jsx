@@ -16,7 +16,7 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
+    // keep previous error visible until a new error arrives or user navigates
     try {
       // O backend espera { email, senha } (campo 'senha' em PT-BR)
   const res = await api.post('/api/login', { email, senha: password });
@@ -57,7 +57,11 @@ export default function Login() {
             <Input label='Senha' name='senha' type='password' value={password} onChange={(e) => setPassword(e.target.value)} required />
           </div>
         </Card>
-        {error && <p className='text-red-400 text-sm mb-2'>{error}</p>}
+        {error && (
+          <p role='alert' aria-live='assertive' className='text-red-400 text-sm mb-2'>
+            {error}
+          </p>
+        )}
         <div className='mt-4'>
           <Button type='submit' className='w-full py-2' loading={loading} disabled={loading}>Entrar</Button>
         </div>
