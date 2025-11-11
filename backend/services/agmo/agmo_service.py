@@ -906,7 +906,7 @@ class Nsga2OtimizacaoService:
 
 def _calcular_retorno_carteira(app, carteira: List[Dict],
                                data_inicio,
-                               data_fim) -> Tuple[float, List[float]]:
+                               data_fim) -> Tuple[float, List[float], pd.DataFrame]:
     """
     Calcula o retorno de uma carteira em um período específico
 
@@ -916,7 +916,7 @@ def _calcular_retorno_carteira(app, carteira: List[Dict],
         data_fim: Data final do período
 
     Returns:
-        Tupla com (retorno_total, lista_de_retornos_mensais)
+        Tupla com (retorno_total, lista_de_retornos_mensais, dataframe_com_datas)
     """
     with app.app_context():
         # Buscar retornos dos ativos no período
@@ -937,7 +937,7 @@ def _calcular_retorno_carteira(app, carteira: List[Dict],
         df = pd.read_sql(query.statement, con=db.session.connection())
 
         if df.empty:
-            return 0.0, []
+            return 0.0, [], pd.DataFrame()
 
         # Pivot para ter retornos por ativo
         df_retornos = df.pivot(
@@ -950,6 +950,7 @@ def _calcular_retorno_carteira(app, carteira: List[Dict],
         pesos_dict = {item['ticker']: item['peso'] for item in carteira}
 
         retornos_mensais = []
+        datas = []
         for data_idx in df_retornos.index:
             retorno_mes = 0
             for ticker in df_retornos.columns:
@@ -959,11 +960,134 @@ def _calcular_retorno_carteira(app, carteira: List[Dict],
                         retorno_mes += pesos_dict[ticker] * ret_ativo
 
             retornos_mensais.append(retorno_mes)
+            datas.append(data_idx)
 
         # Calcular retorno acumulado
         retorno_total = (1 + pd.Series(retornos_mensais)).prod() - 1
 
-        return float(retorno_total), retornos_mensais
+        # Criar DataFrame com resultados
+        df_resultado = pd.DataFrame({
+            'data': datas,
+            'retorno_mensal': retornos_mensais
+        })
+        df_resultado.set_index('data', inplace=True)
+
+        return float(retorno_total), retornos_mensais, df_resultado
+
+
+def salvar_grafico_backtest(carteira: List[Dict],
+                            data_inicio,
+                            data_fim,
+                            app,
+                            nome_arquivo: str = None,
+                            janela_volatilidade: int = 6) -> str:
+    """
+    Gera e salva gráfico mostrando o retorno acumulado e a volatilidade da carteira ao longo do tempo.
+
+    Args:
+        carteira: Lista com composição da carteira otimizada
+        data_inicio: Data inicial do backtest
+        data_fim: Data final do backtest
+        app: Instância da aplicação Flask
+        nome_arquivo: Nome do arquivo para salvar (opcional, gera automaticamente se None)
+        janela_volatilidade: Janela em meses para cálculo da volatilidade rolling (padrão: 6)
+
+    Returns:
+        Caminho completo do arquivo salvo
+    """
+    import os
+    from datetime import datetime
+
+    print(f"\n{'='*70}")
+    print(f"📊 GERANDO GRÁFICO DE BACKTEST")
+    print(f"{'='*70}")
+
+    # Calcular retornos da carteira
+    retorno_total, retornos_mensais, df_retornos = _calcular_retorno_carteira(
+        app, carteira, data_inicio, data_fim
+    )
+
+    if df_retornos.empty:
+        print("  ⚠️  Sem dados para gerar gráfico")
+        return None
+
+    # Calcular retorno acumulado
+    df_retornos['retorno_acumulado'] = (1 + df_retornos['retorno_mensal']).cumprod() - 1
+
+    # Calcular volatilidade rolling (anualizada)
+    df_retornos['volatilidade_rolling'] = (
+        df_retornos['retorno_mensal']
+        .rolling(window=janela_volatilidade, min_periods=1)
+        .std() * np.sqrt(12) * 100  # Anualizada e em %
+    )
+
+    # Configurar figura com 2 subplots
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10))
+    fig.suptitle('Backtest da Carteira Otimizada', fontsize=16, fontweight='bold')
+
+    # Gráfico 1: Retorno Acumulado
+    ax1.plot(df_retornos.index, df_retornos['retorno_acumulado'] * 100,
+             linewidth=2.5, color='#2E86AB', marker='o', markersize=4, label='Retorno Acumulado')
+    ax1.axhline(y=0, color='red', linestyle='--', alpha=0.5, linewidth=1)
+    ax1.fill_between(df_retornos.index, 0, df_retornos['retorno_acumulado'] * 100,
+                     alpha=0.3, color='#2E86AB')
+    ax1.set_title('Retorno Acumulado da Carteira ao Longo do Tempo', fontsize=12, fontweight='bold')
+    ax1.set_xlabel('Data', fontsize=10)
+    ax1.set_ylabel('Retorno Acumulado (%)', fontsize=10)
+    ax1.grid(True, alpha=0.3, linestyle='--')
+    ax1.legend(loc='upper left', fontsize=9)
+
+    # Adicionar anotação com retorno total
+    retorno_final = df_retornos['retorno_acumulado'].iloc[-1] * 100
+    ax1.annotate(f'Retorno Total: {retorno_final:+.2f}%',
+                xy=(df_retornos.index[-1], retorno_final),
+                xytext=(10, 10), textcoords='offset points',
+                bbox=dict(boxstyle='round,pad=0.5', facecolor='yellow', alpha=0.7),
+                fontsize=9, fontweight='bold')
+
+    # Gráfico 2: Volatilidade Rolling
+    ax2.plot(df_retornos.index, df_retornos['volatilidade_rolling'],
+             linewidth=2.5, color='#F18F01', marker='s', markersize=4, label=f'Volatilidade Rolling ({janela_volatilidade} meses)')
+    ax2.fill_between(df_retornos.index, 0, df_retornos['volatilidade_rolling'],
+                     alpha=0.3, color='#F18F01')
+    ax2.set_title(f'Volatilidade da Carteira ao Longo do Tempo (janela de {janela_volatilidade} meses)',
+                  fontsize=12, fontweight='bold')
+    ax2.set_xlabel('Data', fontsize=10)
+    ax2.set_ylabel('Volatilidade Anualizada (%)', fontsize=10)
+    ax2.grid(True, alpha=0.3, linestyle='--')
+    ax2.legend(loc='upper left', fontsize=9)
+
+    # Adicionar linha de média de volatilidade
+    vol_media = df_retornos['volatilidade_rolling'].mean()
+    ax2.axhline(y=vol_media, color='green', linestyle='--', alpha=0.7, linewidth=1.5,
+                label=f'Média: {vol_media:.2f}%')
+    ax2.legend(loc='upper left', fontsize=9)
+
+    plt.tight_layout()
+
+    # Definir nome do arquivo
+    if nome_arquivo is None:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        nome_arquivo = f'backtest_carteira_{timestamp}.png'
+
+    # Garantir que o diretório existe
+    diretorio = os.path.dirname(nome_arquivo) if os.path.dirname(nome_arquivo) else '.'
+    if not os.path.exists(diretorio) and diretorio != '.':
+        os.makedirs(diretorio, exist_ok=True)
+
+    # Salvar gráfico
+    caminho_completo = os.path.abspath(nome_arquivo)
+    plt.savefig(caminho_completo, dpi=300, bbox_inches='tight')
+    plt.close()
+
+    print(f"  ✅ Gráfico salvo em: {caminho_completo}")
+    print(f"  📊 Métricas:")
+    print(f"     Retorno Total: {retorno_final:+.2f}%")
+    print(f"     Volatilidade Média: {vol_media:.2f}%")
+    print(f"     Sharpe Ratio: {(retorno_final/vol_media):.3f}" if vol_media > 0 else "     Sharpe Ratio: N/A")
+    print(f"{'='*70}\n")
+
+    return caminho_completo
 
 
 def otimizar_carteira_atual(app):
@@ -998,7 +1122,7 @@ def backtest(app):
           f"Gen={carteira_backtest['hyperparameters_used']['generations']}")
 
     dataFim = date(2025, 10, 20)
-    retorno_periodo, retornos_mensais = _calcular_retorno_carteira(
+    retorno_periodo, retornos_mensais, df_retornos = _calcular_retorno_carteira(
         app,
         carteira_backtest['composicao'],
         data_backtest,
@@ -1006,6 +1130,15 @@ def backtest(app):
     )
 
     print(f"     Retorno Acumulado: {retorno_periodo * 100:+.2f}%")
+
+    # Gerar e salvar gráfico do backtest
+    salvar_grafico_backtest(
+        carteira_backtest['composicao'],
+        data_backtest,
+        dataFim,
+        app,
+        nome_arquivo='backtest_exemplo.png'
+    )
 
 
 def main():

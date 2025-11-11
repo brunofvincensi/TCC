@@ -24,7 +24,7 @@ class YFinanceProcessor:
                 print(f"  - Nenhum dado retornado para {ativo.ticker}. Pulando.")
                 return
 
-            # Calcular variação mensal ANTES de resetar o índice
+            # Calcular variação mensal antes de resetar o índice
             dados['variacao_mensal'] = dados['Close'].pct_change()
 
             # Resetar o índice para transformar as datas em coluna

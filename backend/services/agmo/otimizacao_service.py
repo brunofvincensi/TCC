@@ -59,7 +59,6 @@ class OtimizacaoService:
             # ========== 1. VALIDAÇÃO DE PARÂMETROS ==========
             logger.info("Iniciando otimização de carteira")
             logger.debug(f"Parâmetros recebidos: {parametros}")
-            logger.debug(f"Número de ativos disponíveis: {len(ativos_disponiveis)}")
 
             # Valida perfil de risco
             perfil_risco = parametros.get('perfil_risco', 'moderado').lower()
