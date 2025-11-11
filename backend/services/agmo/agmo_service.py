@@ -199,7 +199,7 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
 #    Ele agora orquestra o processo usando os parâmetros do usuário.
 # --------------------------------------------------------------------------
 class Nsga2OtimizacaoService:
-    def __init__(self, app, ids_ativos_restringidos, nivel_risco, prazo_anos=5, data_referencia=None, data_inicio=None, ids_ativos: List[int] = None):
+    def __init__(self, app, ids_ativos_restringidos, nivel_risco, prazo_anos=5, data_referencia=None, data_inicio=None, ids_ativos: List[int] = None, exibir_grafico=False):
         """
         Serviço de otimização de carteira usando NSGA-II.
 
@@ -219,6 +219,7 @@ class Nsga2OtimizacaoService:
         self.data_referencia = data_referencia
         # Data inicial da janela de análise
         self.data_inicio = data_inicio
+        self.exibir_grafico = exibir_grafico
         self.ativos_para_otimizar = []
         self.retornos_medios = None
         self.matriz_covariancia = None
@@ -579,9 +580,9 @@ class Nsga2OtimizacaoService:
 
         generations, population_size = self.get_hiperparameters(generations, num_ativos, population_size, use_optimal_config)
 
-        problema = self.get_problema()
+        problem = self.get_problem()
 
-        algoritmo = self.get_algoritmo(crossover_eta, mutation_eta, population_size, max_ativos)
+        algorithm = self.get_algorithm(crossover_eta, mutation_eta, population_size, max_ativos)
 
         callback = self.get_callback(convergence_tracker)
 
@@ -599,7 +600,7 @@ class Nsga2OtimizacaoService:
             print(f"     Usando operadores genéticos com card-constraint")
         print(f"{'='*70}\n")
 
-        resultado = minimize(problema, algoritmo, termination,
+        resultado = minimize(problem, algorithm, termination,
                            callback=callback, verbose=True)
         print("🏁 Otimização NSGA-II concluída.")
 
@@ -616,13 +617,14 @@ class Nsga2OtimizacaoService:
                 f"mas self.tickers tem {len(self.tickers)} elementos!"
             )
 
-        # F = resultado.F
-        # plt.scatter(F[:, 1], -F[:, 0], c=F[:, 2], cmap='viridis')
-        # plt.xlabel("Risco (variância)")
-        # plt.ylabel("Retorno esperado")
-        # plt.colorbar(label="CVaR")
-        # plt.title("Fronteira de Pareto - NSGA-II")
-        # plt.show()
+        if self.exibir_grafico:
+            F = resultado.F
+            plt.scatter(F[:, 1], -F[:, 0], c=F[:, 2], cmap='viridis')
+            plt.xlabel("Risco (variância)")
+            plt.ylabel("Retorno esperado")
+            plt.colorbar(label="CVaR")
+            plt.title("Fronteira de Pareto - NSGA-II")
+            plt.show()
 
         # ✅ CORREÇÃO: Mapeia pesos usando tickers como chave
         # Os pesos_otimos estão na ordem de self.tickers (colunas do DataFrame)
@@ -697,17 +699,16 @@ class Nsga2OtimizacaoService:
 
         return resultado
 
-    def get_problema(self) -> PersonalizedPortfolioProblem:
-        problema = PersonalizedPortfolioProblem(
+    def get_problem(self) -> PersonalizedPortfolioProblem:
+        return PersonalizedPortfolioProblem(
             retornos_medios=self.retornos_medios.values,
             matriz_covariancia=self.matriz_covariancia.values,
             historico_retornos=self.historico_retornos.values,
             tickers=self.tickers,
             nivel_risco=self.nivel_risco
         )
-        return problema
 
-    def get_algoritmo(self, crossover_eta: float, mutation_eta: float,
+    def get_algorithm(self, crossover_eta: float, mutation_eta: float,
                      population_size: int, max_ativos: int = None) -> NSGA2:
         """
         Cria algoritmo NSGA-II com operadores apropriados.
@@ -737,9 +738,8 @@ class Nsga2OtimizacaoService:
             mutation = SimplexMutation(eta=mutation_eta)
             print(f"  🔧 Usando operadores simplex PADRÃO (sem restrição de cardinalidade)")
 
-        algoritmo = NSGA2(pop_size=population_size, crossover=crossover,
+        return NSGA2(pop_size=population_size, crossover=crossover,
                           mutation=mutation, sampling=sampling)
-        return algoritmo
 
     def get_hiperparameters(self, generations: int | None, num_ativos: int, population_size: int | None,
                            use_optimal_config: bool):
@@ -1094,7 +1094,7 @@ def otimizar_carteira_atual(app):
     print("\n" + "=" * 80)
     print("EXEMPLO 1: Otimização normal (usando todos os dados disponíveis)")
     print("=" * 80)
-    service = Nsga2OtimizacaoService(app, [1], "conservador", 5)
+    service = Nsga2OtimizacaoService(app, [1], "conservador", 5, exibir_grafico=True)
     resultado = service.otimizar(max_ativos=10, use_optimal_config=False)
 
     # Informações adicionais

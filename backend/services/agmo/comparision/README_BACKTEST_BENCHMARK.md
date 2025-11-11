@@ -149,7 +149,7 @@ Execute o arquivo de exemplo:
 
 ```bash
 cd backend/services/agmo
-python exemplo_backtest_comparacao.py
+python exemplo_backtest_comparision.py
 ```
 
 Este exemplo demonstra:
@@ -440,7 +440,7 @@ pip install yfinance
 ## 📞 Suporte
 
 Para dúvidas ou problemas:
-1. Verifique os exemplos em `exemplo_backtest_comparacao.py`
+1. Verifique os exemplos em `exemplo_backtest_comparision.py`
 2. Consulte a documentação dos módulos
 3. Revise este README
 
