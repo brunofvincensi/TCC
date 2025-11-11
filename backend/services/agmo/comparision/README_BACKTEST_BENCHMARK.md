@@ -60,8 +60,9 @@ Compara a carteira otimizada com índices de mercado, calculando:
 - E outras métricas importantes
 
 **Uso básico:**
+
 ```python
-from services.agmo.benchmark_comparison import BenchmarkComparison
+from services.agmo.comparision.benchmark_comparison import BenchmarkComparison
 
 comparador = BenchmarkComparison(app)
 metricas = comparador.gerar_relatorio_completo(
@@ -122,7 +123,7 @@ print(f"Gráfico salvo em: {caminho_grafico}")
 ### Passo 3: Comparar com Benchmark
 
 ```python
-from services.agmo.benchmark_comparison import BenchmarkComparison
+from services.agmo.comparision.benchmark_comparison import BenchmarkComparison
 
 comparador = BenchmarkComparison(app)
 
@@ -187,7 +188,7 @@ salvar_grafico_backtest(
 ```python
 from datetime import date
 from app import create_app
-from services.agmo.benchmark_comparison import BenchmarkComparison
+from services.agmo.comparision.benchmark_comparison import BenchmarkComparison
 
 app = create_app()
 comparador = BenchmarkComparison(app)

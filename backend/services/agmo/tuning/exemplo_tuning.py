@@ -22,7 +22,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from app import create_app
 from models import db, Ativo
-from services.agmo.hyperparameter_tuning_service import HyperparameterTuningService
+from services.agmo.tuning.hyperparameter_tuning_service import HyperparameterTuningService
 
 # Configuração de logging
 logging.basicConfig(

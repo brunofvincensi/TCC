@@ -13,7 +13,7 @@ from services.agmo.agmo_service import (
     Nsga2OtimizacaoService,
     salvar_grafico_backtest
 )
-from services.agmo.benchmark_comparison import BenchmarkComparison
+from services.agmo.comparision.benchmark_comparison import BenchmarkComparison
 
 
 def exemplo_completo():

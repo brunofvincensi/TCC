@@ -81,7 +81,7 @@ O menu oferece 5 opções:
 
 ```python
 from app import create_app
-from services.agmo.hyperparameter_tuning_service import HyperparameterTuningService
+from services.agmo.tuning.hyperparameter_tuning_service import HyperparameterTuningService
 
 app = create_app()
 tuning_service = HyperparameterTuningService(app)

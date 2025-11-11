@@ -25,7 +25,7 @@ from dataclasses import dataclass, asdict
 
 from models.ativo import TipoAtivo
 from .quality_metrics import QualityMetrics, ConvergenceTracker
-from .agmo_service import Nsga2OtimizacaoService, PersonalizedPortfolioProblem
+from services.agmo.agmo_service import Nsga2OtimizacaoService, PersonalizedPortfolioProblem
 
 logger = logging.getLogger(__name__)
 
