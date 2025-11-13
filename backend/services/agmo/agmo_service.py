@@ -1,7 +1,6 @@
 from matplotlib import pyplot as plt
 from pymoo.config import Config
-from services.agmo.custom_crossover import SimplexCrossover, SimplexMutation, SimplexSampling
-from services.agmo.cardinality_operators import (
+from services.agmo.custom_operators import (
     SimplexSamplingCardConstraint,
     SimplexCrossoverCardConstraint,
     SimplexMutationCardConstraint
@@ -80,15 +79,17 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
     pelo perfil de risco do usuário.
     """
 
-    def __init__(self, retornos_medios, matriz_covariancia, historico_retornos, tickers, nivel_risco, alpha=0.05, peso_min=0.01, peso_max=0.30):
+    def __init__(self, retornos_medios, matriz_covariancia, historico_retornos, tickers, nivel_risco, max_ativos, alpha=0.05, peso_min=0.01, peso_max=0.30):
         n_ativos = len(retornos_medios)
-        # ✅ Limites por ativo
+        # Limites por ativo
         xl = np.full(n_ativos, peso_min)
         xu = np.full(n_ativos, peso_max)
 
-        n_ieq_constr = 1 if n_ativos >= 10 else 0
+        n_ativos_carteira = min(n_ativos, max_ativos)
 
-        # ✅ HHI (Herfindahl-Hirschman Index) Thresholds por Perfil de Risco
+        n_ieq_constr = 1 if n_ativos_carteira >= 10 else 0
+
+        # HHI (Herfindahl-Hirschman Index) Thresholds por Perfil de Risco
         # HHI = Σ(wi²), onde N_eff = 1/HHI (número efetivo de ativos)
         # Valores baseados em literatura de concentração de mercado e diversificação
         self.hhi_thresholds = {
@@ -101,6 +102,7 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
                          n_ieq_constr=n_ieq_constr,
                          n_eq_constr=0, xl=xl, xu=xu)
         self.n_ativos = n_ativos
+        self.n_ativos_carteira = n_ativos_carteira
         self.mu = retornos_medios
         self.cov = matriz_covariancia
         self.hist = historico_retornos
@@ -109,7 +111,8 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         self.alpha = alpha
         self.peso_min = peso_min
         self.peso_max = peso_max
-        self.hhi_max = self.hhi_thresholds.get(nivel_risco, 0.15)  # Default: moderado
+        self.hhi_max = self.hhi_thresholds.get(nivel_risco, 0.15)
+        self.max_ativos = max_ativos
 
     def _calcular_cvar(self, pesos):
         """
@@ -178,7 +181,7 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
 
         out["F"] = [retorno, variancia, cvar]
 
-        if self.n_ativos >= 10:
+        if self.n_ativos_carteira >= 10:
             hhi = np.sum(pesos ** 2)
             restricao_hhi = hhi - self.hhi_max
             out["G"] = [restricao_hhi]
@@ -238,7 +241,7 @@ class Nsga2OtimizacaoService:
             ).join(Ativo, HistoricoPrecos.id_ativo == Ativo.id) \
                 .filter(HistoricoPrecos.id_ativo.in_(ids_para_otimizar))
 
-            # ✅ BACKTEST: Se data_referencia foi fornecida, filtra apenas dados até essa data
+            # BACKTEST: Se data_referencia foi fornecida, filtra apenas dados até essa data
             if self.data_referencia is not None:
                 if self.data_inicio is not None:
                     query_historico = query_historico.filter(HistoricoPrecos.data >= self.data_inicio)
@@ -255,17 +258,14 @@ class Nsga2OtimizacaoService:
             if df_historico.empty:
                 raise ValueError("Sem histórico para os ativos selecionados.")
 
-            # ✅ FILTRO INTELIGENTE DE ATIVOS POR HISTÓRICO MÍNIMO
+            # FILTRO INTELIGENTE DE ATIVOS POR HISTÓRICO MÍNIMO
             # Problema: ações com histórico curto fazem .dropna() eliminar dados de ações com histórico longo
             # Solução: Filtrar ações antes do pivot baseado no horizonte de investimento
 
-            # Calcula histórico mínimo necessário
-            # Usa margem de 1.5x o prazo para ter mais dados de qualidade
-            MARGEM_SEGURANCA = 1.5
             MINIMO_ABSOLUTO_MESES = 24  # Mínimo de 2 anos mesmo para prazos curtos
 
             historico_minimo_meses = max(
-                int(self.prazo_anos * 12 * MARGEM_SEGURANCA),
+                int(self.prazo_anos * 12),
                 MINIMO_ABSOLUTO_MESES
             )
 
@@ -274,7 +274,6 @@ class Nsga2OtimizacaoService:
             print(f"{'=' * 70}")
             print(f"  Prazo de investimento: {self.prazo_anos} anos")
             print(f"  Histórico mínimo requerido: {historico_minimo_meses} meses ({historico_minimo_meses/12:.1f} anos)")
-            print(f"  Margem de segurança: {MARGEM_SEGURANCA}x")
 
             # Pivot sem dropna para analisar cada ativo
             df_retornos_completo = df_historico.pivot(
@@ -527,7 +526,7 @@ class Nsga2OtimizacaoService:
     def otimizar(self, population_size: int = None, generations: int = None,
                  crossover_eta: float = 10.0, mutation_eta: float = 10.0,
                  convergence_tracker=None, use_optimal_config: bool = True,
-                 enable_early_stopping=False, max_ativos: int = None):
+                 enable_early_stopping=False, max_ativos: int = 20):
         """
         Orquestra o processo completo de otimização personalizada.
 
@@ -569,7 +568,7 @@ class Nsga2OtimizacaoService:
 
         generations, population_size = self.get_hiperparameters(generations, num_ativos, population_size, use_optimal_config)
 
-        problem = self.get_problem()
+        problem = self.get_problem(max_ativos)
 
         algorithm = self.get_algorithm(crossover_eta, mutation_eta, population_size, max_ativos)
 
@@ -615,7 +614,6 @@ class Nsga2OtimizacaoService:
             plt.title("Fronteira de Pareto - NSGA-II")
             plt.show()
 
-        # ✅ CORREÇÃO: Mapeia pesos usando tickers como chave
         # Os pesos_otimos estão na ordem de self.tickers (colunas do DataFrame)
         # Mas self.ativos_para_otimizar pode estar em ordem diferente
         pesos_por_ticker = {ticker: float(peso) for ticker, peso in zip(self.tickers, pesos_otimos)}
@@ -648,7 +646,7 @@ class Nsga2OtimizacaoService:
         for item in composicao_final:
             item['peso'] = item['peso'] / soma_pesos
 
-        # ✅ Calcula métricas da carteira otimizada
+        # Calcula métricas da carteira otimizada
         retorno_esperado = np.dot(pesos_otimos, self.retornos_medios.values)
         risco_carteira = np.sqrt(np.dot(pesos_otimos, self.matriz_covariancia.values @ pesos_otimos))
         sharpe_ratio = retorno_esperado / risco_carteira if risco_carteira > 0 else 0
@@ -662,10 +660,10 @@ class Nsga2OtimizacaoService:
             'sharpe_ratio': float(sharpe_ratio)
         }
 
-        # ✅ APRESENTAÇÃO FORMATADA DOS RESULTADOS
+        # Apresentação formatada dos resultados
         self._printar_resultado_otimizacao(composicao_final, metricas)
 
-        # ✅ RETORNA informações adicionais sobre o período usado (útil para backtest)
+        # Retorna as informações adicionais sobre o período usado (útil para backtest)
         resultado = {
             'composicao': composicao_final,
             'metricas': metricas,
@@ -688,13 +686,14 @@ class Nsga2OtimizacaoService:
 
         return resultado
 
-    def get_problem(self) -> PersonalizedPortfolioProblem:
+    def get_problem(self, max_ativos) -> PersonalizedPortfolioProblem:
         return PersonalizedPortfolioProblem(
             retornos_medios=self.retornos_medios.values,
             matriz_covariancia=self.matriz_covariancia.values,
             historico_retornos=self.historico_retornos.values,
             tickers=self.tickers,
-            nivel_risco=self.nivel_risco
+            nivel_risco=self.nivel_risco,
+            max_ativos=max_ativos
         )
 
     def get_algorithm(self, crossover_eta: float, mutation_eta: float,
@@ -714,18 +713,11 @@ class Nsga2OtimizacaoService:
         Returns:
             Instância do NSGA2 configurada
         """
-        if max_ativos is not None:
-            # ✅ OPERADORES COM RESTRIÇÃO DE CARDINALIDADE
-            sampling = SimplexSamplingCardConstraint(max_assets=max_ativos)
-            crossover = SimplexCrossoverCardConstraint(max_assets=max_ativos, eta=crossover_eta)
-            mutation = SimplexMutationCardConstraint(max_assets=max_ativos, eta=mutation_eta)
-            print(f"  🔧 Usando operadores com RESTRIÇÃO DE CARDINALIDADE (max={max_ativos})")
-        else:
-            # ✅ OPERADORES SIMPLEX PADRÃO (sem restrição de cardinalidade)
-            sampling = SimplexSampling()
-            crossover = SimplexCrossover(eta=crossover_eta)
-            mutation = SimplexMutation(eta=mutation_eta)
-            print(f"  🔧 Usando operadores simplex PADRÃO (sem restrição de cardinalidade)")
+
+        # Operadores customizados com restrição de cardinalidade
+        sampling = SimplexSamplingCardConstraint(max_assets=max_ativos)
+        crossover = SimplexCrossoverCardConstraint(max_assets=max_ativos, eta=crossover_eta)
+        mutation = SimplexMutationCardConstraint(max_assets=max_ativos, eta=mutation_eta)
 
         return NSGA2(pop_size=population_size, crossover=crossover,
                           mutation=mutation, sampling=sampling)
@@ -1080,9 +1072,6 @@ def salvar_grafico_backtest(carteira: List[Dict],
 
 
 def otimizar_carteira_atual(app):
-    print("\n" + "=" * 80)
-    print("EXEMPLO 1: Otimização normal (usando todos os dados disponíveis)")
-    print("=" * 80)
     service = Nsga2OtimizacaoService(app, [1], "conservador", 5, exibir_grafico=False)
     resultado = service.otimizar(max_ativos=10, use_optimal_config=False)
 
@@ -1095,11 +1084,8 @@ def otimizar_carteira_atual(app):
 
 def backtest(app):
     from datetime import date
-    print("\n" + "=" * 80)
-    print("EXEMPLO 2: Otimização com BACKTEST (dados até 2023-12-31)")
-    print("=" * 80)
     data_backtest = date(2019, 1, 1)
-    service_backtest = Nsga2OtimizacaoService(app, [1], "conservador", 6, data_referencia=data_backtest)
+    service_backtest = Nsga2OtimizacaoService(app, [1], "arrojado", 10, data_referencia=data_backtest)
     carteira_backtest = service_backtest.otimizar(max_ativos=10)
 
     # Informações do backtest
@@ -1135,10 +1121,10 @@ def main():
     app = create_app()
 
     # Exemplo 1: Otimização normal (sem backtest)
-   # otimizar_carteira_atual(app)
+    otimizar_carteira_atual(app)
 
     # Exemplo 2: Otimização com backtest (usando dados até uma data específica)
-    backtest(app)
+  #  backtest(app)
 
 
 if __name__ == "__main__":
