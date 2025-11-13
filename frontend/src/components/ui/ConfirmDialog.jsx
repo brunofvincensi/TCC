@@ -4,7 +4,7 @@ export default function ConfirmDialog({ open, title, message, onCancel, onConfir
   if (!open) return null
   return (
     <div className='fixed inset-0 z-50 flex items-center justify-center'>
-      {/* darker overlay to ensure the modal stands out */}
+      {/* sobreposição mais escura para garantir que o modal se destaque */}
       <div className='absolute inset-0 bg-black/80 backdrop-blur-sm' onClick={onCancel} />
       <div className={`${dark ? 'bg-black/95' : 'bg-card'} p-4 rounded shadow-lg w-full max-w-md z-10 border border-white/6` }>
         {title && <div className='text-lg font-semibold mb-2'>{title}</div>}

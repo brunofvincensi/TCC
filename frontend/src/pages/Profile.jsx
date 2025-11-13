@@ -40,7 +40,7 @@ export default function Profile() {
       if (form.senha && form.senha.length > 0) payload.senha = form.senha
       const res = await api.put('/api/usuarios', payload)
       setSuccess(res.data?.mensagem || 'Perfil atualizado com sucesso')
-      // refresh profile
+  // atualizar perfil
       const perfil = await api.get('/api/perfil')
       setUser(perfil.data)
       setEditing(false)
@@ -66,7 +66,7 @@ export default function Profile() {
     setError('')
     try {
       await api.delete('/api/usuarios')
-      // clear local auth and redirect to login
+    // limpar auth local e redirecionar para login
       localStorage.removeItem('token')
       localStorage.removeItem('usuario')
       navigate('/login', { replace: true })

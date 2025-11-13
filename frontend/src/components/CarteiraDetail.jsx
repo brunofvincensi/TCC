@@ -16,7 +16,7 @@ export default function CarteiraDetail({ id }) {
       try {
         const res = await api.get(`/api/carteiras/${id}`)
         const data = res.data
-        // sort composition by peso desc
+  // ordenar composição por peso desc
         if (data.composicao && data.composicao.length > 0) {
           data.composicao = data.composicao.slice().sort((a,b) => {
             const pa = Number(String(a.peso).replace(',', '.')) || 0
@@ -27,7 +27,7 @@ export default function CarteiraDetail({ id }) {
           })
         }
         setCarteira(data)
-        // fetch ativos list to map restricoes ids to tickers
+  // buscar lista de ativos para mapear ids de restrições para tickers
         if (data.parametros && data.parametros.restricoes_ativos_ids && data.parametros.restricoes_ativos_ids.length > 0) {
           try {
             const r = await api.get('/api/ativos')
@@ -37,7 +37,7 @@ export default function CarteiraDetail({ id }) {
             data.parametros.restricoes_ativos_tickers = data.parametros.restricoes_ativos_ids.map(i => map[i] || i)
             setCarteira(data)
           } catch (e) {
-            // ignore
+            // ignorar
           }
         }
       } catch (err) {
@@ -50,12 +50,12 @@ export default function CarteiraDetail({ id }) {
   }, [id])
 
   useEffect(() => {
-    // when the carteira is loaded, ensure the detail card is visible above the page bottom
+  // quando a carteira for carregada, garantir que o cartão de detalhe fique visível acima do rodapé da página
     if (carteira && containerRef.current) {
       try {
         containerRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
       } catch (e) {
-        // ignore
+        // ignorar
       }
     }
   }, [carteira])
@@ -65,28 +65,28 @@ export default function CarteiraDetail({ id }) {
   if (!carteira) return null
 
   return (
-  <div ref={containerRef} className='card p-4 mb-12 relative'>
-      <div>
-        <h4 className='text-lg font-semibold'>{carteira.nome}</h4>
-        {carteira.descricao && <p className='text-sm muted'>{carteira.descricao}</p>}
-        <p className='text-xs muted mt-1'>Criada em: {new Date(carteira.data_criacao).toLocaleString()}</p>
+    <div ref={containerRef} className='card p-4 mb-12 relative'>
+      <div className='flex flex-col md:flex-row md:items-center md:justify-between gap-4'>
+        <div>
+          <h4 className='text-lg font-semibold'>{carteira.nome}</h4>
+          {carteira.descricao && <p className='text-sm muted'>{carteira.descricao}</p>}
+          <p className='text-xs muted mt-1'>Criada em: {new Date(carteira.data_criacao).toLocaleString()}</p>
+        </div>
 
         {carteira.parametros && (
-          <div className='mt-4'>
-            <h5 className='font-semibold'>Parâmetros</h5>
-            <ul className='text-sm muted'>
-              <li>Perfil de risco: {carteira.parametros.perfil_risco_usado}</li>
-              <li>Horizonte (anos): {carteira.parametros.horizonte_tempo_usado}</li>
-              <li>Capital: {carteira.parametros.capital_usado}</li>
-              <li>Objetivos: {carteira.parametros.objetivos_usados}</li>
-              {carteira.parametros.restricoes_ativos_tickers && (
-                <li>Ativos restringidos: {carteira.parametros.restricoes_ativos_tickers.join(', ')}</li>
-              )}
-            </ul>
+          <div className='mt-2 md:mt-0 text-sm muted md:text-right'>
+            <div><strong>Perfil:</strong> {carteira.parametros.perfil_risco_usado}</div>
+            <div><strong>Horizonte:</strong> {carteira.parametros.horizonte_tempo_usado} anos</div>
+            <div><strong>Capital:</strong> {carteira.parametros.capital_usado}</div>
+            {carteira.parametros.objetivos_usados && <div><strong>Objetivos:</strong> {carteira.parametros.objetivos_usados}</div>}
+            {carteira.parametros.restricoes_ativos_tickers && carteira.parametros.restricoes_ativos_tickers.length > 0 && (
+              <div className='mt-1'><strong>Ativos restringidos:</strong> {carteira.parametros.restricoes_ativos_tickers.join(', ')}</div>
+            )}
           </div>
         )}
+      </div>
 
-        <div className='mt-6'>
+      <div className='mt-6'>
           <h5 className='font-semibold mb-2'>Composição</h5>
           {carteira.composicao && carteira.composicao.length > 0 ? (
             <div>
@@ -129,7 +129,6 @@ export default function CarteiraDetail({ id }) {
             <p className='muted'>Sem composição disponível.</p>
           )}
         </div>
-      </div>
     </div>
   )
 }

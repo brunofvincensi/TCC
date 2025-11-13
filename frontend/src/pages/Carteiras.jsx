@@ -20,12 +20,12 @@ export default function Carteiras() {
     setLoading(true)
     setError('')
     try {
-      const res = await api.get('/api/carteiras')
-      setCarteiras(res.data)
-      // if there are carteiras and none selected, select the first
+  const res = await api.get('/api/carteiras')
+  setCarteiras(res.data)
+  // se houver carteiras e nenhuma selecionada, selecionar a primeira
       if (res.data && res.data.length > 0) {
         if (preferredId) {
-          // prefer the id passed via URL/navigation
+          // preferir o id passado pela URL/navegação
           const asNum = Number(preferredId)
           const exists = res.data.find(c => Number(c.id) === asNum)
           if (exists) setSelectedId(asNum)
@@ -33,10 +33,10 @@ export default function Carteiras() {
         } else if (!selectedId) {
           setSelectedId(res.data[0].id)
         }
-        // keep form hidden by default when there are carteiras
+  // manter formulário oculto por padrão quando existirem carteiras
         setShowForm(false)
       } else {
-        // no carteiras: show the form to create one
+        // sem carteiras: mostrar o formulário para criar uma
         setShowForm(true)
       }
     } catch (err) {
@@ -47,7 +47,7 @@ export default function Carteiras() {
   }
 
   useEffect(() => {
-    // check url param for selected id and pass it to fetch
+  // checar param da URL para id selecionado e passar para fetch
     const params = new URLSearchParams(location.search)
     const idParam = params.get('id')
     fetchCarteiras(idParam)
