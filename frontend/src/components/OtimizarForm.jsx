@@ -16,7 +16,7 @@ export default function OtimizarForm({ onCreated }) {
     capital: '',
     quantidade_ativos: '',
     objetivos: '',
-    restricoes_ativos: []
+    possiveis_ativos: []
   })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -26,8 +26,12 @@ export default function OtimizarForm({ onCreated }) {
     const fetch = async () => {
       setLoadingAtivos(true)
       try {
-        const res = await api.get('/api/ativos')
-        setAtivos(res.data)
+  const res = await api.get('/api/ativos')
+  setAtivos(res.data)
+  // padrão: marcar todos os ativos como possíveis (selecionados)
+        if (res.data && res.data.length > 0) {
+          setForm(f => ({ ...f, possiveis_ativos: res.data.map(a => a.id) }))
+        }
       } catch (err) {
         console.error('Erro ao buscar ativos', err)
       } finally {
@@ -55,7 +59,7 @@ export default function OtimizarForm({ onCreated }) {
   }
 
   const handleAssetChange = (selected) => {
-    setForm((f) => ({ ...f, restricoes_ativos: selected }))
+    setForm((f) => ({ ...f, possiveis_ativos: selected }))
   }
 
   const handleSubmit = async (e) => {
@@ -64,7 +68,7 @@ export default function OtimizarForm({ onCreated }) {
     setError('')
     setSuccess('')
     try {
-      // validação básica: apenas nome, perfil e horizonte são obrigatórios
+      // validação básica: nome, perfil, horizonte, capital e quantidade_ativos são obrigatórios
       if (!form.nome || form.nome.trim().length < 3) {
         setError('Nome da carteira precisa ter ao menos 3 caracteres')
         setSubmitting(false)
@@ -80,21 +84,33 @@ export default function OtimizarForm({ onCreated }) {
         setSubmitting(false)
         return
       }
-      // quantidade_ativos é opcional, mas se preenchida precisa ser inteiro > 0
-      if (form.quantidade_ativos !== '' && (Number(form.quantidade_ativos) <= 0 || !Number.isInteger(Number(form.quantidade_ativos)))) {
-        setError('Quantidade de ativos deve ser um número inteiro maior que 0')
+  // quantidade_ativos obrigatório e precisa ser inteiro > 0
+      if (form.quantidade_ativos === '' || Number(form.quantidade_ativos) <= 0 || !Number.isInteger(Number(form.quantidade_ativos))) {
+        setError('Quantidade de ativos é obrigatória e deve ser um número inteiro maior que 0')
+        setSubmitting(false)
+        return
+      }
+  // capital é obrigatório e deve ser > 0
+      if (form.capital === '' || Number(form.capital) <= 0) {
+        setError('Capital (R$) é obrigatório e deve ser maior que 0')
         setSubmitting(false)
         return
       }
 
+  // Construir restricoes como os ativos que NÃO estão selecionados como possíveis
+      const possiveis = form.possiveis_ativos || []
+      const restricoes = ativos
+        .filter(a => !possiveis.includes(a.id))
+        .map(a => a.id)
+
       const parametros = {
         perfil_risco: form.perfil_risco,
         horizonte_tempo: form.horizonte_tempo,
-        capital: form.capital || undefined,
+        capital: form.capital,
         objetivos: form.objetivos,
-        restricoes_ativos: form.restricoes_ativos
+        restricoes_ativos: restricoes
       }
-      if (form.quantidade_ativos !== '') parametros.max_ativos = form.quantidade_ativos
+      parametros.max_ativos = form.quantidade_ativos
 
       const payload = {
         parametros,
@@ -107,7 +123,7 @@ export default function OtimizarForm({ onCreated }) {
       const res = await api.post('/api/carteiras/otimizar', payload)
       setSuccess(res.data.mensagem || 'Carteira criada')
       const created = res.data.carteira
-      setForm({ nome: '', descricao: '', perfil_risco: 'medio', horizonte_tempo: 365, capital: 10000, quantidade_ativos: '', objetivos: '', restricoes_ativos: [] })
+  setForm({ nome: '', descricao: '', perfil_risco: 'medio', horizonte_tempo: 365, capital: '', quantidade_ativos: '', objetivos: '', possiveis_ativos: ativos.map(a => a.id) })
       if (onCreated) onCreated(created)
       // limpa mensagem de sucesso após 4s
       timeoutRef.current = setTimeout(() => setSuccess(''), 4000)
@@ -120,7 +136,7 @@ export default function OtimizarForm({ onCreated }) {
 
   return (
     <form onSubmit={handleSubmit} className='card p-6'>
-      <p className='muted text-sm mb-4'>Campos obrigatórios: <span className='font-medium'>Nome</span>, <span className='font-medium'>Perfil de risco</span> e <span className='font-medium'>Horizonte (prazo)</span>.</p>
+      <p className='muted text-sm mb-4'>Campos obrigatórios: <span className='font-medium'>Nome</span>, <span className='font-medium'>Perfil de risco</span>, <span className='font-medium'>Horizonte (prazo)</span>, <span className='font-medium'>Capital (R$)</span> e <span className='font-medium'>Quantidade de ativos</span>.</p>
 
       <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
         <Input label={'Nome da carteira *'} name='nome' value={form.nome} onChange={handleChange} placeholder='Ex: Carteira Conservadora' />
@@ -139,8 +155,8 @@ export default function OtimizarForm({ onCreated }) {
       </div>
 
       <div className='mt-4 grid grid-cols-1 md:grid-cols-2 gap-4'>
-        <Input label='Capital (R$) (opcional)' name='capital' type='number' value={form.capital} onChange={handleChange} />
-        <Input label='Quantidade de ativos (opcional)' name='quantidade_ativos' type='number' value={form.quantidade_ativos} onChange={handleChange} placeholder='Ex: 10' />
+        <Input label='Capital (R$) *' name='capital' type='number' value={form.capital} onChange={handleChange} />
+        <Input label='Quantidade de ativos *' name='quantidade_ativos' type='number' value={form.quantidade_ativos} onChange={handleChange} placeholder='Ex: 10' />
       </div>
 
       <div className='mt-4 grid grid-cols-1 md:grid-cols-2 gap-4'>
@@ -156,8 +172,8 @@ export default function OtimizarForm({ onCreated }) {
       </div>
 
       <div className='mt-4'>
-        <div className='text-sm font-semibold muted mb-2'>Restringir ativos (opcional)</div>
-        <AssetSelector assets={ativos} selected={form.restricoes_ativos} onChange={handleAssetChange} loading={loadingAtivos} />
+        <div className='text-sm font-semibold muted mb-2'>Possíveis ativos (marcados = permitidos)</div>
+        <AssetSelector assets={ativos} selected={form.possiveis_ativos} onChange={handleAssetChange} loading={loadingAtivos} />
       </div>
 
       <div className='mt-4 flex items-center justify-between'>

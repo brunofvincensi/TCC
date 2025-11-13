@@ -1,9 +1,9 @@
 import React from 'react'
 import { Navigate } from 'react-router-dom'
 
-// This page was previously used to view/edit other users.
-// The app now uses /perfil for profile management. Keep this route
-// as a safe redirect to avoid stale links.
+// Esta página era usada anteriormente para ver/editar outros usuários.
+// O app agora usa /perfil para gerenciar o perfil. Mantenha esta rota
+// como um redirecionamento seguro para evitar links obsoletos.
 export default function UsuarioDetail() {
   return <Navigate to="/perfil" replace />
 }

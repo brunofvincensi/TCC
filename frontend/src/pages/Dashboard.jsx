@@ -69,15 +69,15 @@ export default function Dashboard() {
       const res = await api.get('/api/carteiras')
       const list = res.data || []
       setCarteiras(list)
-      // fetch details for first few carteiras to build previews and metrics
-      // increase to first 6 to make 'Ativos preview' and topExposure more representative
-      const firstIds = list.slice(0, 6).map((c) => c.id)
-      const detailPromises = firstIds.map((id) => api.get(`/api/carteiras/${id}`).then(r => r.data).catch(() => null))
-      const details = await Promise.all(detailPromises)
-      const filt = details.filter(Boolean)
-      setPreviews(filt)
-      setMainPreview((prev) => prev || filt[0] || null)
-      // cache the details
+  // buscar detalhes das primeiras carteiras para montar prévias e métricas
+  // aumentar para as primeiras 6 para tornar 'Ativos preview' e topExposure mais representativos
+  const firstIds = list.slice(0, 6).map((c) => c.id)
+  const detailPromises = firstIds.map((id) => api.get(`/api/carteiras/${id}`).then(r => r.data).catch(() => null))
+  const details = await Promise.all(detailPromises)
+  const filt = details.filter(Boolean)
+  setPreviews(filt)
+  setMainPreview((prev) => prev || filt[0] || null)
+  // cachear os detalhes
       const cache = {}
       filt.forEach(d => { if (d && d.id) cache[d.id] = d })
       setDetailsCache(cache)
@@ -106,7 +106,7 @@ export default function Dashboard() {
     return { totalCarteiras, totalAtivos, topExposure }
   }, [carteiras, previews])
 
-  // mainPreview state is managed above
+  // estado mainPreview é gerenciado acima
 
   return (
     <div>
@@ -172,7 +172,7 @@ export default function Dashboard() {
                 onChange={async (e) => {
                   const id = Number(e.target.value)
                   if (!id) return
-                  // if cached, use it
+                  // se em cache, usar
                   if (detailsCache[id]) {
                     setMainPreview(detailsCache[id])
                     return

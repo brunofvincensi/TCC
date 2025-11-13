@@ -16,7 +16,7 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
-    // keep previous error visible until a new error arrives or user navigates
+    // manter o erro anterior visível até um novo erro chegar ou o usuário navegar
     try {
       // O backend espera { email, senha } (campo 'senha' em PT-BR)
   const res = await api.post('/api/login', { email, senha: password });

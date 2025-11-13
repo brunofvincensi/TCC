@@ -1,9 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 
-// The original popover component used inline edit/delete with browser confirm.
-// The app now uses a dedicated /perfil page. Keep this component as a lightweight
-// navigation anchor to the profile instead of duplicating edit/delete UI here.
+// O popover original usava edição/deleção inline com confirm do navegador.
+// O app agora usa a página /perfil. Mantenha este componente como uma âncora leve
+// de navegação para o perfil em vez de duplicar a UI de edição/deleção aqui.
 export default function UserPopover() {
   const ref = useRef(null)
   const [open, setOpen] = useState(false)

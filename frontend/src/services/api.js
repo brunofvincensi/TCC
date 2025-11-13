@@ -7,24 +7,24 @@ const api = axios.create({
   withCredentials: true,
 })
 
-// Attach token to requests
+// Anexar token às requisições
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
-// Global response handler: if 401, clear auth and redirect to login
+// Manipulador global de respostas: se 401, limpar auth e redirecionar para login
 api.interceptors.response.use(
   (res) => res,
   (err) => {
     const status = err?.response?.status
     if (status === 401) {
       try {
-        // don't auto-redirect when we're already on the login route or
-        // when the failing request was the login attempt itself. This
-        // prevents the global handler from performing a hard reload and
-        // clearing local error messages shown on the login page.
+        // não redirecionar automaticamente quando já estivermos na rota de login ou
+        // quando a requisição com erro foi a tentativa de login. Isso
+        // impede que o manipulador global realize um reload completo e
+        // limpe as mensagens de erro locais mostradas na página de login.
         const reqUrl = err?.config?.url || ''
         const isLoginAttempt = reqUrl.includes('/login') || window.location.pathname === '/login'
 
@@ -32,11 +32,11 @@ api.interceptors.response.use(
         localStorage.removeItem('usuario')
 
         if (!isLoginAttempt) {
-          // redirect to login (hard reload ensures cleaned state)
+          // redirecionar para login (hard reload garante estado limpo)
           window.location.href = '/login'
         }
       } catch (e) {
-        // ignore
+        // ignorar
       }
     }
     return Promise.reject(err)

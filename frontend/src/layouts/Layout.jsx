@@ -1,6 +1,6 @@
 import { Link, Outlet, useNavigate } from 'react-router-dom'
 import logo from '../assets/walletai.png'
-// User popover replaced by dedicated profile page
+// Popover de usuário substituído por página de perfil dedicada
 
 export default function Layout() {
   const navigate = useNavigate()
