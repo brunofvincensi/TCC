@@ -230,6 +230,254 @@ class BenchmarkComparison:
 
             return df_resultado
 
+    def _buscar_dados_ativos_individuais(self, carteira: List[Dict],
+                                         data_inicio: date,
+                                         data_fim: date) -> Tuple[pd.DataFrame, List[Dict]]:
+        """
+        Busca dados históricos de retorno de cada ativo individual da carteira.
+
+        Args:
+            carteira: Lista com composição da carteira
+            data_inicio: Data inicial
+            data_fim: Data final
+
+        Returns:
+            Tupla contendo:
+            - DataFrame com retornos mensais de cada ativo (colunas = tickers)
+            - Lista com informações dos ativos ordenados por peso decrescente
+        """
+        with self.app.app_context():
+            ids_ativos = [item['id_ativo'] for item in carteira]
+
+            # Criar dicionário com informações completas dos ativos
+            ativos_info = {
+                item['ticker']: {
+                    'ticker': item['ticker'],
+                    'nome': item.get('nome', item['ticker']),
+                    'peso': item['peso']
+                }
+                for item in carteira
+            }
+
+            # Buscar retornos dos ativos
+            query = db.session.query(
+                HistoricoPrecos.data,
+                HistoricoPrecos.variacao_mensal,
+                Ativo.ticker
+            ).join(Ativo, HistoricoPrecos.id_ativo == Ativo.id) \
+                .filter(
+                    HistoricoPrecos.id_ativo.in_(ids_ativos),
+                    HistoricoPrecos.data >= data_inicio,
+                    HistoricoPrecos.data <= data_fim
+                ) \
+                .order_by(HistoricoPrecos.data)
+
+            df = pd.read_sql(query.statement, con=db.session.connection())
+
+            if df.empty:
+                raise ValueError("Sem dados históricos para os ativos da carteira.")
+
+            # Pivot para ter retornos por ativo
+            df_retornos = df.pivot(
+                index='data',
+                columns='ticker',
+                values='variacao_mensal'
+            )
+
+            # Ordenar ativos por peso decrescente
+            ativos_ordenados = sorted(
+                ativos_info.values(),
+                key=lambda x: x['peso'],
+                reverse=True
+            )
+
+            return df_retornos, ativos_ordenados
+
+    def gerar_grafico_evolucao_ativos(self,
+                                      carteira: List[Dict],
+                                      data_inicio: date,
+                                      data_fim: date,
+                                      nome_arquivo: str = None) -> str:
+        """
+        Gera gráfico mostrando a evolução do retorno acumulado de cada ativo
+        individual da carteira AGMO, com sumário lateral mostrando a participação
+        de cada ativo.
+
+        Args:
+            carteira: Lista com composição da carteira (deve incluir 'nome' de cada ativo)
+            data_inicio: Data inicial
+            data_fim: Data final
+            nome_arquivo: Nome do arquivo para salvar (opcional)
+
+        Returns:
+            Caminho do arquivo salvo
+        """
+        print(f"\n{'='*70}")
+        print(f"📊 GERANDO GRÁFICO DE EVOLUÇÃO DOS ATIVOS DA CARTEIRA")
+        print(f"{'='*70}")
+
+        # Buscar dados dos ativos
+        df_retornos, ativos_ordenados = self._buscar_dados_ativos_individuais(
+            carteira, data_inicio, data_fim
+        )
+
+        # Calcular retorno acumulado para cada ativo
+        df_retorno_acumulado = (1 + df_retornos).cumprod() - 1
+
+        # Calcular retorno acumulado final de cada ativo para o sumário
+        retorno_final_por_ticker = {}
+        for ticker in df_retorno_acumulado.columns:
+            retorno_final = df_retorno_acumulado[ticker].iloc[-1] * 100  # em %
+            retorno_final_por_ticker[ticker] = retorno_final
+
+        # Configurar cores distintas para cada ativo (usando uma paleta de cores)
+        num_ativos = len(ativos_ordenados)
+        cores = plt.cm.tab20(np.linspace(0, 1, num_ativos))
+
+        # Criar figura com layout customizado
+        # 70% para o gráfico, 30% para o sumário
+        fig = plt.figure(figsize=(18, 10))
+        gs = fig.add_gridspec(1, 2, width_ratios=[7, 3], hspace=0.3, wspace=0.3)
+
+        ax_grafico = fig.add_subplot(gs[0, 0])
+        ax_sumario = fig.add_subplot(gs[0, 1])
+
+        # Criar mapeamento ticker -> cor
+        ticker_cor = {}
+        for i, ativo_info in enumerate(ativos_ordenados):
+            ticker_cor[ativo_info['ticker']] = cores[i]
+
+        # Plotar linhas do gráfico
+        datas = df_retorno_acumulado.index
+
+        for ticker in df_retorno_acumulado.columns:
+            if ticker in ticker_cor:
+                ax_grafico.plot(
+                    datas,
+                    df_retorno_acumulado[ticker] * 100,
+                    linewidth=2,
+                    color=ticker_cor[ticker],
+                    label=ticker,
+                    alpha=0.8
+                )
+
+        # Configurar gráfico
+        ax_grafico.axhline(y=0, color='gray', linestyle='--', alpha=0.5, linewidth=1)
+        ax_grafico.set_title('Evolução dos Ativos da Carteira AGMO',
+                            fontsize=14, fontweight='bold', pad=20)
+        ax_grafico.set_xlabel('Data', fontsize=11)
+        ax_grafico.set_ylabel('Retorno Acumulado (%)', fontsize=11)
+        ax_grafico.grid(True, alpha=0.3, linestyle='--')
+
+        # Rotacionar labels do eixo X para melhor legibilidade
+        ax_grafico.tick_params(axis='x', rotation=45)
+
+        # ====================================================================
+        # CRIAR SUMÁRIO LATERAL
+        # ====================================================================
+        ax_sumario.axis('off')  # Desligar eixos
+
+        # Título do sumário
+        ax_sumario.text(0.5, 0.95, 'Composição da Carteira',
+                       ha='center', va='top', fontsize=12, fontweight='bold',
+                       transform=ax_sumario.transAxes)
+
+        # Desenhar linha separadora
+        ax_sumario.plot([0.1, 0.9], [0.92, 0.92], 'k-', lw=1,
+                       transform=ax_sumario.transAxes)
+
+        # Configurações do sumário
+        y_start = 0.88
+        y_step = 0.85 / (num_ativos + 1)  # Espaçamento dinâmico
+
+        # Cabeçalho
+        y_pos = y_start
+        ax_sumario.text(0.05, y_pos, '#', ha='left', va='top',
+                       fontsize=9, fontweight='bold',
+                       transform=ax_sumario.transAxes)
+        ax_sumario.text(0.15, y_pos, 'Ticker', ha='left', va='top',
+                       fontsize=9, fontweight='bold',
+                       transform=ax_sumario.transAxes)
+        ax_sumario.text(0.50, y_pos, 'Retorno', ha='right', va='top',
+                       fontsize=9, fontweight='bold',
+                       transform=ax_sumario.transAxes)
+        ax_sumario.text(0.70, y_pos, 'Peso', ha='right', va='top',
+                       fontsize=9, fontweight='bold',
+                       transform=ax_sumario.transAxes)
+        ax_sumario.text(0.80, y_pos, 'Barra', ha='left', va='top',
+                       fontsize=9, fontweight='bold',
+                       transform=ax_sumario.transAxes)
+
+        y_pos -= y_step * 0.3
+
+        # Listar ativos
+        for i, ativo_info in enumerate(ativos_ordenados, start=1):
+            ticker = ativo_info['ticker']
+            peso = ativo_info['peso']
+            cor = ticker_cor[ticker]
+            retorno = retorno_final_por_ticker.get(ticker, 0)
+
+            # Número
+            ax_sumario.text(0.05, y_pos, f"{i}", ha='left', va='top',
+                           fontsize=8, color='black',
+                           transform=ax_sumario.transAxes)
+
+            # Ticker (com cor do ativo)
+            ax_sumario.text(0.15, y_pos, ticker, ha='left', va='top',
+                           fontsize=8, fontweight='bold', color=cor,
+                           transform=ax_sumario.transAxes)
+
+            # Retorno acumulado
+            ax_sumario.text(0.50, y_pos, f"{retorno:+.2f}%", ha='right', va='top',
+                           fontsize=8, color='black',
+                           transform=ax_sumario.transAxes)
+
+            # Peso percentual
+            ax_sumario.text(0.70, y_pos, f"{peso*100:.2f}%", ha='right', va='top',
+                           fontsize=8, color='black',
+                           transform=ax_sumario.transAxes)
+
+            # Barra de peso (usando caracteres Unicode)
+            # Normalizar peso para escala de 0 a 15 caracteres
+            max_chars = 12
+            num_chars = int(peso * 100 / (max([a['peso'] for a in ativos_ordenados]) * 100) * max_chars)
+            barra = '█' * max(num_chars, 1)  # Mínimo 1 caractere
+
+            ax_sumario.text(0.80, y_pos, barra, ha='left', va='top',
+                           fontsize=8, color=cor, family='monospace',
+                           transform=ax_sumario.transAxes)
+
+            y_pos -= y_step
+
+        # Adicionar rodapé com total
+        ax_sumario.plot([0.1, 0.9], [y_pos + y_step * 0.2, y_pos + y_step * 0.2],
+                       'k-', lw=0.5, transform=ax_sumario.transAxes)
+
+        total_peso = sum([a['peso'] for a in ativos_ordenados])
+        ax_sumario.text(0.5, y_pos, f"Total: {total_peso*100:.2f}%",
+                       ha='center', va='top', fontsize=9, fontweight='bold',
+                       transform=ax_sumario.transAxes)
+
+        # Ajustar layout manualmente (tight_layout causa warning com axis('off'))
+        plt.subplots_adjust(left=0.05, right=0.98, top=0.95, bottom=0.08, wspace=0.25)
+
+        # Salvar gráfico
+        if nome_arquivo is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            nome_arquivo = f'evolucao_ativos_carteira_{timestamp}.png'
+
+        output_dir = Path('comparison_results')
+        output_dir.mkdir(exist_ok=True)
+
+        caminho_completo = output_dir / nome_arquivo
+        plt.savefig(caminho_completo, dpi=300, bbox_inches='tight')
+        plt.close()
+
+        print(f"  ✅ Gráfico de evolução dos ativos salvo em: {caminho_completo}")
+        print(f"{'='*70}\n")
+
+        return str(caminho_completo)
+
     def calcular_metricas_comparativas(self,
                                        carteira: List[Dict],
                                        ticker_benchmark: str,
@@ -439,57 +687,102 @@ class BenchmarkComparison:
         print(f"📊 GERANDO GRÁFICO COMPARATIVO")
         print(f"{'='*70}")
 
-        # Configurar figura com 2 subplots
-        fig, axes = plt.subplots(2, 1, figsize=(14, 12))
+        # Configurar figura com 3 subplots verticais
+        fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(14, 16))
         fig.suptitle('Comparação: Carteira vs Benchmark', fontsize=16, fontweight='bold')
 
         datas = self.portfolio_data.index
 
+        # ====================================================================
         # Gráfico 1: Retorno Acumulado
-        axes[0].plot(datas, self.portfolio_data['retorno_acumulado'] * 100,
+        # ====================================================================
+        ax1.plot(datas, self.portfolio_data['retorno_acumulado'] * 100,
                     linewidth=2.5, color='#2E86AB', marker='o', markersize=3,
                     label='Carteira Otimizada')
-        axes[0].plot(datas, self.benchmark_data['retorno_acumulado'] * 100,
+        ax1.plot(datas, self.benchmark_data['retorno_acumulado'] * 100,
                     linewidth=2.5, color='#F18F01', marker='s', markersize=3,
                     label=f'Benchmark ({ticker_benchmark or "Índice"})')
-        axes[0].axhline(y=0, color='red', linestyle='--', alpha=0.5, linewidth=1)
-        axes[0].set_title('Retorno Acumulado ao Longo do Tempo', fontsize=12, fontweight='bold')
-        axes[0].set_xlabel('Data', fontsize=10)
-        axes[0].set_ylabel('Retorno Acumulado (%)', fontsize=10)
-        axes[0].grid(True, alpha=0.3, linestyle='--')
-        axes[0].legend(loc='upper left', fontsize=9)
+        ax1.axhline(y=0, color='red', linestyle='--', alpha=0.5, linewidth=1)
+        ax1.set_title('Retorno Acumulado ao Longo do Tempo', fontsize=12, fontweight='bold')
+        ax1.set_xlabel('Data', fontsize=10)
+        ax1.set_ylabel('Retorno Acumulado (%)', fontsize=10)
+        ax1.grid(True, alpha=0.3, linestyle='--')
+        ax1.legend(loc='upper left', fontsize=9)
+        ax1.tick_params(axis='x', rotation=45)
 
         # Adicionar anotações com retornos finais
         ret_final_cart = self.portfolio_data['retorno_acumulado'].iloc[-1] * 100
         ret_final_bench = self.benchmark_data['retorno_acumulado'].iloc[-1] * 100
 
-        axes[0].annotate(f'Carteira: {ret_final_cart:+.2f}%',
+        ax1.annotate(f'Carteira: {ret_final_cart:+.2f}%',
                         xy=(datas[-1], ret_final_cart),
                         xytext=(10, 10), textcoords='offset points',
                         bbox=dict(boxstyle='round,pad=0.5', facecolor='#2E86AB', alpha=0.7),
                         fontsize=8, fontweight='bold', color='white')
 
-        axes[0].annotate(f'Benchmark: {ret_final_bench:+.2f}%',
+        ax1.annotate(f'Benchmark: {ret_final_bench:+.2f}%',
                         xy=(datas[-1], ret_final_bench),
                         xytext=(10, -20), textcoords='offset points',
                         bbox=dict(boxstyle='round,pad=0.5', facecolor='#F18F01', alpha=0.7),
                         fontsize=8, fontweight='bold', color='white')
 
-        # Gráfico 2: Retornos Mensais Comparados
+        # ====================================================================
+        # Gráfico 2: Volatilidade Rolante (6 meses, anualizada)
+        # ====================================================================
+        janela = 6  # 6 meses de janela rolante
+
+        # Calcular volatilidade rolante anualizada
+        vol_cart_rolling = self.portfolio_data['retorno'].rolling(window=janela).std() * np.sqrt(12) * 100
+        vol_bench_rolling = self.benchmark_data['retorno'].rolling(window=janela).std() * np.sqrt(12) * 100
+
+        # Calcular volatilidade média do período (para o sumário)
+        vol_media_cart = vol_cart_rolling.mean()
+        vol_media_bench = vol_bench_rolling.mean()
+
+        ax2.plot(datas, vol_cart_rolling,
+                linewidth=2.5, color='#2E86AB', marker='o', markersize=3,
+                label='Carteira Otimizada')
+        ax2.plot(datas, vol_bench_rolling,
+                linewidth=2.5, color='#F18F01', marker='s', markersize=3,
+                label=f'Benchmark ({ticker_benchmark or "Índice"})')
+        ax2.set_title(f'Volatilidade Rolante ({janela} meses, anualizada)', fontsize=12, fontweight='bold')
+        ax2.set_xlabel('Data', fontsize=10)
+        ax2.set_ylabel('Volatilidade (%)', fontsize=10)
+        ax2.grid(True, alpha=0.3, linestyle='--')
+        ax2.legend(loc='upper left', fontsize=9)
+        ax2.tick_params(axis='x', rotation=45)
+
+        # Adicionar anotações com volatilidade média
+        ax2.annotate(f'Média Carteira: {vol_media_cart:.2f}%',
+                    xy=(0.02, 0.95), xycoords='axes fraction',
+                    bbox=dict(boxstyle='round,pad=0.5', facecolor='#2E86AB', alpha=0.7),
+                    fontsize=8, fontweight='bold', color='white',
+                    va='top')
+
+        ax2.annotate(f'Média Benchmark: {vol_media_bench:.2f}%',
+                    xy=(0.02, 0.85), xycoords='axes fraction',
+                    bbox=dict(boxstyle='round,pad=0.5', facecolor='#F18F01', alpha=0.7),
+                    fontsize=8, fontweight='bold', color='white',
+                    va='top')
+
+        # ====================================================================
+        # Gráfico 3: Retornos Mensais Comparados
+        # ====================================================================
         x = np.arange(len(datas))
         width = 0.35
 
-        axes[1].bar(x - width/2, self.portfolio_data['retorno'] * 100, width,
+        ax3.bar(x - width/2, self.portfolio_data['retorno'] * 100, width,
                    label='Carteira', color='#2E86AB', alpha=0.7)
-        axes[1].bar(x + width/2, self.benchmark_data['retorno'] * 100, width,
+        ax3.bar(x + width/2, self.benchmark_data['retorno'] * 100, width,
                    label=f'Benchmark ({ticker_benchmark or "Índice"})', color='#F18F01', alpha=0.7)
-        axes[1].axhline(y=0, color='black', linestyle='-', alpha=0.3)
-        axes[1].set_title('Retornos Mensais Comparados', fontsize=12, fontweight='bold')
-        axes[1].set_xlabel('Período', fontsize=10)
-        axes[1].set_ylabel('Retorno Mensal (%)', fontsize=10)
-        axes[1].grid(True, alpha=0.3, linestyle='--', axis='y')
-        axes[1].legend(loc='upper left', fontsize=9)
+        ax3.axhline(y=0, color='black', linestyle='-', alpha=0.3)
+        ax3.set_title('Retornos Mensais Comparados', fontsize=12, fontweight='bold')
+        ax3.set_xlabel('Período', fontsize=10)
+        ax3.set_ylabel('Retorno Mensal (%)', fontsize=10)
+        ax3.grid(True, alpha=0.3, linestyle='--', axis='y')
+        ax3.legend(loc='upper left', fontsize=9)
 
+        # Ajustar layout
         plt.tight_layout()
 
         # Salvar gráfico
@@ -533,12 +826,21 @@ class BenchmarkComparison:
             carteira, ticker_benchmark, data_inicio, data_fim
         )
 
-        # Gerar gráfico se solicitado
+        # Gerar gráficos se solicitado
         if salvar_grafico:
+            # Gráfico comparativo entre carteira e benchmark
             caminho_grafico = self.gerar_grafico_comparacao(
                 ticker_benchmark=ticker_benchmark
             )
             metricas['grafico_path'] = caminho_grafico
+
+            # Gráfico de evolução dos ativos individuais da carteira
+            caminho_grafico_ativos = self.gerar_grafico_evolucao_ativos(
+                carteira=carteira,
+                data_inicio=data_inicio,
+                data_fim=data_fim
+            )
+            metricas['grafico_ativos_path'] = caminho_grafico_ativos
 
         return metricas
 

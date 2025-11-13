@@ -21,7 +21,7 @@ from app import create_app
 from models import db, Ativo, HistoricoPrecos
 from models.ativo import TipoAtivo
 
-DEFAULT_GEN_SIZE = 100
+DEFAULT_GEN_SIZE = 50
 DEFAULT_POPULATION_SIZE = 100
 
 MIN_ATIVOS = 5
@@ -175,17 +175,6 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
 
         # Obj 3: Risco de cauda (CVaR)
         cvar = self._calcular_cvar(pesos)
-
-        # --- AJUSTE DOS OBJETIVOS PELO PERFIL DE RISCO ---
-        # Penaliza mais o risco para perfis conservadores e menos para arrojados.
-        # Isso "empurra" o algoritmo para as regiões da Fronteira de Pareto desejadas.
-        # if self.nivel_risco == 'conservador':
-        #     variancia *= 1.5
-        #     cvar *= 2.0
-        # elif self.nivel_risco == 'arrojado':
-        #     variancia *= 0.8
-        #     cvar *= 0.8
-        # Para 'moderado', não fazemos nada (peso 1.0)
 
         out["F"] = [retorno, variancia, cvar]
 
@@ -1094,7 +1083,7 @@ def otimizar_carteira_atual(app):
     print("\n" + "=" * 80)
     print("EXEMPLO 1: Otimização normal (usando todos os dados disponíveis)")
     print("=" * 80)
-    service = Nsga2OtimizacaoService(app, [1], "conservador", 5, exibir_grafico=True)
+    service = Nsga2OtimizacaoService(app, [1], "conservador", 5, exibir_grafico=False)
     resultado = service.otimizar(max_ativos=10, use_optimal_config=False)
 
     # Informações adicionais
@@ -1146,10 +1135,10 @@ def main():
     app = create_app()
 
     # Exemplo 1: Otimização normal (sem backtest)
-    otimizar_carteira_atual(app)
+   # otimizar_carteira_atual(app)
 
     # Exemplo 2: Otimização com backtest (usando dados até uma data específica)
-    # backtest(app)
+    backtest(app)
 
 
 if __name__ == "__main__":
