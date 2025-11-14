@@ -57,5 +57,5 @@ def create_app():
 
 if __name__ == '__main__':
     app = create_app()
-    print(f"🚀 Iniciando {app.config['APP_NAME']} v{app.config['APP_VERSION']}")
+    print(f"Iniciando {app.config['APP_NAME']} v{app.config['APP_VERSION']}")
     app.run(debug=True)
