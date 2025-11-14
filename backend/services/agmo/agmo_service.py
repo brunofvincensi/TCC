@@ -1,4 +1,5 @@
 from matplotlib import pyplot as plt
+from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.config import Config
 from services.agmo.custom_operators import (
     SimplexSamplingCardConstraint,
@@ -12,7 +13,7 @@ import numpy as np
 import pandas as pd
 from typing import List, Dict, Tuple
 from pymoo.core.problem import ElementwiseProblem
-from pymoo.algorithms.moo.nsga2 import NSGA2
+from pymoo.algorithms.moo.rnsga2 import RNSGA2
 from pymoo.optimize import minimize
 from pymoo.core.callback import Callback
 
@@ -20,7 +21,7 @@ from app import create_app
 from models import db, Ativo, HistoricoPrecos
 from models.ativo import TipoAtivo
 
-DEFAULT_GEN_SIZE = 50
+DEFAULT_GEN_SIZE = 100
 DEFAULT_POPULATION_SIZE = 100
 
 MIN_ATIVOS = 5
@@ -193,15 +194,25 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
 class Nsga2OtimizacaoService:
     def __init__(self, app, ids_ativos_restringidos, nivel_risco, prazo_anos=5, data_referencia=None, data_inicio=None, ids_ativos: List[int] = None, exibir_grafico=False):
         """
-        Serviço de otimização de carteira usando NSGA-II.
+        Serviço de otimização de carteira usando R-NSGA2 (Reference Point Based NSGA-II).
+
+        R-NSGA2 permite guiar a busca durante a otimização usando pontos de referência
+        customizados por perfil de risco, ao contrário do NSGA2 tradicional que só
+        permite seleção após gerar todas as soluções não-dominadas.
 
         Args:
             app: Instância da aplicação Flask
             ids_ativos_restringidos: Lista de IDs de ativos a serem excluídos da otimização
             nivel_risco: Perfil de risco ('conservador', 'moderado', 'arrojado')
+                        - conservador: Prioriza minimizar riscos (variância e CVaR)
+                        - moderado: Busca equilíbrio entre retorno e risco
+                        - arrojado: Prioriza maximizar retorno
             prazo_anos: Prazo do investimento em anos
             data_referencia: Data de referência para backtest (opcional). Se fornecida,
                            usa apenas dados históricos até essa data. Formato: datetime.date
+
+        Referências:
+            - Deb & Sundar (2006). "Reference point based multi-objective optimization using evolutionary algorithms"
         """
         self.app = app
         self.ids_ativos_restringidos = ids_ativos_restringidos
@@ -577,8 +588,9 @@ class Nsga2OtimizacaoService:
         termination = self.get_termination(generations, enable_early_stopping)
 
         print(f"\n{'='*70}")
-        print(f"🚀 EXECUTANDO OTIMIZAÇÃO")
+        print(f"🚀 EXECUTANDO OTIMIZAÇÃO R-NSGA2")
         print(f"{'='*70}")
+        print(f"  Algoritmo: R-NSGA2 (Reference Point Based)")
         print(f"  População: {population_size}")
         print(f"  Gerações: {generations}")
         print(f"  Perfil de risco: {self.nivel_risco}")
@@ -590,7 +602,7 @@ class Nsga2OtimizacaoService:
 
         resultado = minimize(problem, algorithm, termination,
                            callback=callback, verbose=True)
-        print("🏁 Otimização NSGA-II concluída.")
+        print("🏁 Otimização R-NSGA2 concluída.")
 
         if resultado.X is None:
             raise ValueError("O algoritmo não conseguiu encontrar nenhuma solução.")
@@ -605,13 +617,52 @@ class Nsga2OtimizacaoService:
                 f"mas self.tickers tem {len(self.tickers)} elementos!"
             )
 
+        # if self.exibir_grafico:
+        #     F = resultado.F
+        #     plt.scatter(F[:, 1], -F[:, 0], c=F[:, 2], cmap='viridis')
+        #     plt.xlabel("Risco (variância)")
+        #     plt.ylabel("Retorno esperado")
+        #     plt.colorbar(label="CVaR")
+        #     plt.title(f"Fronteira de Pareto - R-NSGA2 (Perfil: {self.nivel_risco})")
+        #     plt.show()
+
         if self.exibir_grafico:
             F = resultado.F
-            plt.scatter(F[:, 1], -F[:, 0], c=F[:, 2], cmap='viridis')
-            plt.xlabel("Risco (variância)")
-            plt.ylabel("Retorno esperado")
-            plt.colorbar(label="CVaR")
-            plt.title("Fronteira de Pareto - NSGA-II")
+
+            # # Limites fixos para comparação entre diferentes execuções
+            # # Ajuste estes valores conforme necessário baseado nos seus dados
+            # LIMITE_X = (0.001, 0.012)  # Variância (risco)
+            # LIMITE_Y = (0.014, 0.032)  # Retorno esperado
+            # LIMITE_CVAR = (0.075, 0.10)  # CVaR
+
+            LIMITE_X = (0.001, 0.012)  # Variância (risco)
+            LIMITE_Y = (0.014, 0.032)  # Retorno esperado
+            LIMITE_CVAR = (0.075, 0.10)  # CVaR
+
+            fig, ax = plt.subplots(figsize=(10, 8))
+
+            scatter = ax.scatter(
+                F[:, 1],  # Variância (eixo X)
+                -F[:, 0],  # Retorno (eixo Y, invertido)
+                c=F[:, 2],  # CVaR (cor)
+                cmap='viridis',
+                s=80,  # Tamanho dos pontos
+                alpha=0.7,
+                vmin=LIMITE_CVAR[0],  # Limite mínimo da escala de cor
+                vmax=LIMITE_CVAR[1]  # Limite máximo da escala de cor
+            )
+
+            # Aplicar limites fixos aos eixos
+            ax.set_xlim(LIMITE_X)
+            ax.set_ylim(LIMITE_Y)
+
+            ax.set_xlabel("Risco (variância)", fontsize=11)
+            ax.set_ylabel("Retorno esperado", fontsize=11)
+            ax.set_title(f"Fronteira de Pareto - R-NSGA2 (Perfil: {self.nivel_risco})", fontsize=12)
+            ax.grid(True, alpha=0.3)
+
+            plt.colorbar(scatter, ax=ax, label="CVaR")
+            plt.tight_layout()
             plt.show()
 
         # Os pesos_otimos estão na ordem de self.tickers (colunas do DataFrame)
@@ -699,10 +750,13 @@ class Nsga2OtimizacaoService:
     def get_algorithm(self, crossover_eta: float, mutation_eta: float,
                      population_size: int, max_ativos: int = None) -> NSGA2:
         """
-        Cria algoritmo NSGA-II com operadores apropriados.
+        Cria algoritmo R-NSGA2 com operadores apropriados e pontos de referência
+        customizados por perfil de risco.
+
+        R-NSGA2 guia a busca durante a otimização usando pontos de referência,
+        direcionando as soluções para regiões específicas da fronteira de Pareto.
 
         Se max_ativos for especificado, usa operadores com restrição de cardinalidade.
-        Caso contrário, usa operadores simplex padrão.
 
         Args:
             crossover_eta: Parâmetro eta do crossover
@@ -711,7 +765,11 @@ class Nsga2OtimizacaoService:
             max_ativos: Número máximo de ativos (None = sem restrição)
 
         Returns:
-            Instância do NSGA2 configurada
+            Instância do R-NSGA2 configurada
+
+        Referências:
+            - Deb & Sundar (2006). "Reference point based multi-objective optimization using evolutionary algorithms"
+            - Molina et al. (2009). "Preference incorporation to solve many-objective airfoil design problems"
         """
 
         # Operadores customizados com restrição de cardinalidade
@@ -719,8 +777,55 @@ class Nsga2OtimizacaoService:
         crossover = SimplexCrossoverCardConstraint(max_assets=max_ativos, eta=crossover_eta)
         mutation = SimplexMutationCardConstraint(max_assets=max_ativos, eta=mutation_eta)
 
-        return NSGA2(pop_size=population_size, crossover=crossover,
-                          mutation=mutation, sampling=sampling)
+        # Pontos de referência por perfil
+        # Cada linha é um ponto no espaço de objetivos [retorno_neg, variância, cvar]
+        # reference_points_config = {            'conservador': np.array([
+        #         [0.3, 0.0, 0.0],  # Prioridade máxima: minimizar variância e CVaR
+        #         [0.2, 0.1, 0.1],  # Aceitável: pequeno aumento de risco
+        #         [0.1, 0.2, 0.2],  # Tolerável: risco moderado
+        #     ]),
+        #     'moderado': np.array([
+        #         [0.1, 0.2, 0.2],  # Bom retorno com risco controlado
+        #         [0.2, 0.3, 0.3],  # Balanceado
+        #         [0.3, 0.1, 0.1],  # Foco em retorno quando risco é baixo
+        #     ]),
+        #     'arrojado': np.array([
+        #         [0.0, 0.3, 0.3],  # Prioridade máxima: maximizar retorno
+        #         [0.0, 0.5, 0.5],  # Aceita risco alto para máximo retorno
+        #         [0.1, 0.4, 0.4],  # Bom retorno com risco alto
+        #     ])
+        #
+        # }
+
+        reference_points_config = {
+            'conservador': np.array([
+                [0.3, 0.0, 0.0],  # Prioridade máxima: minimizar variância e CVaR
+            ]),
+            'moderado': np.array([
+                [0.0, 0.3, 0.3],  # Balanceado
+            ]),
+            'arrojado': np.array([
+                [0.0, 0.3, 0.3],  # Bom retorno com risco alto
+            ])
+        }
+
+        ref_points = reference_points_config.get(self.nivel_risco)
+
+        return RNSGA2(
+            ref_points=ref_points,
+            pop_size=population_size,
+            crossover=crossover,
+            mutation=mutation,
+            sampling=sampling,
+            epsilon=0.01,  # Controla o tamanho da região de interesse em torno dos pontos de referência
+            normalization='front',  # Normaliza baseado na fronteira atual
+            extreme_points_as_reference_points=False,  # Usa apenas nossos pontos customizados
+            weights=np.array([0.5, 0.25, 0.25])  # Pesos para Achievement Scalarizing Function
+        )
+
+        # return NSGA2(pop_size=population_size, crossover=crossover,
+        #     mutation=mutation,
+        #     sampling=sampling)
 
     def get_hiperparameters(self, generations: int | None, num_ativos: int, population_size: int | None,
                            use_optimal_config: bool):
@@ -1072,7 +1177,7 @@ def salvar_grafico_backtest(carteira: List[Dict],
 
 
 def otimizar_carteira_atual(app):
-    service = Nsga2OtimizacaoService(app, [1], "conservador", 5, exibir_grafico=False)
+    service = Nsga2OtimizacaoService(app, [1], "moderado", 10, exibir_grafico=True)
     resultado = service.otimizar(max_ativos=10, use_optimal_config=False)
 
     # Informações adicionais
@@ -1084,8 +1189,8 @@ def otimizar_carteira_atual(app):
 
 def backtest(app):
     from datetime import date
-    data_backtest = date(2019, 1, 1)
-    service_backtest = Nsga2OtimizacaoService(app, [1], "arrojado", 10, data_referencia=data_backtest)
+    data_backtest = date(2015, 1, 1)
+    service_backtest = Nsga2OtimizacaoService(app, [1, 10], "moderado", 10, data_referencia=data_backtest, exibir_grafico=True)
     carteira_backtest = service_backtest.otimizar(max_ativos=10)
 
     # Informações do backtest
@@ -1121,10 +1226,10 @@ def main():
     app = create_app()
 
     # Exemplo 1: Otimização normal (sem backtest)
-    otimizar_carteira_atual(app)
+ #   otimizar_carteira_atual(app)
 
     # Exemplo 2: Otimização com backtest (usando dados até uma data específica)
-  #  backtest(app)
+    backtest(app)
 
 
 if __name__ == "__main__":

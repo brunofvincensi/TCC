@@ -3,7 +3,10 @@ Serviço de Otimização de Carteiras - Interface para API
 
 Este módulo fornece a interface entre as rotas da API e o serviço de otimização
 AGMO (Algoritmo Genético Multiobjetivo). Ele mapeia os parâmetros da requisição
-HTTP para os parâmetros esperados pelo Nsga2OtimizacaoService.
+HTTP para os parâmetros esperados pelo Nsga2OtimizacaoService (R-NSGA2).
+
+R-NSGA2 permite guiar a busca durante a otimização usando pontos de referência
+customizados por perfil de risco, diferente do NSGA2 tradicional.
 
 Autor: Sistema de Otimização de Portfólio - TCC
 """
@@ -32,7 +35,11 @@ class OtimizacaoService:
     @staticmethod
     def otimizar_carteira(parametros: dict) -> Tuple[Optional[List[Dict]], str]:
         """
-        Otimiza uma carteira de investimentos usando AGMO (NSGA-II).
+        Otimiza uma carteira de investimentos usando AGMO (R-NSGA2).
+
+        R-NSGA2 usa pontos de referência para guiar a busca durante a otimização,
+        direcionando as soluções para regiões específicas da fronteira de Pareto
+        baseadas no perfil de risco do usuário.
 
         Args:
             parametros: Dicionário com parâmetros de otimização:
@@ -111,7 +118,7 @@ class OtimizacaoService:
 
             # ========== 3. EXECUÇÃO DA OTIMIZAÇÃO ==========
             logger.info("=" * 70)
-            logger.info("INICIANDO OTIMIZAÇÃO AGMO (NSGA-II)")
+            logger.info("INICIANDO OTIMIZAÇÃO AGMO (R-NSGA2)")
             logger.info("=" * 70)
             logger.info(f"  Perfil de risco: {perfil_risco}")
             logger.info(f"  Horizonte: {prazo_anos} anos")

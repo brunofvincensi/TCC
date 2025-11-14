@@ -40,7 +40,7 @@ def exemplo_completo():
 
     # Parâmetros da otimização
     ids_ativos_restringidos = []  # Sem restrições de ativos
-    nivel_risco = 'conservador'  # Perfil de risco
+    nivel_risco = 'arrojado'  # Perfil de risco
     prazo_anos = 10  # Prazo de investimento
     max_ativos_carteira = 10  # Máximo de ativos na carteira
 
