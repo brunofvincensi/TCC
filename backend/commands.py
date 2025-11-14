@@ -1,7 +1,6 @@
 import csv
 from models import db
 from models.ativo import Ativo, TipoAtivo
-from services.history_processor.anbima_processor import AnbimaProcessor
 from services.history_processor.yfinance_processor import YFinanceProcessor
 
 
