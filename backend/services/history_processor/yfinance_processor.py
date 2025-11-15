@@ -6,12 +6,12 @@ from models.ativo import HistoricoPrecos
 class YFinanceProcessor:
 
     def process(self, asset):
-        period = "max"  # if full_history else "1y"
+        period = "max"
         print(f"\nIniciando atualização de preços MENSAIS (período: {period})...")
 
         print(f"Buscando histórico para {asset.ticker}...")
         try:
-            """Busca o histórico MENSAL de preços ajustados por dividendos."""
+            """Busca o histórico mensal de preços ajustados por dividendos."""
             data = yf.download(
                 asset.ticker + '.SA',
                 interval="1mo",
