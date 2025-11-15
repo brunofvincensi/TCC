@@ -538,37 +538,6 @@ class Nsga2OtimizacaoService:
                  crossover_eta: float = 10.0, mutation_eta: float = 10.0,
                  convergence_tracker=None, use_optimal_config: bool = True,
                  enable_early_stopping=False, max_ativos: int = 20):
-        """
-        Orquestra o processo completo de otimização personalizada.
-
-        Args:
-            population_size: Tamanho da população para o NSGA-II (None = auto-lookup)
-            generations: Número de gerações (None = auto-lookup)
-            crossover_eta: Parâmetro eta do crossover
-            mutation_eta: Parâmetro eta da mutação
-            convergence_tracker: Instância de ConvergenceTracker para rastrear convergência (opcional)
-            use_optimal_config: Se True, tenta buscar configuração ótima do banco de dados
-            enable_early_stopping: Se True, cria um critério de parada complementar ao numero máximo de gerações
-            max_ativos: Número máximo de ativos na carteira (None = sem restrição).
-                       Quando especificado, usa operadores genéticos com restrição de cardinalidade.
-
-        Returns:
-            dict: Dicionário contendo:
-                - composicao: Lista de dicionários com id_ativo, ticker e peso
-                - data_referencia: Data de referência usada (None se não for backtest)
-                - periodo_inicio: Data inicial dos dados históricos usados
-                - periodo_fim: Data final dos dados históricos usados
-                - num_meses: Número de meses de dados históricos utilizados
-                - hyperparameters_used: Hiperparâmetros utilizados
-                - max_ativos_enforced: Se restrição de cardinalidade foi aplicada
-
-        Referências (restrição de cardinalidade):
-            - Chang et al. (2000). "Heuristics for cardinality constrained portfolio optimisation".
-              Computers & Operations Research, 27(13), 1271-1302.
-            - Ruiz-Torrubiano & Suárez (2010). "Hybrid approaches and dimensionality reduction
-              for portfolio selection with cardinality constraints".
-              IEEE Computational Intelligence Magazine, 5(2), 92-107.
-        """
 
         if max_ativos is not None and max_ativos < MIN_ATIVOS:
             raise ValueError(f"São necessários pelo menos {MIN_ATIVOS} ativos do tipo 'Ação' para a otimização.")
@@ -610,31 +579,17 @@ class Nsga2OtimizacaoService:
         # Seleciona a melhor carteira da fronteira de Pareto
         pesos_otimos = self._escolher_melhor_carteira(resultado.opt.get("F"), resultado.opt.get("X"))
 
-        # ✅ VALIDAÇÃO: Garante que os tamanhos correspondem
+        # Garante que os tamanhos correspondem
         if len(pesos_otimos) != len(self.tickers):
             raise ValueError(
                 f"Inconsistência detectada: pesos_otimos tem {len(pesos_otimos)} elementos, "
                 f"mas self.tickers tem {len(self.tickers)} elementos!"
             )
 
-        # if self.exibir_grafico:
-        #     F = resultado.F
-        #     plt.scatter(F[:, 1], -F[:, 0], c=F[:, 2], cmap='viridis')
-        #     plt.xlabel("Risco (variância)")
-        #     plt.ylabel("Retorno esperado")
-        #     plt.colorbar(label="CVaR")
-        #     plt.title(f"Fronteira de Pareto - R-NSGA2 (Perfil: {self.nivel_risco})")
-        #     plt.show()
-
         if self.exibir_grafico:
             F = resultado.F
 
-            # # Limites fixos para comparação entre diferentes execuções
-            # # Ajuste estes valores conforme necessário baseado nos seus dados
-            # LIMITE_X = (0.001, 0.012)  # Variância (risco)
-            # LIMITE_Y = (0.014, 0.032)  # Retorno esperado
-            # LIMITE_CVAR = (0.075, 0.10)  # CVaR
-
+            # Limites fixos para comparação entre diferentes execuções
             LIMITE_X = (0.001, 0.012)  # Variância (risco)
             LIMITE_Y = (0.014, 0.032)  # Retorno esperado
             LIMITE_CVAR = (0.075, 0.10)  # CVaR
@@ -756,8 +711,6 @@ class Nsga2OtimizacaoService:
         R-NSGA2 guia a busca durante a otimização usando pontos de referência,
         direcionando as soluções para regiões específicas da fronteira de Pareto.
 
-        Se max_ativos for especificado, usa operadores com restrição de cardinalidade.
-
         Args:
             crossover_eta: Parâmetro eta do crossover
             mutation_eta: Parâmetro eta da mutação
@@ -794,7 +747,6 @@ class Nsga2OtimizacaoService:
         #         [0.0, 0.5, 0.5],  # Aceita risco alto para máximo retorno
         #         [0.1, 0.4, 0.4],  # Bom retorno com risco alto
         #     ])
-        #
         # }
 
         reference_points_config = {
@@ -964,31 +916,8 @@ class Nsga2OtimizacaoService:
 
         print(f"{'─'*80}")
 
-        # 3. Concentração
-        print(f"\n🎯 ANÁLISE DE CONCENTRAÇÃO:")
-        print(f"{'─'*80}")
-
-        top_3_peso = sum(a['peso'] for a in composicao_ordenada[:3]) * 100
-        max_peso = composicao_ordenada[0]['peso'] * 100
-        min_peso = composicao_ordenada[-1]['peso'] * 100
-
-        print(f"   Top 3 ativos concentram:    {top_3_peso:>8.2f}%")
-        print(f"   Maior alocação individual:  {max_peso:>8.2f}% ({composicao_ordenada[0]['ticker']})")
-        print(f"   Menor alocação individual:  {min_peso:>8.2f}% ({composicao_ordenada[-1]['ticker']})")
-
-        # Avaliação de diversificação
-        if top_3_peso > 70:
-            print(f"   ⚠️  Alta concentração - Considere diversificar")
-        elif top_3_peso < 40:
-            print(f"   ✅ Boa diversificação")
-        else:
-            print(f"   ℹ️  Diversificação moderada")
-
-        print(f"{'─'*80}")
-
         print(f"\n✅ Otimização concluída com sucesso!")
         print(f"{'='*80}\n")
-
 
 def _calcular_retorno_carteira(app, carteira: List[Dict],
                                data_inicio,

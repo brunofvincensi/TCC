@@ -21,12 +21,6 @@ Referências:
   "Hybrid approaches and dimensionality reduction for portfolio selection
   with cardinality constraints". IEEE Computational Intelligence Magazine, 5(2), 92-107.
 
-- Bienstock, D. (1996).
-  "Computational study of a family of mixed-integer quadratic programming problems".
-  Mathematical Programming, 74(2), 121-140.
-
-Autor: Claude Code
-Data: 2025-11-04
 """
 
 import numpy as np
@@ -50,9 +44,6 @@ def _enforce_cardinality(weights: np.ndarray, max_assets: int) -> np.ndarray:
 
     Returns:
         Vetor de pesos com no máximo max_assets ativos não-zero, soma = 1
-
-    Referência:
-        Chang et al. (2000) - "Heuristics for cardinality constrained portfolio optimisation"
     """
     n_var = len(weights)
 
@@ -235,7 +226,7 @@ class SimplexCrossoverCardConstraint(Crossover):
             c1 = c1 / c1.sum()
             c2 = c2 / c2.sum()
 
-            # ✅ APLICAR RESTRIÇÃO DE CARDINALIDADE
+            # Aplica a restrição de cardinalidade
             c1 = _enforce_cardinality(c1, self.max_assets)
             c2 = _enforce_cardinality(c2, self.max_assets)
 
@@ -360,7 +351,7 @@ class SimplexMutationCardConstraint(Mutation):
                 # Fallback
                 individuo = np.ones(n_var) / n_var
 
-            # ✅ APLICAR RESTRIÇÃO DE CARDINALIDADE
+            # Aplica a restrição de cardinalidade
             individuo = _enforce_cardinality(individuo, self.max_assets)
 
             # Garantir limites do problema

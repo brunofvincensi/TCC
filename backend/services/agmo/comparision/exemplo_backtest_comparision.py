@@ -1,10 +1,5 @@
 """
 Exemplo de uso integrado do backtest com gráficos e comparação com benchmark.
-
-Este exemplo demonstra como:
-1. Executar um backtest de carteira otimizada
-2. Gerar gráficos de retorno e volatilidade
-3. Comparar a carteira com um benchmark (ex: Ibovespa)
 """
 
 from datetime import date
