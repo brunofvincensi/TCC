@@ -352,7 +352,7 @@ class Nsga2OtimizacaoService:
                 if a.ticker in self.tickers
             ]
 
-            # ✅ VALIDAÇÃO: Garante que todos os tickers em self.tickers têm um ativo correspondente
+            # Validação para garantir que todos os tickers em self.tickers têm um ativo correspondente
             asset_tickers = {a.ticker for a in self.assets_to_optimize}
             missing_tickers = set(self.tickers) - asset_tickers
             if missing_tickers:
@@ -360,14 +360,14 @@ class Nsga2OtimizacaoService:
                     f"Inconsistência detectada: Tickers no DataFrame sem ativo correspondente: {missing_tickers}"
                 )
 
-            # ✅ VALIDAÇÃO: Garante que os tamanhos correspondem
+            # Validação para garantir que os tamanhos correspondem
             if len(self.assets_to_optimize) != len(self.tickers):
                 raise ValueError(
                     f"Inconsistência detectada: {len(self.assets_to_optimize)} ativos, "
                     f"mas {len(self.tickers)} tickers no DataFrame!"
                 )
 
-            # ✅ Validação de dados suficientes
+            # Validação de dados suficientes
             if len(df_returns) < minimum_history_months:
                 raise ValueError(
                     f"Dados históricos insuficientes após alinhamento!\n"
@@ -392,7 +392,6 @@ class Nsga2OtimizacaoService:
             self.covariance_matrix = df_returns.cov()
             correlation_matrix = df_returns.corr()
 
-            # ✅ PRINTAR MATRIZ DE CORRELAÇÃO
             print(f"\n{'=' * 70}")
             print(f"📊 MATRIZ DE CORRELAÇÃO")
             print(f"{'=' * 70}")
@@ -401,7 +400,6 @@ class Nsga2OtimizacaoService:
             # Análise da correlação
             self._analyze_correlation(correlation_matrix)
 
-            # ✅ PRINTAR MATRIZ DE COVARIÂNCIA
             print(f"\n{'=' * 70}")
             print(f"📊 MATRIZ DE COVARIÂNCIA (Mensal)")
             print(f"{'=' * 70}")
