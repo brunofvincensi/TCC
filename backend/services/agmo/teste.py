@@ -20,7 +20,7 @@ from models import db, Ativo, HistoricoPrecos
 from models.ativo import TipoAtivo
 
 
-def analisar_cvar_por_ativo(app):
+def analyze_cvar_by_asset(app):
     """
     Calcula o CVaR individual de cada ativo para entender
     por que BBDC4 foi escolhido.
@@ -64,104 +64,104 @@ def analisar_cvar_por_ativo(app):
         ).dropna()
 
         # Calcula métricas por ativo
-        resultados = []
+        results = []
 
         for ticker in df_retornos.columns:
-            retornos = df_retornos[ticker].values
+            returns = df_retornos[ticker].values
 
             # Retorno médio
-            ret_medio = np.mean(retornos) * 100  # %
+            mean_return = np.mean(returns) * 100  # %
 
             # Volatilidade
-            volatilidade = np.std(retornos) * 100  # %
+            volatility = np.std(returns) * 100  # %
 
             # CVaR (5% piores cenários)
             alpha = 0.05
-            perdas = -retornos  # Inverte sinal
-            perdas_validas = perdas[np.isfinite(perdas)]
-            k = max(1, int(np.ceil(alpha * len(perdas_validas))))
-            perdas_ordenadas = np.sort(perdas_validas)
-            cauda = perdas_ordenadas[-k:]  # k piores
-            cvar = np.mean(cauda) * 100  # %
+            losses = -returns  # Inverte sinal
+            valid_losses = losses[np.isfinite(losses)]
+            k = max(1, int(np.ceil(alpha * len(valid_losses))))
+            sorted_losses = np.sort(valid_losses)
+            tail = sorted_losses[-k:]  # k piores
+            cvar = np.mean(tail) * 100  # %
 
             # Sharpe
-            sharpe = ret_medio / volatilidade if volatilidade > 0 else 0
+            sharpe = mean_return / volatility if volatility > 0 else 0
 
             # Downside deviation (volatilidade dos retornos negativos)
-            retornos_negativos = retornos[retornos < 0]
-            downside_vol = np.std(retornos_negativos) * 100 if len(retornos_negativos) > 0 else 0
+            negative_returns = returns[returns < 0]
+            downside_vol = np.std(negative_returns) * 100 if len(negative_returns) > 0 else 0
 
             # Assimetria (skewness)
             from scipy.stats import skew
-            assimetria = skew(retornos)
+            skewness = skew(returns)
 
             # Curtose (kurtosis)
             from scipy.stats import kurtosis
-            curtose = kurtosis(retornos)
+            kurt = kurtosis(returns)
 
-            resultados.append({
+            results.append({
                 'ticker': ticker,
-                'retorno_mensal': ret_medio,
-                'volatilidade': volatilidade,
+                'retorno_mensal': mean_return,
+                'volatilidade': volatility,
                 'cvar_5': cvar,
                 'sharpe': sharpe,
                 'downside_vol': downside_vol,
-                'assimetria': assimetria,
-                'curtose': curtose
+                'assimetria': skewness,
+                'curtose': kurt
             })
 
         # DataFrame de resultados
-        df_resultados = pd.DataFrame(resultados)
+        df_results = pd.DataFrame(results)
 
         # Ordena por CVaR (menor = melhor)
-        df_resultados = df_resultados.sort_values('cvar_5')
+        df_results = df_results.sort_values('cvar_5')
 
         print("\n📊 RANKING POR CVaR (Risco de Cauda - 5% piores cenários)")
         print("=" * 80)
         print(f"{'Rank':<5} {'Ticker':<10} {'CVaR':<10} {'Retorno':<12} {'Vol':<10} {'Sharpe':<10}")
         print("-" * 80)
 
-        for i, row in df_resultados.iterrows():
+        for i, row in df_results.iterrows():
             # Destaca BBDC4
-            destaque = " ← ALTO PESO!" if row['ticker'] == 'BBDC4' else ""
+            highlight = " ← ALTO PESO!" if row['ticker'] == 'BBDC4' else ""
 
-            print(f"{df_resultados.index.get_loc(i) + 1:<5} "
+            print(f"{df_results.index.get_loc(i) + 1:<5} "
                   f"{row['ticker']:<10} "
                   f"{row['cvar_5']:>8.2f}% "
                   f"{row['retorno_mensal']:>10.2f}% "
                   f"{row['volatilidade']:>8.2f}% "
                   f"{row['sharpe']:>8.2f}"
-                  f"{destaque}")
+                  f"{highlight}")
 
         # Análise específica do BBDC4
-        bbdc4 = df_resultados[df_resultados['ticker'] == 'BBDC4'].iloc[0]
+        bbdc4 = df_results[df_results['ticker'] == 'BBDC4'].iloc[0]
 
         print("\n" + "=" * 80)
         print("🔬 ANÁLISE DETALHADA: BBDC4")
         print("=" * 80)
 
         # Posição nos rankings
-        rank_cvar = df_resultados.index.get_loc(
-            df_resultados[df_resultados['ticker'] == 'BBDC4'].index[0]
+        rank_cvar = df_results.index.get_loc(
+            df_results[df_results['ticker'] == 'BBDC4'].index[0]
         ) + 1
 
-        df_por_retorno = df_resultados.sort_values('retorno_mensal', ascending=False)
-        rank_retorno = df_por_retorno.index.get_loc(
-            df_por_retorno[df_por_retorno['ticker'] == 'BBDC4'].index[0]
+        df_by_return = df_results.sort_values('retorno_mensal', ascending=False)
+        rank_return = df_by_return.index.get_loc(
+            df_by_return[df_by_return['ticker'] == 'BBDC4'].index[0]
         ) + 1
 
-        df_por_vol = df_resultados.sort_values('volatilidade')
-        rank_vol = df_por_vol.index.get_loc(
-            df_por_vol[df_por_vol['ticker'] == 'BBDC4'].index[0]
+        df_by_vol = df_results.sort_values('volatilidade')
+        rank_vol = df_by_vol.index.get_loc(
+            df_by_vol[df_by_vol['ticker'] == 'BBDC4'].index[0]
         ) + 1
 
-        df_por_sharpe = df_resultados.sort_values('sharpe', ascending=False)
-        rank_sharpe = df_por_sharpe.index.get_loc(
-            df_por_sharpe[df_por_sharpe['ticker'] == 'BBDC4'].index[0]
+        df_by_sharpe = df_results.sort_values('sharpe', ascending=False)
+        rank_sharpe = df_by_sharpe.index.get_loc(
+            df_by_sharpe[df_by_sharpe['ticker'] == 'BBDC4'].index[0]
         ) + 1
 
         print(f"\n📊 Métricas:")
-        print(f"   Retorno Mensal:    {bbdc4['retorno_mensal']:>6.2f}%  (Rank: {rank_retorno}/16)")
+        print(f"   Retorno Mensal:    {bbdc4['retorno_mensal']:>6.2f}%  (Rank: {rank_return}/16)")
         print(f"   Volatilidade:      {bbdc4['volatilidade']:>6.2f}%  (Rank: {rank_vol}/16)")
         print(f"   CVaR (5%):         {bbdc4['cvar_5']:>6.2f}%  (Rank: {rank_cvar}/16) ← CHAVE!")
         print(f"   Sharpe Ratio:      {bbdc4['sharpe']:>6.2f}   (Rank: {rank_sharpe}/16)")
@@ -195,7 +195,7 @@ def analisar_cvar_por_ativo(app):
         print("🤔 Por que NÃO escolheu os de melhor Sharpe?")
         print("=" * 80)
 
-        top_sharpe = df_resultados.nlargest(5, 'sharpe')
+        top_sharpe = df_results.nlargest(5, 'sharpe')
 
         print(f"\n{'Ticker':<10} {'Sharpe':<10} {'CVaR':<10} {'Por que peso baixo?'}")
         print("-" * 80)
@@ -209,13 +209,13 @@ def analisar_cvar_por_ativo(app):
             # Por enquanto, vou fazer uma análise genérica
 
             if cvar > bbdc4['cvar_5']:
-                motivo = "CVaR maior (mais risco extremo)"
+                reason = "CVaR maior (mais risco extremo)"
             elif row['volatilidade'] > bbdc4['volatilidade']:
-                motivo = "Volatilidade maior"
+                reason = "Volatilidade maior"
             else:
-                motivo = "Possivelmente correlações/HHI"
+                reason = "Possivelmente correlações/HHI"
 
-            print(f"{ticker:<10} {sharpe:>8.2f} {cvar:>8.2f}% {motivo}")
+            print(f"{ticker:<10} {sharpe:>8.2f} {cvar:>8.2f}% {reason}")
 
         # Recomendações
         print("\n" + "=" * 80)
@@ -239,10 +239,10 @@ def analisar_cvar_por_ativo(app):
         print("   • Mas baixa com SUZB3, EMBR3, VALE3")
         print("   • Pode estar ajudando na diversificação setorial")
 
-        return df_resultados
+        return df_results
 
 
-def criar_carteira_controle(df_metricas):
+def create_control_portfolio(df_metrics):
     """
     Cria uma carteira de controle usando apenas Sharpe Ratio
     para comparar com a carteira AGMO.
@@ -252,29 +252,29 @@ def criar_carteira_controle(df_metricas):
     print("=" * 80)
 
     # Normaliza Sharpe para criar pesos
-    df_positivos = df_metricas[df_metricas['sharpe'] > 0].copy()
-    df_positivos['peso'] = df_positivos['sharpe'] / df_positivos['sharpe'].sum()
+    df_positive = df_metrics[df_metrics['sharpe'] > 0].copy()
+    df_positive['peso'] = df_positive['sharpe'] / df_positive['sharpe'].sum()
 
     # Ordena por peso
-    df_positivos = df_positivos.sort_values('peso', ascending=False)
+    df_positive = df_positive.sort_values('peso', ascending=False)
 
     print("\nSe otimizasse APENAS por Sharpe Ratio:")
     print(f"{'Rank':<5} {'Ticker':<10} {'Peso':<10} {'Sharpe':<10}")
     print("-" * 50)
 
-    for i, (_, row) in enumerate(df_positivos.head(10).iterrows(), 1):
-        destaque = " ← DEVERIA TER MAIS!" if row['ticker'] == 'BBDC4' else ""
-        print(f"{i:<5} {row['ticker']:<10} {row['peso'] * 100:>8.2f}% {row['sharpe']:>8.2f}{destaque}")
+    for i, (_, row) in enumerate(df_positive.head(10).iterrows(), 1):
+        highlight = " ← DEVERIA TER MAIS!" if row['ticker'] == 'BBDC4' else ""
+        print(f"{i:<5} {row['ticker']:<10} {row['peso'] * 100:>8.2f}% {row['sharpe']:>8.2f}{highlight}")
 
     # Compara
-    bbdc4_sharpe_peso = df_positivos[df_positivos['ticker'] == 'BBDC4']['peso'].values[0] * 100
+    bbdc4_sharpe_weight = df_positive[df_positive['ticker'] == 'BBDC4']['peso'].values[0] * 100
 
     print(f"\n📊 Comparação BBDC4:")
-    print(f"   Peso por Sharpe:     {bbdc4_sharpe_peso:>6.2f}%")
+    print(f"   Peso por Sharpe:     {bbdc4_sharpe_weight:>6.2f}%")
     print(f"   Peso AGMO (real):    17.30%")
-    print(f"   Diferença:           {17.30 - bbdc4_sharpe_peso:>+6.2f}%")
+    print(f"   Diferença:           {17.30 - bbdc4_sharpe_weight:>+6.2f}%")
 
-    if 17.30 > bbdc4_sharpe_peso * 2:
+    if 17.30 > bbdc4_sharpe_weight * 2:
         print(f"\n   ⚠️  BBDC4 tem mais que o DOBRO do peso esperado!")
         print(f"   → Algoritmo está PRIORIZANDO algo além de Sharpe")
         print(f"   → Provavelmente: CVaR (risco de cauda)")
@@ -284,11 +284,11 @@ if __name__ == "__main__":
     app = create_app()
 
     # Análise principal
-    df_metricas = analisar_cvar_por_ativo(app)
+    df_metrics = analyze_cvar_by_asset(app)
 
     # Carteira controle
-    if df_metricas is not None:
-        criar_carteira_controle(df_metricas)
+    if df_metrics is not None:
+        create_control_portfolio(df_metrics)
 
     print("\n" + "=" * 80)
     print("✅ ANÁLISE CONCLUÍDA")

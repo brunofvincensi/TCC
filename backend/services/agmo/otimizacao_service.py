@@ -33,7 +33,7 @@ class OtimizacaoService:
     """
 
     @staticmethod
-    def otimizar_carteira(parametros: dict) -> Tuple[Optional[List[Dict]], str]:
+    def optimize_portfolio(parameters: dict) -> Tuple[Optional[List[Dict]], str]:
         """
         Otimiza uma carteira de investimentos usando AGMO (R-NSGA2).
 
@@ -65,110 +65,110 @@ class OtimizacaoService:
         try:
             # ========== 1. VALIDAÇÃO DE PARÂMETROS ==========
             logger.info("Iniciando otimização de carteira")
-            logger.debug(f"Parâmetros recebidos: {parametros}")
+            logger.debug(f"Parâmetros recebidos: {parameters}")
 
             # Valida perfil de risco
-            perfil_risco = parametros.get('perfil_risco', 'moderado').lower()
-            if perfil_risco not in ['conservador', 'moderado', 'arrojado']:
+            risk_profile = parameters.get('perfil_risco', 'moderado').lower()
+            if risk_profile not in ['conservador', 'moderado', 'arrojado']:
                 return None, (
-                    f"Perfil de risco inválido: '{perfil_risco}'. "
+                    f"Perfil de risco inválido: '{risk_profile}'. "
                     f"Use 'conservador', 'moderado' ou 'arrojado'."
                 )
 
             # Valida horizonte de tempo
-            horizonte_tempo = parametros.get('horizonte_tempo')
-            if not horizonte_tempo or not isinstance(horizonte_tempo, (int, float)):
+            time_horizon = parameters.get('horizonte_tempo')
+            if not time_horizon or not isinstance(time_horizon, (int, float)):
                 return None, "Horizonte de tempo inválido. Informe o prazo em anos (número)."
 
-            prazo_anos = int(horizonte_tempo)
-            if prazo_anos < 1 or prazo_anos > 30:
-                return None, f"Horizonte de tempo inválido: {prazo_anos} anos. Use valores entre 1 e 30 anos."
+            years_period = int(time_horizon)
+            if years_period < 1 or years_period > 30:
+                return None, f"Horizonte de tempo inválido: {years_period} anos. Use valores entre 1 e 30 anos."
 
             # ========== 2. MAPEAMENTO DE PARÂMETROS ==========
 
             # IDs de ativos restringidos (a serem excluídos da otimização)
-            ids_ativos_restringidos = parametros.get('restricoes_ativos', [])
-            if not isinstance(ids_ativos_restringidos, list):
-                ids_ativos_restringidos = []
+            restricted_asset_ids = parameters.get('restricoes_ativos', [])
+            if not isinstance(restricted_asset_ids, list):
+                restricted_asset_ids = []
 
-            logger.info(f"Ativos restringidos (excluídos): {ids_ativos_restringidos}")
+            logger.info(f"Ativos restringidos (excluídos): {restricted_asset_ids}")
 
             # Número máximo de ativos na carteira (restrição de cardinalidade)
-            max_ativos = parametros.get('max_ativos')
-            if max_ativos is not None:
+            max_assets = parameters.get('max_ativos')
+            if max_assets is not None:
                 try:
-                    max_ativos = int(max_ativos)
-                    if max_ativos < MIN_ATIVOS:
+                    max_assets = int(max_assets)
+                    if max_assets < MIN_ATIVOS:
                         return None, (
-                            f"Número máximo de ativos ({max_ativos}) não pode ser menor que "
+                            f"Número máximo de ativos ({max_assets}) não pode ser menor que "
                             f"o mínimo necessário ({MIN_ATIVOS})."
                         )
                 except (ValueError, TypeError):
-                    return None, f"Número máximo de ativos inválido: {max_ativos}"
+                    return None, f"Número máximo de ativos inválido: {max_assets}"
 
             # Hiperparâmetros opcionais do algoritmo genético
-            use_optimal_config = parametros.get('use_optimal_config', True)
-            population_size = parametros.get('population_size')  # None = auto
-            generations = parametros.get('generations')  # None = auto
+            use_optimal_config = parameters.get('use_optimal_config', True)
+            population_size = parameters.get('population_size')  # None = auto
+            generations = parameters.get('generations')  # None = auto
 
             # Extrai IDs dos ativos disponíveis (para passar ao serviço AGMO)
             # Nota: O AGMO vai buscar todos os ativos do tipo ACAO automaticamente,
             # mas podemos passar uma lista específica se necessário
-            ids_ativos = None  # None = usar todos os ativos disponíveis do tipo ACAO
+            asset_ids = None  # None = usar todos os ativos disponíveis do tipo ACAO
 
             # ========== 3. EXECUÇÃO DA OTIMIZAÇÃO ==========
             logger.info("=" * 70)
             logger.info("INICIANDO OTIMIZAÇÃO AGMO (R-NSGA2)")
             logger.info("=" * 70)
-            logger.info(f"  Perfil de risco: {perfil_risco}")
-            logger.info(f"  Horizonte: {prazo_anos} anos")
-            logger.info(f"  Ativos restringidos: {len(ids_ativos_restringidos)}")
-            if max_ativos:
-                logger.info(f"  Máx. ativos na carteira: {max_ativos}")
+            logger.info(f"  Perfil de risco: {risk_profile}")
+            logger.info(f"  Horizonte: {years_period} anos")
+            logger.info(f"  Ativos restringidos: {len(restricted_asset_ids)}")
+            if max_assets:
+                logger.info(f"  Máx. ativos na carteira: {max_assets}")
             logger.info("=" * 70)
 
             # Cria instância do serviço AGMO
             service = Nsga2OtimizacaoService(
                 app=current_app._get_current_object(),  # Instância Flask
-                ids_ativos_restringidos=ids_ativos_restringidos,
-                nivel_risco=perfil_risco,
-                prazo_anos=prazo_anos,
+                ids_ativos_restringidos=restricted_asset_ids,
+                nivel_risco=risk_profile,
+                prazo_anos=years_period,
                 data_referencia=None,  # Para backtest, usar parâmetro específico
                 data_inicio=None,
-                ids_ativos=ids_ativos
+                ids_ativos=asset_ids
             )
 
             # Executa otimização
-            resultado = service.otimizar(
+            result = service.optimize(
                 population_size=population_size,
                 generations=generations,
                 use_optimal_config=use_optimal_config,
-                max_ativos=max_ativos
+                max_ativos=max_assets
             )
 
             # ========== 4. FORMATAÇÃO DO RESULTADO ==========
-            composicao = resultado['composicao']
-            metricas = resultado['metricas']
+            composition = result['composicao']
+            metrics = result['metricas']
 
             logger.info("=" * 70)
             logger.info("OTIMIZAÇÃO CONCLUÍDA COM SUCESSO")
             logger.info("=" * 70)
-            logger.info(f"  Carteira com {len(composicao)} ativos")
-            logger.info(f"  Retorno esperado anual: {metricas['retorno_esperado_anual']*100:.2f}%")
-            logger.info(f"  Volatilidade anual: {metricas['volatilidade_anual']*100:.2f}%")
-            logger.info(f"  Índice de Sharpe: {metricas['sharpe_ratio']:.2f}")
+            logger.info(f"  Carteira com {len(composition)} ativos")
+            logger.info(f"  Retorno esperado anual: {metrics['retorno_esperado_anual']*100:.2f}%")
+            logger.info(f"  Volatilidade anual: {metrics['volatilidade_anual']*100:.2f}%")
+            logger.info(f"  Índice de Sharpe: {metrics['sharpe_ratio']:.2f}")
             logger.info("=" * 70)
 
             # Formata mensagem de sucesso
-            mensagem = (
+            message = (
                 f"Carteira otimizada com sucesso! "
-                f"{len(composicao)} ativos selecionados. "
-                f"Retorno esperado: {metricas['retorno_esperado_anual']*100:.2f}% a.a. | "
-                f"Volatilidade: {metricas['volatilidade_anual']*100:.2f}% a.a. | "
-                f"Sharpe: {metricas['sharpe_ratio']:.2f}"
+                f"{len(composition)} ativos selecionados. "
+                f"Retorno esperado: {metrics['retorno_esperado_anual']*100:.2f}% a.a. | "
+                f"Volatilidade: {metrics['volatilidade_anual']*100:.2f}% a.a. | "
+                f"Sharpe: {metrics['sharpe_ratio']:.2f}"
             )
 
-            return composicao, mensagem
+            return composition, message
 
         except ValueError as ve:
             # Erros de validação ou negócio

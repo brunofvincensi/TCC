@@ -286,14 +286,14 @@ class SimplexMutationCardConstraint(Mutation):
         Y = X.copy()
 
         for i in range(len(X)):
-            individuo = Y[i].copy()
-            n_var = len(individuo)
+            individual = Y[i].copy()
+            n_var = len(individual)
 
             # Garantir que soma = 1
-            individuo = individuo / individuo.sum()
+            individual = individual / individual.sum()
 
             # Identifica ativos ativos
-            active_mask = individuo > 1e-6
+            active_mask = individual > 1e-6
             active_indices = np.where(active_mask)[0]
             n_active = len(active_indices)
 
@@ -307,14 +307,14 @@ class SimplexMutationCardConstraint(Mutation):
 
                 if len(inactive_indices) > 0:
                     # Escolhe ativo para remover (menor peso)
-                    remove_idx = active_indices[np.argmin(individuo[active_indices])]
+                    remove_idx = active_indices[np.argmin(individual[active_indices])]
 
                     # Escolhe ativo para adicionar (aleatório)
                     add_idx = np.random.choice(inactive_indices)
 
                     # Transfere todo o peso
-                    individuo[add_idx] = individuo[remove_idx]
-                    individuo[remove_idx] = 0.0
+                    individual[add_idx] = individual[remove_idx]
+                    individual[remove_idx] = 0.0
 
             else:
                 # MUTAÇÃO POR TRANSFERÊNCIA: move peso entre ativos ativos
@@ -334,35 +334,35 @@ class SimplexMutationCardConstraint(Mutation):
                     delta_q = 1.0 - (2.0 * (1.0 - u)) ** (1.0 / (self.eta + 1.0))
 
                 # Magnitude da transferência (até 20% do menor valor)
-                magnitude = min(individuo[idx1], individuo[idx2]) * 0.2 * delta_q
+                magnitude = min(individual[idx1], individual[idx2]) * 0.2 * delta_q
 
                 # Transferir peso
-                individuo[idx1] = individuo[idx1] - magnitude
-                individuo[idx2] = individuo[idx2] + magnitude
+                individual[idx1] = individual[idx1] - magnitude
+                individual[idx2] = individual[idx2] + magnitude
 
             # Garantir não-negatividade
-            individuo = np.maximum(individuo, 0)
+            individual = np.maximum(individual, 0)
 
             # Normalizar (preserva simplex)
-            weight_sum = individuo.sum()
+            weight_sum = individual.sum()
             if weight_sum > 0:
-                individuo = individuo / weight_sum
+                individual = individual / weight_sum
             else:
                 # Fallback
-                individuo = np.ones(n_var) / n_var
+                individual = np.ones(n_var) / n_var
 
             # Aplica a restrição de cardinalidade
-            individuo = _enforce_cardinality(individuo, self.max_assets)
+            individual = _enforce_cardinality(individual, self.max_assets)
 
             # Garantir limites do problema
-            individuo = np.clip(individuo, problem.xl, problem.xu)
+            individual = np.clip(individual, problem.xl, problem.xu)
 
             # Re-normalizar após clip
-            individuo = individuo / individuo.sum()
+            individual = individual / individual.sum()
 
             # Re-aplicar cardinalidade (pode ter criado novos ativos no clip)
-            individuo = _enforce_cardinality(individuo, self.max_assets)
+            individual = _enforce_cardinality(individual, self.max_assets)
 
-            Y[i] = individuo
+            Y[i] = individual
 
         return Y

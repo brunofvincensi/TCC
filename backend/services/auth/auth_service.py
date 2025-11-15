@@ -5,22 +5,22 @@ from models import Usuario
 class AuthService:
 
     @staticmethod
-    def login(email, senha):
+    def login(email, password):
         """
         Realiza o login do usuário
         Retorna: (token, usuario_dict) ou (None, erro_mensagem)
         """
-        if not email or not senha:
+        if not email or not password:
             return None, 'Email e senha são obrigatórios'
 
-        usuario = Usuario.query.filter_by(email=email).first()
+        user = Usuario.query.filter_by(email=email).first()
 
-        if not usuario or not usuario.check_password(senha):
+        if not user or not user.check_password(password):
             return None, 'Credenciais inválidas'
 
-        if not usuario.ativo:
+        if not user.ativo:
             return None, 'Usuário inativo'
 
-        access_token = create_access_token(identity=str(usuario.id))
+        access_token = create_access_token(identity=str(user.id))
 
-        return access_token, usuario.to_dict()
+        return access_token, user.to_dict()

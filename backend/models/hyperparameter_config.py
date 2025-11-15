@@ -115,21 +115,21 @@ class HyperparameterConfig(db.Model):
         }
 
     @staticmethod
-    def get_optimal_config(num_ativos: int, nivel_risco: str = 'neutro'):
+    def get_optimal_config(num_assets: int, risk_level: str = 'neutro'):
         """
         Busca a configuração ótima para um número específico de ativos.
 
         Args:
-            num_ativos: Número de ativos
-            nivel_risco: Perfil de risco (conservador, moderado, arrojado, neutro)
+            num_assets: Número de ativos
+            risk_level: Perfil de risco (conservador, moderado, arrojado, neutro)
 
         Returns:
             HyperparameterConfig ou None se não encontrado
         """
         # Busca configuração exata
         config = HyperparameterConfig.query.filter_by(
-            num_ativos=num_ativos,
-            nivel_risco=nivel_risco,
+            num_ativos=num_assets,
+            nivel_risco=risk_level,
             is_active=True
         ).first()
 
@@ -140,22 +140,22 @@ class HyperparameterConfig(db.Model):
         # Tenta +/- 2 ativos
         for offset in [0, 1, -1, 2, -2]:
             config = HyperparameterConfig.query.filter_by(
-                num_ativos=num_ativos + offset,
-                nivel_risco=nivel_risco,
+                num_ativos=num_assets + offset,
+                nivel_risco=risk_level,
                 is_active=True
             ).first()
             if config:
                 return config
 
         # Se ainda não encontrar, busca configuração neutra
-        if nivel_risco != 'neutro':
-            return HyperparameterConfig.get_optimal_config(num_ativos, 'neutro')
+        if risk_level != 'neutro':
+            return HyperparameterConfig.get_optimal_config(num_assets, 'neutro')
 
         # Última tentativa: qualquer configuração próxima
         config = HyperparameterConfig.query.filter_by(
             is_active=True
         ).order_by(
-            db.func.abs(HyperparameterConfig.num_ativos - num_ativos)
+            db.func.abs(HyperparameterConfig.num_ativos - num_assets)
         ).first()
 
         return config
@@ -166,16 +166,16 @@ class HyperparameterConfig(db.Model):
         return HyperparameterConfig.query.filter_by(is_active=True).all()
 
     @staticmethod
-    def deactivate_all_for_num_ativos(num_ativos: int, nivel_risco: str = None):
+    def deactivate_all_for_num_assets(num_assets: int, risk_level: str = None):
         """
         Desativa todas as configurações para um número de ativos.
 
         Útil quando um novo tuning é realizado e queremos substituir
         a configuração antiga.
         """
-        query = HyperparameterConfig.query.filter_by(num_ativos=num_ativos)
-        if nivel_risco:
-            query = query.filter_by(nivel_risco=nivel_risco)
+        query = HyperparameterConfig.query.filter_by(num_ativos=num_assets)
+        if risk_level:
+            query = query.filter_by(nivel_risco=risk_level)
 
         configs = query.all()
         for config in configs:

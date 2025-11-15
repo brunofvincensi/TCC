@@ -12,7 +12,7 @@ from backtest_service import BacktestService
 from app import create_app
 
 
-def teste_carteira_data_especifica():
+def test_portfolio_specific_date():
     """
     Exemplo 1: Obter carteira otimizada para uma data específica no passado
     """
@@ -47,7 +47,7 @@ def teste_carteira_data_especifica():
     print(f"Soma dos pesos: {sum(item['peso'] for item in carteira):.4f}")
 
 
-def teste_backtest_periodo():
+def test_backtest_period():
     """
     Exemplo 2: Backtest completo em um período
     """
@@ -82,7 +82,7 @@ def teste_backtest_periodo():
         print(f"{chave_formatada:<35} {valor}")
 
 
-def teste_comparacao_perfis():
+def test_risk_profiles_comparison():
     """
     Exemplo 3: Comparar diferentes perfis de risco
     """
@@ -141,7 +141,7 @@ def teste_comparacao_perfis():
               f"{metricas['sharpe']:>6.4f}")
 
 
-def teste_rapido():
+def test_quick():
     """
     Exemplo 4: Teste rápido com período curto
     """

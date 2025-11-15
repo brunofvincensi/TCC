@@ -12,15 +12,15 @@ def seed_assets(app):
             with open('ativos.csv', 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    ativo = Ativo.query.filter_by(ticker=row['ticker']).first()
-                    if not ativo:
-                        novo_ativo = Ativo(
+                    asset = Ativo.query.filter_by(ticker=row['ticker']).first()
+                    if not asset:
+                        new_asset = Ativo(
                             ticker=row['ticker'],
                             nome=row['nome'],
                             tipo=row['tipo'],
                             setor=row.get('setor')
                         )
-                        db.session.add(novo_ativo)
+                        db.session.add(new_asset)
                         print(f"-> Ativo {row['ticker']} adicionado.")
 
                 db.session.commit()
@@ -37,17 +37,17 @@ def update_prices(app):
     """
     with app.app_context():
         # Instancia as classes de processadores dos preços históricos
-        yfinanceProcessor = YFinanceProcessor()
+        yfinance_processor = YFinanceProcessor()
 
-        ativos = Ativo.query.all()
-        if not ativos:
+        assets = Ativo.query.all()
+        if not assets:
             print("Nenhum ativo encontrado no banco.")
             return
 
         print(f"\nIniciando atualização de preços mensais...")
 
-        for ativo in ativos:
-            if ativo.tipo == TipoAtivo.ACAO:
-                yfinanceProcessor.process(ativo)
+        for asset in assets:
+            if asset.tipo == TipoAtivo.ACAO:
+                yfinance_processor.process(asset)
 
         print("\n✅ Atualização de preços mensais concluída!")

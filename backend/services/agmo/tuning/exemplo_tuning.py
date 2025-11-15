@@ -32,7 +32,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def exemplo_1_analise_convergencia():
+def example_1_convergence_analysis():
     """
     Exemplo 1: Análise de Convergência
 
@@ -83,7 +83,7 @@ def exemplo_1_analise_convergencia():
         logger.error(f"Erro na análise de convergência: {e}")
         raise
 
-def exemplo_2_grid_search_completo():
+def example_2_complete_grid_search():
     """
     Exemplo 2: Grid Search Completo (para TCC)
 
@@ -125,7 +125,7 @@ def exemplo_2_grid_search_completo():
 
     try:
         summary = tuning_service.grid_search(
-            ids_ativos=ids_ativos,
+            ids_assets=ids_assets,
             population_sizes=population_sizes,
             generation_counts=generation_counts,
             n_runs=10,
@@ -162,7 +162,7 @@ def exemplo_2_grid_search_completo():
         logger.error(f"Erro no grid search completo: {e}")
         raise
 
-def exemplo_3_quick_test():
+def example_3_quick_test():
     """
     Exemplo 3: Teste Rápido
 
@@ -192,7 +192,7 @@ def exemplo_3_quick_test():
 
     try:
         summary = tuning_service.grid_search(
-            ids_ativos=ids_ativos,
+            ids_assets=ids_assets,
             population_sizes=[50, 100],
             generation_counts=[25, 50],
             n_runs=2
@@ -210,7 +210,7 @@ def exemplo_3_quick_test():
         raise
 
 
-def exemplo_4_tuning_adaptativo():
+def example_4_adaptive_tuning():
     """
     Exemplo 4: Tuning Adaptativo por Quantidade de Ativos
 
@@ -253,8 +253,8 @@ def exemplo_4_tuning_adaptativo():
     print(f"\n⏱️  Estimativa de tempo: 4-8 HORAS")
     print(f"   Recomendação: Execute durante a noite ou fim de semana\n")
 
-    resposta = input("Deseja continuar? (s/n): ")
-    if resposta.lower() != 's':
+    answer = input("Deseja continuar? (s/n): ")
+    if answer.lower() != 's':
         print("Operação cancelada.")
         return
 
@@ -264,7 +264,7 @@ def exemplo_4_tuning_adaptativo():
 
         df_optimal = tuning_service.adaptive_tuning_by_num_assets(
             asset_ranges=asset_ranges,
-            nivel_risco='moderado',
+            risk_level='moderado',
             population_sizes=population_sizes,
             generation_counts=generation_counts,
             n_runs=n_runs,
@@ -307,7 +307,7 @@ def exemplo_4_tuning_adaptativo():
         raise
 
 
-def exemplo_5_testar_auto_lookup():
+def example_5_test_auto_lookup():
     """
     Exemplo 5: Testar Auto-Lookup de Configurações
 
@@ -325,9 +325,9 @@ def exemplo_5_testar_auto_lookup():
 
     print("🔍 Testando auto-lookup para diferentes quantidades de ativos:\n")
 
-    for num_ativos in test_quantities:
+    for num_assets in test_quantities:
         print(f"\n{'='*60}")
-        print(f"Testando com {num_ativos} ativos:")
+        print(f"Testando com {num_assets} ativos:")
         print(f"{'='*60}")
 
         # Busca configuração do banco
@@ -335,7 +335,7 @@ def exemplo_5_testar_auto_lookup():
             from models import HyperparameterConfig
 
             config = HyperparameterConfig.get_optimal_config(
-                num_ativos=num_ativos,
+                num_ativos=num_assets,
                 nivel_risco='neutro'
             )
 
@@ -361,7 +361,7 @@ def exemplo_5_testar_auto_lookup():
     print("\n✅ ZERO configuração manual necessária!")
 
 
-def menu_principal():
+def main_menu():
     """Menu principal para escolher qual exemplo executar."""
     print("\n" + "=" * 80)
     print("SISTEMA DE TUNING DE HIPERPARÂMETROS - EXEMPLOS")
@@ -400,7 +400,7 @@ def menu_principal():
 
 if __name__ == "__main__":
     try:
-        menu_principal()
+        main_menu()
     except KeyboardInterrupt:
         print("\n\nPrograma encerrado pelo usuário.")
     except Exception as e:

@@ -52,9 +52,9 @@ class BacktestService:
         self.app = app
         self.resultados: List[BacktestResult] = []
         
-    def _buscar_dados_ate_data(self, data_referencia: datetime, 
-                                ids_ativos_restringidos: List[int],
-                                janela_meses: int = 36) -> Tuple[List[Ativo], pd.DataFrame]:
+    def _fetch_data_until_date(self, reference_date: datetime,
+                                restricted_asset_ids: List[int],
+                                window_months: int = 36) -> Tuple[List[Ativo], pd.DataFrame]:
         """
         Busca dados históricos disponíveis até uma data de referência específica
         
@@ -129,10 +129,10 @@ class BacktestService:
             
             return ativos_finais, df_retornos
     
-    def _otimizar_carteira_historica(self, data_referencia: datetime,
-                                     ids_ativos_restringidos: List[int],
-                                     nivel_risco: str,
-                                     janela_meses: int = 36) -> List[Dict]:
+    def _optimize_historical_portfolio(self, reference_date: datetime,
+                                     restricted_asset_ids: List[int],
+                                     risk_level: str,
+                                     window_months: int = 36) -> List[Dict]:
         """
         Otimiza uma carteira usando apenas dados disponíveis até uma data específica
         
@@ -220,9 +220,9 @@ class BacktestService:
         
         return composicao
     
-    def _escolher_melhor_carteira(self, objetivos: np.ndarray, 
-                                   solucoes: np.ndarray, 
-                                   nivel_risco: str) -> np.ndarray:
+    def _choose_best_portfolio(self, objectives: np.ndarray,
+                                   solutions: np.ndarray,
+                                   risk_level: str) -> np.ndarray:
         """
         Seleciona a melhor carteira da Fronteira de Pareto
         """
@@ -258,9 +258,9 @@ class BacktestService:
         idx_melhor = np.argmax(scores)
         return solucoes[idx_melhor]
     
-    def _calcular_retorno_carteira(self, carteira: List[Dict], 
-                                    data_inicio: datetime,
-                                    data_fim: datetime) -> Tuple[float, List[float]]:
+    def _calculate_portfolio_return(self, portfolio: List[Dict],
+                                    start_date: datetime,
+                                    end_date: datetime) -> Tuple[float, List[float]]:
         """
         Calcula o retorno de uma carteira em um período específico
         
@@ -319,13 +319,13 @@ class BacktestService:
             
             return float(retorno_total), retornos_mensais
     
-    def executar_backtest(self, 
-                         data_inicio: datetime,
-                         data_fim: datetime,
-                         ids_ativos_restringidos: Optional[List[int]] = None,
-                         nivel_risco: str = 'moderado',
-                         frequencia_rebalanceamento_meses: int = 6,
-                         janela_otimizacao_meses: int = 36) -> List[BacktestResult]:
+    def execute_backtest(self,
+                         start_date: datetime,
+                         end_date: datetime,
+                         restricted_asset_ids: Optional[List[int]] = None,
+                         risk_level: str = 'moderado',
+                         rebalance_frequency_months: int = 6,
+                         optimization_window_months: int = 36) -> List[BacktestResult]:
         """
         Executa backtest completo em um período
         
@@ -443,7 +443,7 @@ class BacktestService:
         
         return self.resultados
     
-    def gerar_relatorio(self, salvar_graficos: bool = True) -> Dict:
+    def generate_report(self, save_charts: bool = True) -> Dict:
         """
         Gera relatório completo do backtest com gráficos
         
@@ -494,7 +494,7 @@ class BacktestService:
         
         return metricas
     
-    def _calcular_max_drawdown(self, retornos_acumulados: List[float]) -> float:
+    def _calculate_max_drawdown(self, cumulative_returns: List[float]) -> float:
         """Calcula o máximo drawdown da série de retornos"""
         valores = [(1 + r) for r in retornos_acumulados]
         pico = valores[0]
@@ -509,8 +509,8 @@ class BacktestService:
         
         return max_dd
     
-    def _plotar_resultados(self, datas, retornos_acumulados, retornos_periodo,
-                           volatilidades, sharpes):
+    def _plot_results(self, dates, cumulative_returns, period_returns,
+                           volatilities, sharpes):
         """Gera gráficos dos resultados do backtest"""
         
         # Configurar estilo

@@ -12,27 +12,27 @@ def login():
     data = request.get_json()
 
     email = data.get('email') if data else None
-    senha = data.get('senha') if data else None
+    password = data.get('senha') if data else None
 
-    token, resultado = AuthService.login(email, senha)
+    token, result = AuthService.login(email, password)
 
     if token:
         return jsonify({
             'token': token,
-            'usuario': resultado
+            'usuario': result
         }), 200
     else:
-        return jsonify({'erro': resultado}), 401
+        return jsonify({'erro': result}), 401
 
 
 @auth_bp.route('/perfil', methods=['GET'])
 @jwt_required()
-def perfil():
+def profile():
     """Retorna o perfil do usuário logado"""
-    usuario_id = get_jwt_identity()
-    usuario = Usuario.query.get(usuario_id)
+    user_id = get_jwt_identity()
+    user = Usuario.query.get(user_id)
 
-    if not usuario:
+    if not user:
         return jsonify({'erro': 'Usuário não encontrado'}), 404
 
-    return jsonify(usuario.to_dict()), 200
+    return jsonify(user.to_dict()), 200

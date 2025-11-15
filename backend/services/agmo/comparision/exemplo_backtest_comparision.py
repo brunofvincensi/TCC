@@ -11,7 +11,7 @@ from services.agmo.agmo_service import (
 from services.agmo.comparision.benchmark_comparison import BenchmarkComparison
 
 
-def exemplo_completo():
+def complete_example():
     """
     Exemplo completo: Backtest + Gráficos + Comparação com Benchmark
     """
@@ -162,7 +162,7 @@ def exemplo_completo():
     }
 
 
-def exemplo_simples_backtest():
+def simple_backtest_example():
     """
     Exemplo simples: Apenas backtest com gráfico
     """
@@ -196,7 +196,7 @@ def exemplo_simples_backtest():
     print("\n✅ Backtest concluído! Verifique o gráfico gerado.\n")
 
 
-def exemplo_simples_comparacao():
+def simple_comparison_example():
     """
     Exemplo simples: Apenas comparação com benchmark
 
@@ -233,8 +233,8 @@ if __name__ == "__main__":
     # Escolha qual exemplo executar:
 
     # Exemplo completo (backtest + gráficos + comparação)
-    exemplo_completo()
+    complete_example()
 
     # Ou exemplos simples:
-    # exemplo_simples_backtest()
-    # exemplo_simples_comparacao()
+    # simple_backtest_example()
+    # simple_comparison_example()

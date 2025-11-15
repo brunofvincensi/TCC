@@ -8,7 +8,7 @@ ativo_bp = Blueprint('ativos', __name__)
 # Rota para criar um novo ativo (ex: para popular o banco)
 @ativo_bp.route('/ativos', methods=['POST'])
 @jwt_required()
-def criar_ativo():
+def create_asset():
     data = request.get_json()
     if not data or not data.get('ticker') or not data.get('nome') or not data.get('tipo'):
         return jsonify({'erro': 'Ticker, nome e tipo são obrigatórios'}), 400
@@ -16,7 +16,7 @@ def criar_ativo():
     if Ativo.query.filter_by(ticker=data['ticker']).first():
         return jsonify({'erro': 'Ticker já cadastrado'}), 409
 
-    novo_ativo = Ativo(
+    new_asset = Ativo(
         ticker=data['ticker'],
         nome=data['nome'],
         tipo=data['tipo'],
@@ -24,18 +24,18 @@ def criar_ativo():
         moeda=data.get('moeda', 'BRL')
     )
 
-    db.session.add(novo_ativo)
+    db.session.add(new_asset)
     db.session.commit()
 
     return jsonify({
         'mensagem': 'Ativo criado com sucesso',
-        'ativo': novo_ativo.to_dict()
+        'ativo': new_asset.to_dict()
     }), 201
 
 
 # Rota para listar todos os ativos disponíveis
 @ativo_bp.route('/ativos', methods=['GET'])
 @jwt_required()
-def listar_ativos():
-    ativos = Ativo.query.all()
-    return jsonify([ativo.to_dict() for ativo in ativos]), 200
+def list_assets():
+    assets = Ativo.query.all()
+    return jsonify([asset.to_dict() for asset in assets]), 200

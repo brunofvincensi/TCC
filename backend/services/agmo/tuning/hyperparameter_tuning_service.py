@@ -84,8 +84,8 @@ class HyperparameterTuningService:
 
     def convergence_analysis(
         self,
-        ids_ativos: List[int],
-        nivel_risco: str = 'moderado',
+        ids_assets: List[int],
+        risk_level: str = 'moderado',
         max_generations: int = 200,
         population_size: int = 100,
         n_runs: int = 5
@@ -94,8 +94,8 @@ class HyperparameterTuningService:
         Analisa a convergência do algoritmo ao longo das gerações.
 
         Args:
-            ids_ativos: IDs dos ativos para otimização
-            nivel_risco: Perfil de risco ('conservador', 'moderado', 'arrojado')
+            ids_assets: IDs dos ativos para otimização
+            risk_level: Perfil de risco ('conservador', 'moderado', 'arrojado')
             max_generations: Número máximo de gerações para análise
             population_size: Tamanho da população
             n_runs: Número de execuções independentes
@@ -107,7 +107,7 @@ class HyperparameterTuningService:
                    f"{max_generations} gerações, população {population_size}")
 
         # Prepara dados para otimização
-        service = Nsga2OtimizacaoService(self.app, [], nivel_risco, 10)
+        service = Nsga2OtimizacaoService(self.app, [], risk_level, 10)
 
         # Múltiplas execuções para análise estatística
         all_runs = []
@@ -118,7 +118,7 @@ class HyperparameterTuningService:
             convergence_tracker = ConvergenceTracker()
 
             result = service.otimizar(
-                ids_ativos=ids_ativos,
+                ids_ativos=ids_assets,
                 population_size=population_size,
                 generations=max_generations,
                 convergence_tracker=convergence_tracker
@@ -140,7 +140,7 @@ class HyperparameterTuningService:
 
     def grid_search(
         self,
-        ids_ativos: List[int],
+        ids_assets: List[int],
         population_sizes: List[int] = None,
         generation_counts: List[int] = None,
         n_runs: int = 3,
@@ -150,7 +150,7 @@ class HyperparameterTuningService:
         Realiza grid search para encontrar os melhores hiperparâmetros.
 
         Args:
-            ids_ativos: IDs dos ativos para otimização
+            ids_assets: IDs dos ativos para otimização
             population_sizes: Lista de tamanhos de população para testar
             generation_counts: Lista de números de gerações para testar
             n_runs: Número de execuções por configuração
@@ -194,7 +194,7 @@ class HyperparameterTuningService:
                     print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
                     result = self._run_single_optimization(
                         config=config,
-                        ids_ativos=ids_ativos,
+                        ids_assets=ids_assets,
                         run_number=run + 1
                     )
                     results.append(result)
@@ -218,15 +218,15 @@ class HyperparameterTuningService:
     def _run_single_optimization(
         self,
         config: HyperparameterConfig,
-        ids_ativos: List[int],
+        ids_assets: List[int],
         run_number: int,
-        max_ativos: int = None
+        max_assets: int = None
     ) -> TuningResult:
 
         """
         Executa uma única otimização com uma configuração específica.
         """
-        service = Nsga2OtimizacaoService(self.app, [], "moderado", ids_ativos=ids_ativos)
+        service = Nsga2OtimizacaoService(self.app, [], "moderado", ids_ativos=ids_assets)
         convergence_tracker = ConvergenceTracker()
 
         start_time = time.time()
@@ -236,7 +236,7 @@ class HyperparameterTuningService:
             population_size=config.population_size,
             generations=config.generations,
             convergence_tracker=convergence_tracker,
-            max_ativos=max_ativos
+            max_ativos=max_assets
         )
 
         execution_time = time.time() - start_time
@@ -573,7 +573,7 @@ class HyperparameterTuningService:
     def adaptive_tuning_by_num_assets(
         self,
         asset_ranges: List[int] = None,
-        nivel_risco: str = 'moderado',
+        risk_level: str = 'moderado',
         population_sizes: List[int] = None,
         generation_counts: List[int] = None,
         n_runs: int = 3,
@@ -590,7 +590,7 @@ class HyperparameterTuningService:
         Args:
             asset_ranges: Lista com quantidades de ativos a testar
                          (default: [5, 10, 15, 20])
-            nivel_risco: Perfil de risco
+            risk_level: Perfil de risco
             population_sizes: Lista de tamanhos de população
                             (default: [50, 100, 150, 200, 300])
             generation_counts: Lista de números de gerações
@@ -615,13 +615,13 @@ class HyperparameterTuningService:
         logger.info(f"  Populações: {population_sizes}")
         logger.info(f"  Gerações: {generation_counts}")
         logger.info(f"  Execuções por config: {n_runs}")
-        logger.info(f"  Perfil de risco: {nivel_risco}")
+        logger.info(f"  Perfil de risco: {risk_level}")
 
         optimal_configs = []
 
-        for num_ativos in asset_ranges:
+        for num_assets in asset_ranges:
             logger.info(f"\n{'='*70}")
-            logger.info(f"Testando com {num_ativos} ativos")
+            logger.info(f"Testando com {num_assets} ativos")
             logger.info(f"{'='*70}")
 
             # Busca ativos do banco para teste
@@ -629,19 +629,19 @@ class HyperparameterTuningService:
                 from models import db, Ativo
                 from models.ativo import TipoAtivo
 
-                ativos = db.session.query(Ativo).filter(Ativo.tipo == TipoAtivo.ACAO).limit(num_ativos).all()
+                assets = db.session.query(Ativo).filter(Ativo.tipo == TipoAtivo.ACAO).limit(num_assets).all()
 
-                if len(ativos) < num_ativos:
-                    logger.warning(f"Apenas {len(ativos)} ativos disponíveis. "
-                                 f"Pulando testes com {num_ativos} ativos.")
+                if len(assets) < num_assets:
+                    logger.warning(f"Apenas {len(assets)} ativos disponíveis. "
+                                 f"Pulando testes com {num_assets} ativos.")
                     continue
 
-                ids_ativos = [a.id for a in ativos]
+                ids_assets = [a.id for a in assets]
 
             # Executa grid search para esta quantidade de ativos
             try:
                 summary = self.grid_search(
-                    ids_ativos=ids_ativos,
+                    ids_assets=ids_assets,
                     population_sizes=population_sizes,
                     generation_counts=generation_counts,
                     n_runs=n_runs
@@ -652,8 +652,8 @@ class HyperparameterTuningService:
                     best = summary.iloc[0]
 
                     optimal_config = {
-                        'num_ativos': num_ativos,
-                        'nivel_risco': nivel_risco,
+                        'num_ativos': num_assets,
+                        'nivel_risco': risk_level,
                         'population_size': int(best['population_size']),
                         'generations': int(best['generations']),
                         'crossover_eta': 15.0,
@@ -674,7 +674,7 @@ class HyperparameterTuningService:
 
                     optimal_configs.append(optimal_config)
 
-                    logger.info(f"\n✅ Melhor configuração para {num_ativos} ativos:")
+                    logger.info(f"\n✅ Melhor configuração para {num_assets} ativos:")
                     logger.info(f"   População: {optimal_config['population_size']}")
                     logger.info(f"   Gerações: {optimal_config['generations']}")
                     logger.info(f"   Hypervolume: {optimal_config['hypervolume_mean']:.6f} "
@@ -683,7 +683,7 @@ class HyperparameterTuningService:
                               f"(±{optimal_config['execution_time_std']:.2f}s)")
 
             except Exception as e:
-                logger.error(f"Erro ao testar {num_ativos} ativos: {e}")
+                logger.error(f"Erro ao testar {num_assets} ativos: {e}")
                 continue
 
         # Converte para DataFrame
@@ -842,14 +842,14 @@ class HyperparameterTuningService:
         plt.close()
 
     @staticmethod
-    def get_optimal_config_from_db(num_ativos: int, nivel_risco: str = 'neutro',
+    def get_optimal_config_from_db(num_assets: int, risk_level: str = 'neutro',
                                    app=None):
         """
         Busca configuração ótima do banco de dados.
 
         Args:
-            num_ativos: Número de ativos
-            nivel_risco: Perfil de risco
+            num_assets: Número de ativos
+            risk_level: Perfil de risco
             app: Instância Flask
 
         Returns:
@@ -861,11 +861,11 @@ class HyperparameterTuningService:
         with app.app_context():
             from models import HyperparameterConfig
 
-            config = HyperparameterConfig.get_optimal_config(num_ativos, nivel_risco)
+            config = HyperparameterConfig.get_optimal_config(num_assets, risk_level)
 
             if config:
                 logger.info(f"✅ Usando configuração ótima do banco para "
-                          f"{num_ativos} ativos (perfil: {nivel_risco})")
+                          f"{num_assets} ativos (perfil: {risk_level})")
                 logger.info(f"   População: {config.population_size}, "
                           f"Gerações: {config.generations}")
 
@@ -876,6 +876,6 @@ class HyperparameterTuningService:
                     'mutation_eta': config.mutation_eta
                 }
 
-            logger.warning(f"⚠️  Configuração não encontrada para {num_ativos} ativos. "
+            logger.warning(f"⚠️  Configuração não encontrada para {num_assets} ativos. "
                          f"Usando valores padrão.")
             return None

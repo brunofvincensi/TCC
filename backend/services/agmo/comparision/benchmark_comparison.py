@@ -47,9 +47,9 @@ class BenchmarkComparison:
         self.benchmark_data = None
         self.portfolio_data = None
 
-    def _buscar_dados_benchmark(self, ticker_benchmark: str,
-                                data_inicio: date,
-                                data_fim: date) -> pd.DataFrame:
+    def _fetch_benchmark_data(self, benchmark_ticker: str,
+                                start_date: date,
+                                end_date: date) -> pd.DataFrame:
         """
         Busca dados históricos de um benchmark específico usando Yahoo Finance.
 
@@ -163,9 +163,9 @@ class BenchmarkComparison:
                 f"    - ^FTSE: FTSE 100 (Reino Unido)"
             )
 
-    def _calcular_retornos_carteira(self, carteira: List[Dict],
-                                    data_inicio: date,
-                                    data_fim: date) -> pd.DataFrame:
+    def _calculate_portfolio_returns(self, portfolio: List[Dict],
+                                    start_date: date,
+                                    end_date: date) -> pd.DataFrame:
         """
         Calcula os retornos mensais de uma carteira.
 
@@ -230,9 +230,9 @@ class BenchmarkComparison:
 
             return df_resultado
 
-    def _buscar_dados_ativos_individuais(self, carteira: List[Dict],
-                                         data_inicio: date,
-                                         data_fim: date) -> Tuple[pd.DataFrame, List[Dict]]:
+    def _fetch_individual_assets_data(self, portfolio: List[Dict],
+                                         start_date: date,
+                                         end_date: date) -> Tuple[pd.DataFrame, List[Dict]]:
         """
         Busca dados históricos de retorno de cada ativo individual da carteira.
 
@@ -293,11 +293,11 @@ class BenchmarkComparison:
 
             return df_retornos, ativos_ordenados
 
-    def gerar_grafico_evolucao_ativos(self,
-                                      carteira: List[Dict],
-                                      data_inicio: date,
-                                      data_fim: date,
-                                      nome_arquivo: str = None) -> str:
+    def generate_assets_evolution_chart(self,
+                                      portfolio: List[Dict],
+                                      start_date: date,
+                                      end_date: date,
+                                      file_name: str = None) -> str:
         """
         Gera gráfico mostrando a evolução do retorno acumulado de cada ativo
         individual da carteira AGMO, com sumário lateral mostrando a participação
@@ -478,11 +478,11 @@ class BenchmarkComparison:
 
         return str(caminho_completo)
 
-    def calcular_metricas_comparativas(self,
-                                       carteira: List[Dict],
-                                       ticker_benchmark: str,
-                                       data_inicio: date,
-                                       data_fim: date) -> Dict:
+    def calculate_comparative_metrics(self,
+                                       portfolio: List[Dict],
+                                       benchmark_ticker: str,
+                                       start_date: date,
+                                       end_date: date) -> Dict:
         """
         Calcula métricas comparativas entre a carteira e o benchmark.
 
@@ -603,7 +603,7 @@ class BenchmarkComparison:
 
         return metricas
 
-    def _imprimir_metricas(self, metricas: Dict):
+    def _print_metrics(self, metrics: Dict):
         """Imprime as métricas de forma formatada"""
         print(f"\n{'─'*70}")
         print(f"📈 MÉTRICAS DA CARTEIRA:")
@@ -665,9 +665,9 @@ class BenchmarkComparison:
 
         print(f"{'─'*70}\n")
 
-    def gerar_grafico_comparacao(self,
-                                nome_arquivo: str = None,
-                                ticker_benchmark: str = None) -> str:
+    def generate_comparison_chart(self,
+                                file_name: str = None,
+                                benchmark_ticker: str = None) -> str:
         """
         Gera gráfico comparando a carteira com o benchmark.
 
@@ -802,12 +802,12 @@ class BenchmarkComparison:
 
         return caminho_completo
 
-    def gerar_relatorio_completo(self,
-                                carteira: List[Dict],
-                                ticker_benchmark: str,
-                                data_inicio: date,
-                                data_fim: date,
-                                salvar_grafico: bool = True) -> Dict:
+    def generate_complete_report(self,
+                                portfolio: List[Dict],
+                                benchmark_ticker: str,
+                                start_date: date,
+                                end_date: date,
+                                save_chart: bool = True) -> Dict:
         """
         Gera relatório completo comparando a carteira com o benchmark.
 
@@ -845,7 +845,7 @@ class BenchmarkComparison:
         return metricas
 
 
-def exemplo_uso():
+def example_usage():
     """
     Exemplo de uso da classe BenchmarkComparison
 
