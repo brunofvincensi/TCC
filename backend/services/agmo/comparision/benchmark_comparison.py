@@ -447,7 +447,7 @@ class BenchmarkComparison:
         # Salvar gráfico
         if file_name is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            nome_arquivo = f'evolucao_ativos_portfolio_{timestamp}.png'
+            file_name = f'evolucao_ativos_portfolio_{timestamp}.png'
 
         output_dir = Path('comparison_results')
         output_dir.mkdir(exist_ok=True)

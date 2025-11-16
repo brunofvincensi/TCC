@@ -499,11 +499,6 @@ class Nsga2OtimizacaoService:
     def _print_matrix(self, matrix, formato=".3f"):
         """
         Printa matriz formatada com cores
-
-        Args:
-            matrix: DataFrame pandas com a matriz
-            titulo: Título da matriz
-            formato: Formato dos números (ex: ".3f")
         """
         tickers = matrix.columns.tolist()
         n = len(tickers)
@@ -802,7 +797,7 @@ class Nsga2OtimizacaoService:
 
             with self.app.app_context():
                 optimal_config = HyperparameterConfig.get_optimal_config(
-                    num_ativos=num_assets,
+                    num_assets=num_assets,
                     risk_level=self.risk_level
                 )
 
@@ -850,7 +845,7 @@ class Nsga2OtimizacaoService:
             return termination
         else:
             print(f"  🎯 Gerações fixas: {generations} (do banco)")
-            return ('n_gen', generations)
+            return 'n_gen', generations
 
     def get_callback(self, convergence_tracker) -> ConvergenceCallback:
         if convergence_tracker is not None:
@@ -993,20 +988,9 @@ def save_backtest_chart(portfolio: List[Dict],
                             end_date,
                             app,
                             file_name: str = None,
-                            volatility_window: int = 6) -> str:
+                            volatility_window: int = 6) -> str | None:
     """
     Gera e salva gráfico mostrando o retorno acumulado e a volatilidade da carteira ao longo do tempo.
-
-    Args:
-        portfolio: Lista com composição da carteira otimizada
-        start_date: Data inicial do backtest
-        end_date: Data final do backtest
-        app: Instância da aplicação Flask
-        file_name: Nome do arquivo para salvar (opcional, gera automaticamente se None)
-        volatility_window: Janela em meses para cálculo da volatilidade rolling (padrão: 6)
-
-    Returns:
-        Caminho completo do arquivo salvo
     """
     import os
     from datetime import datetime

@@ -4,9 +4,6 @@ Operadores Genéticos com Restrição de Cardinalidade para NSGA-II
 Este módulo implementa operadores customizados (Sampling, Crossover, Mutation) que
 garantem que TODAS as soluções geradas tenham no máximo K ativos com peso > 0.
 
-Problema: Card-Constrained Portfolio Optimization
-Objetivo: Otimizar carteira com no máximo max_ativos ativos
-
 Abordagem:
 - Após cada operação genética, zerar ativos excedentes (menor peso)
 - Renormalizar para soma = 1
@@ -27,7 +24,6 @@ import numpy as np
 from pymoo.core.crossover import Crossover
 from pymoo.core.mutation import Mutation
 from pymoo.core.sampling import Sampling
-
 
 def _enforce_cardinality(weights: np.ndarray, max_assets: int) -> np.ndarray:
     """
@@ -302,7 +298,7 @@ class SimplexMutationCardConstraint(Mutation):
             replace_prob = 0.3 if (self.max_assets and n_active >= self.max_assets) else 0.0
 
             if np.random.random() < replace_prob and n_active > 1:
-                # MUTAÇÃO POR SUBSTITUIÇÃO: troca um ativo ativo por um inativo
+                # Mutação por substituição: troca um ativo ativo por um inativo
                 inactive_indices = np.where(~active_mask)[0]
 
                 if len(inactive_indices) > 0:
@@ -317,7 +313,7 @@ class SimplexMutationCardConstraint(Mutation):
                     individual[remove_idx] = 0.0
 
             else:
-                # MUTAÇÃO POR TRANSFERÊNCIA: move peso entre ativos ativos
+                # Mutação por transferência: move peso entre ativos ativos
                 if n_active >= 2:
                     # Escolhe dois ativos ativos
                     idx1, idx2 = np.random.choice(active_indices, 2, replace=False)

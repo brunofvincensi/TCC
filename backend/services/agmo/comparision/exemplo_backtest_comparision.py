@@ -21,9 +21,6 @@ def complete_example():
     print("🚀 EXEMPLO COMPLETO: BACKTEST COM COMPARAÇÃO DE BENCHMARK")
     print("=" * 80)
 
-    # ========================================================================
-    # PASSO 1: DEFINIR PARÂMETROS DO BACKTEST
-    # ========================================================================
     print("\n📋 PASSO 1: Definindo parâmetros do backtest")
     print("─" * 80)
 
@@ -49,9 +46,6 @@ def complete_example():
     print(f"  Máximo de ativos: {max_ativos_portfolio}")
     print(f"  Benchmark: {ticker_benchmark}")
 
-    # ========================================================================
-    # PASSO 2: OTIMIZAR portfolio (usando dados até reference_date)
-    # ========================================================================
     print("\n📊 PASSO 2: Otimizando portfolio")
     print("─" * 80)
 
@@ -79,9 +73,6 @@ def complete_example():
     for item in sorted(portfolio_otimizada, key=lambda x: x['peso'], reverse=True):
         print(f"     {item['ticker']:8s} - {item['peso']*100:6.2f}%")
 
-    # ========================================================================
-    # PASSO 3: GERAR GRÁFICO DE BACKTEST (Retorno e Volatilidade)
-    # ========================================================================
     print("\n📈 PASSO 3: Gerando gráfico de retorno e volatilidade")
     print("─" * 80)
 
@@ -112,9 +103,6 @@ def complete_example():
         save_chart=True
     )
 
-    # ========================================================================
-    # PASSO 5: RESUMO FINAL
-    # ========================================================================
     print("\n" + "=" * 80)
     print("✅ RESUMO FINAL")
     print("=" * 80)
@@ -196,45 +184,11 @@ def simple_backtest_example():
     print("\n✅ Backtest concluído! Verifique o gráfico gerado.\n")
 
 
-def simple_comparison_example():
-    """
-    Exemplo simples: Apenas comparação com benchmark
-
-    Nota: Os dados do benchmark são obtidos automaticamente via Yahoo Finance.
-          Não é necessário ter o índice cadastrado no banco de dados!
-    """
-    app = create_app()
-
-    print("\n" + "=" * 80)
-    print("🔍 EXEMPLO SIMPLES: COMPARAÇÃO COM BENCHMARK")
-    print("=" * 80)
-
-    # portfolio exemplo (substitua pela sua portfolio otimizada)
-    portfolio_exemplo = [
-        {'id_ativo': 1, 'ticker': 'PETR4', 'peso': 0.3},
-        {'id_ativo': 2, 'ticker': 'VALE3', 'peso': 0.3},
-        {'id_ativo': 3, 'ticker': 'ITUB4', 'peso': 0.4}
-    ]
-
-    # Comparar com Ibovespa - dados obtidos automaticamente do Yahoo Finance
-    comparador = BenchmarkComparison(app)
-    metricas = comparador.generate_complete_report(
-        portfolio=portfolio_exemplo,
-        benchmark_ticker='^BVSP',  # Busca automática via yfinance
-        start_date=date(2020, 1, 1),
-        end_date=date(2024, 12, 31),
-        save_chart=True
-    )
-
-    print("\n✅ Comparação concluída! Verifique o gráfico gerado.\n")
-
-
 if __name__ == "__main__":
     # Escolha qual exemplo executar:
 
     # Exemplo completo (backtest + gráficos + comparação)
     complete_example()
 
-    # Ou exemplos simples:
+    # Apenas o backtest:
     # simple_backtest_example()
-    # simple_comparison_example()
