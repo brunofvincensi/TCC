@@ -8,7 +8,6 @@ de cada dia, garantindo que os dados do dia estejam disponíveis.
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from datetime import datetime
 import logging
 
 # Configurar logging
@@ -56,10 +55,6 @@ class PriceUpdateScheduler:
     def start(self, hour=23, minute=0):
         """
         Inicia o scheduler com o horário configurado.
-
-        Args:
-            hour: Hora do dia para executar (0-23). Padrão: 23 (11 PM)
-            minute: Minuto da hora para executar (0-59). Padrão: 0
         """
         if self.scheduler.running:
             logger.warning("Scheduler já está em execução.")
@@ -111,9 +106,6 @@ class PriceUpdateScheduler:
     def get_status(self):
         """
         Retorna o status atual do scheduler.
-
-        Returns:
-            dict com informações sobre o scheduler
         """
         job = self.scheduler.get_job('daily_price_update')
 

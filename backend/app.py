@@ -52,9 +52,6 @@ def create_app(enable_scheduler=None):
     # Registrar blueprints
     register_blueprints(app)
 
-    # Registras os comandos via terminal
-    # register_commands(app)
-
     # Criar tabelas
     with app.app_context():
         db.create_all()
