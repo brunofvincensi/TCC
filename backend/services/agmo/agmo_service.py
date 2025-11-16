@@ -26,9 +26,6 @@ DEFAULT_POPULATION_SIZE = 100
 
 MIN_ATIVOS = 5
 
-# --------------------------------------------------------------------------
-# 0. CALLBACK PARA RASTREAMENTO DE CONVERGÊNCIA
-# --------------------------------------------------------------------------
 class ConvergenceCallback(Callback):
     """
     Callback do pymoo para rastrear métricas de convergência durante a otimização.
@@ -69,10 +66,6 @@ class ConvergenceCallback(Callback):
             population_fitness=population_fitness
         )
 
-# --------------------------------------------------------------------------
-# 1. CLASSE DO PROBLEMA PARA O PYMOO
-#    Agora ela recebe os parâmetros do usuário para guiar a otimização.
-# --------------------------------------------------------------------------
 class PersonalizedPortfolioProblem(ElementwiseProblem):
 
     """
@@ -187,10 +180,6 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
             hhi_constraint = hhi - self.hhi_max
             out["G"] = [hhi_constraint]
 
-# --------------------------------------------------------------------------
-# 2. SERVIÇO PRINCIPAL DE OTIMIZAÇÃO
-#    Ele agora orquestra o processo usando os parâmetros do usuário.
-# --------------------------------------------------------------------------
 class Nsga2OtimizacaoService:
     def __init__(self, app, restricted_asset_ids, risk_level, years_period=5, reference_date=None, start_date=None, asset_ids: List[int] = None, show_chart=False):
         """
@@ -269,12 +258,8 @@ class Nsga2OtimizacaoService:
             if df_history.empty:
                 raise ValueError("Sem histórico para os ativos selecionados.")
 
-            # FILTRO INTELIGENTE DE ATIVOS POR HISTÓRICO MÍNIMO
-            # Problema: ações com histórico curto fazem .dropna() eliminar dados de ações com histórico longo
-            # Solução: Filtrar ações antes do pivot baseado no horizonte de investimento
-
+            # Filtrar ações antes do pivot baseado no horizonte de investimento
             ABSOLUTE_MINIMUM_MONTHS = 24  # Mínimo de 2 anos mesmo para prazos curtos
-
             minimum_history_months = max(
                 int(self.years_period * 12),
                 ABSOLUTE_MINIMUM_MONTHS
@@ -1088,7 +1073,7 @@ def save_backtest_chart(portfolio: List[Dict],
 
 
 def optimize_current_portfolio(app):
-    service = Nsga2OtimizacaoService(app, [1], "moderado", 10, show_chart=True)
+    service = Nsga2OtimizacaoService(app, [1], "arrojado", 10, show_chart=True)
     result = service.optimize(max_assets=10, use_optimal_config=False)
 
     # Informações adicionais
@@ -1101,7 +1086,7 @@ def optimize_current_portfolio(app):
 def backtest(app):
     from datetime import date
     backtest_date = date(2015, 1, 1)
-    backtest_service = Nsga2OtimizacaoService(app, [1, 10], "moderado", 10, reference_date=backtest_date, show_chart=True)
+    backtest_service = Nsga2OtimizacaoService(app, [1, 10], "arrojado", 10, reference_date=backtest_date, show_chart=True)
     backtest_portfolio = backtest_service.optimize(max_assets=10)
 
     # Informações do backtest
