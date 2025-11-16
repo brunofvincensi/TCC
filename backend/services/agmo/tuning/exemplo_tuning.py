@@ -64,8 +64,8 @@ def example_1_convergence_analysis():
 
     try:
         resultados = tuning_service.convergence_analysis(
-            ids_ativos=ids_ativos,
-            nivel_risco='moderado',
+            ids_assets=ids_ativos,
+            risk_level='moderado',
             max_generations=50,
             population_size=100,
             n_runs=1
@@ -99,9 +99,9 @@ def example_2_complete_grid_search():
 
     # Busca ativos
     with app.app_context():
-        ativos = db.session.query(Ativo).limit(15).all()
-        ids_ativos = [a.id for a in ativos]
-        print(f"Usando {len(ids_ativos)} ativos: {[a.ticker for a in ativos]}\n")
+        assets = db.session.query(Ativo).limit(15).all()
+        ids_assets = [a.id for a in assets]
+        print(f"Usando {len(ids_assets)} ativos: {[a.ticker for a in assets]}\n")
 
     # Cria o serviço
     tuning_service = HyperparameterTuningService(app)
@@ -178,9 +178,9 @@ def example_3_quick_test():
 
     # Busca ativos
     with app.app_context():
-        ativos = db.session.query(Ativo).limit(5).all()
-        ids_ativos = [a.id for a in ativos]
-        print(f"Usando apenas {len(ids_ativos)} ativos para teste rápido\n")
+        assets = db.session.query(Ativo).limit(5).all()
+        ids_assets = [a.id for a in assets]
+        print(f"Usando apenas {len(ids_assets)} ativos para teste rápido\n")
 
     tuning_service = HyperparameterTuningService(app)
 
@@ -335,8 +335,8 @@ def example_5_test_auto_lookup():
             from models import HyperparameterConfig
 
             config = HyperparameterConfig.get_optimal_config(
-                num_ativos=num_assets,
-                nivel_risco='neutro'
+                num_assets=num_assets,
+                risk_level='neutro'
             )
 
             if config:
@@ -374,25 +374,25 @@ def main_menu():
     print("5. Testar Auto-Lookup de Configurações")
     print("0. Sair")
 
-    escolha = input("\nDigite o número do exemplo: ")
+    choose = input("\nDigite o número do exemplo: ")
 
-    exemplos = {
-        '1': exemplo_1_analise_convergencia,
-        '2': exemplo_2_grid_search_completo,
-        '3': exemplo_3_quick_test,
-        '4': exemplo_4_tuning_adaptativo,
-        '5': exemplo_5_testar_auto_lookup,
+    examples = {
+        '1': example_1_convergence_analysis(),
+        '2': example_2_complete_grid_search(),
+        '3': example_3_quick_test(),
+        '4': example_4_adaptive_tuning(),
+        '5': example_5_test_auto_lookup(),
     }
 
-    if escolha in exemplos:
+    if choose in examples:
         try:
-            exemplos[escolha]()
+            examples[choose]()
         except KeyboardInterrupt:
             print("\n\n⚠️  Operação interrompida pelo usuário.")
         except Exception as e:
             print(f"\n❌ Erro durante execução: {e}")
             logger.exception("Erro detalhado:")
-    elif escolha == '0':
+    elif choose == '0':
         print("\nSaindo...")
     else:
         print("\n❌ Opção inválida!")

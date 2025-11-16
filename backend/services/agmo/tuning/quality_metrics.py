@@ -13,7 +13,7 @@ Métricas Implementadas:
 """
 
 import numpy as np
-from typing import List, Tuple, Optional
+from typing import Optional
 import logging
 
 logger = logging.getLogger(__name__)

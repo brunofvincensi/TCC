@@ -1,7 +1,7 @@
 """
-Módulo para comparação de carteiras com benchmarks de mercado.
+Módulo para comparação de portfolios com benchmarks de mercado.
 
-Este módulo fornece ferramentas para comparar o desempenho de carteiras otimizadas
+Este módulo fornece ferramentas para comparar o desempenho de portfolios otimizadas
 com índices de mercado como Ibovespa, permitindo avaliar se a estratégia de otimização
 está gerando alpha (retorno acima do benchmark).
 
@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import yfinance as yf
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple
 from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
 
@@ -24,7 +24,7 @@ from models import db, Ativo, HistoricoPrecos
 
 class BenchmarkComparison:
     """
-    Classe para comparar carteiras otimizadas com benchmarks de mercado.
+    Classe para comparar portfolios otimizadas com benchmarks de mercado.
 
     Permite comparar métricas como:
     - Retorno acumulado
@@ -54,33 +54,25 @@ class BenchmarkComparison:
         Busca dados históricos de um benchmark específico usando Yahoo Finance.
 
         Usa a mesma lógica do yfinance_processor: interval="1mo" que retorna
-        o primeiro dia de cada mês (compatível com os dados da carteira).
-
-        Args:
-            ticker_benchmark: Ticker do benchmark (ex: '^BVSP' para Ibovespa)
-            data_inicio: Data inicial
-            data_fim: Data final
-
-        Returns:
-            DataFrame com retornos mensais do benchmark
+        o primeiro dia de cada mês (compatível com os dados da portfolio).
         """
-        print(f"\n  🌐 Buscando dados do benchmark '{ticker_benchmark}' via Yahoo Finance...")
+        print(f"\n  🌐 Buscando dados do benchmark '{benchmark_ticker}' via Yahoo Finance...")
 
         try:
             # Ajustar datas para cobrir o período completo
-            # Começar do primeiro dia do mês de data_inicio
-            data_inicio_ajustada = data_inicio.replace(day=1)
+            # Começar do primeiro dia do mês de start_date
+            start_date_ajustada = start_date.replace(day=1)
 
             # Adicionar buffer no fim para garantir cobertura completa
-            data_fim_ajustada = data_fim + relativedelta(months=1)
+            end_date_ajustada = end_date + relativedelta(months=1)
 
             # Baixar dados mensais do Yahoo Finance
-            # ✅ Usando interval="1mo" como no yfinance_processor
+            # Usando interval="1mo" como no yfinance_processor
             # Isso retorna automaticamente o primeiro dia de cada mês
             df_precos = yf.download(
-                ticker_benchmark,
-                start=data_inicio_ajustada,
-                end=data_fim_ajustada,
+                benchmark_ticker,
+                start=start_date_ajustada,
+                end=end_date_ajustada,
                 interval="1mo",  # Dados mensais (primeiro dia do mês)
                 progress=False,
                 auto_adjust=True  # Ajuste automático por dividendos/splits
@@ -88,7 +80,7 @@ class BenchmarkComparison:
 
             if df_precos.empty:
                 raise ValueError(
-                    f"Não foi possível obter dados do Yahoo Finance para '{ticker_benchmark}'.\n"
+                    f"Não foi possível obter dados do Yahoo Finance para '{benchmark_ticker}'.\n"
                     f"Verifique se o ticker está correto.\n"
                     f"Exemplos: '^BVSP' (Ibovespa), '^GSPC' (S&P 500), '^DJI' (Dow Jones)"
                 )
@@ -114,7 +106,7 @@ class BenchmarkComparison:
                     data_mes = pd.to_datetime(data_col).date()
 
                     # Filtrar pelo período solicitado
-                    if data_mes < data_inicio or data_mes > data_fim:
+                    if data_mes < start_date or data_mes > end_date:
                         continue
 
                     # Extrair variacao_mensal
@@ -135,8 +127,8 @@ class BenchmarkComparison:
 
             if not dados_processados:
                 raise ValueError(
-                    f"Sem dados do benchmark '{ticker_benchmark}' após processamento "
-                    f"para o período {data_inicio} até {data_fim}."
+                    f"Sem dados do benchmark '{benchmark_ticker}' após processamento "
+                    f"para o período {start_date} até {end_date}."
                 )
 
             # Criar DataFrame final
@@ -151,7 +143,7 @@ class BenchmarkComparison:
 
         except Exception as e:
             raise ValueError(
-                f"Erro ao buscar dados do benchmark '{ticker_benchmark}': {str(e)}\n\n"
+                f"Erro ao buscar dados do benchmark '{benchmark_ticker}': {str(e)}\n\n"
                 f"Dicas:\n"
                 f"  • Verifique sua conexão com a internet\n"
                 f"  • Confirme que o ticker está correto\n"
@@ -167,19 +159,19 @@ class BenchmarkComparison:
                                     start_date: date,
                                     end_date: date) -> pd.DataFrame:
         """
-        Calcula os retornos mensais de uma carteira.
+        Calcula os retornos mensais de uma portfolio.
 
         Args:
-            carteira: Lista com composição da carteira
-            data_inicio: Data inicial
-            data_fim: Data final
+            portfolio: Lista com composição da portfolio
+            start_date: Data inicial
+            end_date: Data final
 
         Returns:
-            DataFrame com retornos mensais da carteira
+            DataFrame com retornos mensais da portfolio
         """
         with self.app.app_context():
-            ids_ativos = [item['id_ativo'] for item in carteira]
-            pesos_dict = {item['ticker']: item['peso'] for item in carteira}
+            ids_ativos = [item['id_ativo'] for item in portfolio]
+            pesos_dict = {item['ticker']: item['peso'] for item in portfolio}
 
             # Buscar retornos dos ativos
             query = db.session.query(
@@ -189,15 +181,15 @@ class BenchmarkComparison:
             ).join(Ativo, HistoricoPrecos.id_ativo == Ativo.id) \
                 .filter(
                     HistoricoPrecos.id_ativo.in_(ids_ativos),
-                    HistoricoPrecos.data >= data_inicio,
-                    HistoricoPrecos.data <= data_fim
+                    HistoricoPrecos.data >= start_date,
+                    HistoricoPrecos.data <= end_date
                 ) \
                 .order_by(HistoricoPrecos.data)
 
             df = pd.read_sql(query.statement, con=db.session.connection())
 
             if df.empty:
-                raise ValueError("Sem dados históricos para os ativos da carteira.")
+                raise ValueError("Sem dados históricos para os ativos da portfolio.")
 
             # Pivot para ter retornos por ativo
             df_retornos = df.pivot(
@@ -206,8 +198,8 @@ class BenchmarkComparison:
                 values='variacao_mensal'
             )
 
-            # Calcular retorno ponderado da carteira
-            retornos_carteira = []
+            # Calcular retorno ponderado da portfolio
+            retornos_portfolio = []
             datas = []
 
             for data_idx in df_retornos.index:
@@ -218,13 +210,13 @@ class BenchmarkComparison:
                         if pd.notna(ret_ativo):
                             retorno_mes += pesos_dict[ticker] * ret_ativo
 
-                retornos_carteira.append(retorno_mes)
+                retornos_portfolio.append(retorno_mes)
                 datas.append(data_idx)
 
             # Criar DataFrame
             df_resultado = pd.DataFrame({
                 'data': datas,
-                'retorno_mensal': retornos_carteira
+                'retorno_mensal': retornos_portfolio
             })
             df_resultado.set_index('data', inplace=True)
 
@@ -234,12 +226,12 @@ class BenchmarkComparison:
                                          start_date: date,
                                          end_date: date) -> Tuple[pd.DataFrame, List[Dict]]:
         """
-        Busca dados históricos de retorno de cada ativo individual da carteira.
+        Busca dados históricos de retorno de cada ativo individual da portfolio.
 
         Args:
-            carteira: Lista com composição da carteira
-            data_inicio: Data inicial
-            data_fim: Data final
+            portfolio: Lista com composição da portfolio
+            start_date: Data inicial
+            end_date: Data final
 
         Returns:
             Tupla contendo:
@@ -247,7 +239,7 @@ class BenchmarkComparison:
             - Lista com informações dos ativos ordenados por peso decrescente
         """
         with self.app.app_context():
-            ids_ativos = [item['id_ativo'] for item in carteira]
+            ids_ativos = [item['id_ativo'] for item in portfolio]
 
             # Criar dicionário com informações completas dos ativos
             ativos_info = {
@@ -256,7 +248,7 @@ class BenchmarkComparison:
                     'nome': item.get('nome', item['ticker']),
                     'peso': item['peso']
                 }
-                for item in carteira
+                for item in portfolio
             }
 
             # Buscar retornos dos ativos
@@ -267,15 +259,15 @@ class BenchmarkComparison:
             ).join(Ativo, HistoricoPrecos.id_ativo == Ativo.id) \
                 .filter(
                     HistoricoPrecos.id_ativo.in_(ids_ativos),
-                    HistoricoPrecos.data >= data_inicio,
-                    HistoricoPrecos.data <= data_fim
+                    HistoricoPrecos.data >= start_date,
+                    HistoricoPrecos.data <= end_date
                 ) \
                 .order_by(HistoricoPrecos.data)
 
             df = pd.read_sql(query.statement, con=db.session.connection())
 
             if df.empty:
-                raise ValueError("Sem dados históricos para os ativos da carteira.")
+                raise ValueError("Sem dados históricos para os ativos da portfolio.")
 
             # Pivot para ter retornos por ativo
             df_retornos = df.pivot(
@@ -300,25 +292,16 @@ class BenchmarkComparison:
                                       file_name: str = None) -> str:
         """
         Gera gráfico mostrando a evolução do retorno acumulado de cada ativo
-        individual da carteira AGMO, com sumário lateral mostrando a participação
+        individual da portfolio AGMO, com sumário lateral mostrando a participação
         de cada ativo.
-
-        Args:
-            carteira: Lista com composição da carteira (deve incluir 'nome' de cada ativo)
-            data_inicio: Data inicial
-            data_fim: Data final
-            nome_arquivo: Nome do arquivo para salvar (opcional)
-
-        Returns:
-            Caminho do arquivo salvo
         """
         print(f"\n{'='*70}")
-        print(f"📊 GERANDO GRÁFICO DE EVOLUÇÃO DOS ATIVOS DA CARTEIRA")
+        print(f"📊 GERANDO GRÁFICO DE EVOLUÇÃO DOS ATIVOS DA portfolio")
         print(f"{'='*70}")
 
         # Buscar dados dos ativos
-        df_retornos, ativos_ordenados = self._buscar_dados_ativos_individuais(
-            carteira, data_inicio, data_fim
+        df_retornos, ativos_ordenados = self._fetch_individual_assets_data(
+            portfolio, start_date, end_date
         )
 
         # Calcular retorno acumulado para cada ativo
@@ -363,7 +346,7 @@ class BenchmarkComparison:
 
         # Configurar gráfico
         ax_grafico.axhline(y=0, color='gray', linestyle='--', alpha=0.5, linewidth=1)
-        ax_grafico.set_title('Evolução dos Ativos da Carteira AGMO',
+        ax_grafico.set_title('Evolução dos Ativos da portfolio AGMO',
                             fontsize=14, fontweight='bold', pad=20)
         ax_grafico.set_xlabel('Data', fontsize=11)
         ax_grafico.set_ylabel('Retorno Acumulado (%)', fontsize=11)
@@ -378,7 +361,7 @@ class BenchmarkComparison:
         ax_sumario.axis('off')  # Desligar eixos
 
         # Título do sumário
-        ax_sumario.text(0.5, 0.95, 'Composição da Carteira',
+        ax_sumario.text(0.5, 0.95, 'Composição da portfolio',
                        ha='center', va='top', fontsize=12, fontweight='bold',
                        transform=ax_sumario.transAxes)
 
@@ -462,21 +445,21 @@ class BenchmarkComparison:
         plt.subplots_adjust(left=0.05, right=0.98, top=0.95, bottom=0.08, wspace=0.25)
 
         # Salvar gráfico
-        if nome_arquivo is None:
+        if file_name is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            nome_arquivo = f'evolucao_ativos_carteira_{timestamp}.png'
+            nome_arquivo = f'evolucao_ativos_portfolio_{timestamp}.png'
 
         output_dir = Path('comparison_results')
         output_dir.mkdir(exist_ok=True)
 
-        caminho_completo = output_dir / nome_arquivo
-        plt.savefig(caminho_completo, dpi=300, bbox_inches='tight')
+        full_path = output_dir / file_name
+        plt.savefig(full_path, dpi=300, bbox_inches='tight')
         plt.close()
 
-        print(f"  ✅ Gráfico de evolução dos ativos salvo em: {caminho_completo}")
+        print(f"  ✅ Gráfico de evolução dos ativos salvo em: {full_path}")
         print(f"{'='*70}\n")
 
-        return str(caminho_completo)
+        return str(full_path)
 
     def calculate_comparative_metrics(self,
                                        portfolio: List[Dict],
@@ -484,35 +467,26 @@ class BenchmarkComparison:
                                        start_date: date,
                                        end_date: date) -> Dict:
         """
-        Calcula métricas comparativas entre a carteira e o benchmark.
-
-        Args:
-            carteira: Lista com composição da carteira
-            ticker_benchmark: Ticker do benchmark (ex: '^BVSP')
-            data_inicio: Data inicial da comparação
-            data_fim: Data final da comparação
-
-        Returns:
-            Dicionário com métricas comparativas
+        Calcula métricas comparativas entre a portfolio e o benchmark.
         """
         print(f"\n{'='*70}")
         print(f"📊 CALCULANDO MÉTRICAS COMPARATIVAS")
         print(f"{'='*70}")
-        print(f"  Benchmark: {ticker_benchmark}")
-        print(f"  Período: {data_inicio} até {data_fim}")
+        print(f"  Benchmark: {benchmark_ticker}")
+        print(f"  Período: {start_date} até {end_date}")
 
         # Buscar dados
-        df_benchmark = self._buscar_dados_benchmark(ticker_benchmark, data_inicio, data_fim)
-        df_carteira = self._calcular_retornos_carteira(carteira, data_inicio, data_fim)
+        df_benchmark = self._fetch_benchmark_data(benchmark_ticker, start_date, end_date)
+        df_portfolio = self._calculate_portfolio_returns(portfolio, start_date, end_date)
 
         # Alinhar datas (pegar apenas datas comuns)
-        datas_comuns = df_benchmark.index.intersection(df_carteira.index)
+        datas_comuns = df_benchmark.index.intersection(df_portfolio.index)
 
         if len(datas_comuns) == 0:
-            raise ValueError("Não há datas em comum entre a carteira e o benchmark.")
+            raise ValueError("Não há datas em comum entre a portfolio e o benchmark.")
 
         retornos_bench = df_benchmark.loc[datas_comuns, 'variacao_mensal'].values
-        retornos_cart = df_carteira.loc[datas_comuns, 'retorno_mensal'].values
+        retornos_cart = df_portfolio.loc[datas_comuns, 'retorno_mensal'].values
 
         retornos_bench_series = pd.Series(retornos_bench, index=datas_comuns)
         retornos_cart_series = pd.Series(retornos_cart, index=datas_comuns)
@@ -569,8 +543,8 @@ class BenchmarkComparison:
         max_dd_cart = calcular_max_drawdown(retornos_cart)
         max_dd_bench = calcular_max_drawdown(retornos_bench)
 
-        metricas = {
-            'carteira': {
+        metrics = {
+            'portfolio': {
                 'retorno_total': float(retorno_total_cart),
                 'retorno_anualizado': float(retorno_medio_cart),
                 'volatilidade_anualizada': float(vol_cart),
@@ -578,7 +552,7 @@ class BenchmarkComparison:
                 'max_drawdown': float(max_dd_cart)
             },
             'benchmark': {
-                'ticker': ticker_benchmark,
+                'ticker': benchmark_ticker,
                 'retorno_total': float(retorno_total_bench),
                 'retorno_anualizado': float(retorno_medio_bench),
                 'volatilidade_anualizada': float(vol_bench),
@@ -593,69 +567,69 @@ class BenchmarkComparison:
                 'correlacao': float(correlacao)
             },
             'periodo': {
-                'data_inicio': data_inicio.isoformat(),
-                'data_fim': data_fim.isoformat(),
+                'start_date': start_date.isoformat(),
+                'end_date': end_date.isoformat(),
                 'num_meses': len(datas_comuns)
             }
         }
 
-        self._imprimir_metricas(metricas)
+        self._print_metrics(metrics)
 
-        return metricas
+        return metrics
 
     def _print_metrics(self, metrics: Dict):
         """Imprime as métricas de forma formatada"""
         print(f"\n{'─'*70}")
-        print(f"📈 MÉTRICAS DA CARTEIRA:")
+        print(f"📈 MÉTRICAS DA portfolio:")
         print(f"{'─'*70}")
-        print(f"  Retorno Total:           {metricas['carteira']['retorno_total']*100:>8.2f}%")
-        print(f"  Retorno Anualizado:      {metricas['carteira']['retorno_anualizado']*100:>8.2f}%")
-        print(f"  Volatilidade Anualizada: {metricas['carteira']['volatilidade_anualizada']*100:>8.2f}%")
-        print(f"  Sharpe Ratio:            {metricas['carteira']['sharpe_ratio']:>8.3f}")
-        print(f"  Max Drawdown:            {metricas['carteira']['max_drawdown']*100:>8.2f}%")
+        print(f"  Retorno Total:           {metrics['portfolio']['retorno_total']*100:>8.2f}%")
+        print(f"  Retorno Anualizado:      {metrics['portfolio']['retorno_anualizado']*100:>8.2f}%")
+        print(f"  Volatilidade Anualizada: {metrics['portfolio']['volatilidade_anualizada']*100:>8.2f}%")
+        print(f"  Sharpe Ratio:            {metrics['portfolio']['sharpe_ratio']:>8.3f}")
+        print(f"  Max Drawdown:            {metrics['portfolio']['max_drawdown']*100:>8.2f}%")
 
         print(f"\n{'─'*70}")
-        print(f"📊 MÉTRICAS DO BENCHMARK ({metricas['benchmark']['ticker']}):")
+        print(f"📊 MÉTRICAS DO BENCHMARK ({metrics['benchmark']['ticker']}):")
         print(f"{'─'*70}")
-        print(f"  Retorno Total:           {metricas['benchmark']['retorno_total']*100:>8.2f}%")
-        print(f"  Retorno Anualizado:      {metricas['benchmark']['retorno_anualizado']*100:>8.2f}%")
-        print(f"  Volatilidade Anualizada: {metricas['benchmark']['volatilidade_anualizada']*100:>8.2f}%")
-        print(f"  Sharpe Ratio:            {metricas['benchmark']['sharpe_ratio']:>8.3f}")
-        print(f"  Max Drawdown:            {metricas['benchmark']['max_drawdown']*100:>8.2f}%")
+        print(f"  Retorno Total:           {metrics['benchmark']['retorno_total']*100:>8.2f}%")
+        print(f"  Retorno Anualizado:      {metrics['benchmark']['retorno_anualizado']*100:>8.2f}%")
+        print(f"  Volatilidade Anualizada: {metrics['benchmark']['volatilidade_anualizada']*100:>8.2f}%")
+        print(f"  Sharpe Ratio:            {metrics['benchmark']['sharpe_ratio']:>8.3f}")
+        print(f"  Max Drawdown:            {metrics['benchmark']['max_drawdown']*100:>8.2f}%")
 
         print(f"\n{'─'*70}")
         print(f"🔍 MÉTRICAS COMPARATIVAS:")
         print(f"{'─'*70}")
-        print(f"  Alpha (vs benchmark):    {metricas['comparativas']['alpha']*100:>8.2f}%")
-        print(f"  Beta:                    {metricas['comparativas']['beta']:>8.3f}")
-        print(f"  Tracking Error:          {metricas['comparativas']['tracking_error']*100:>8.2f}%")
-        print(f"  Information Ratio:       {metricas['comparativas']['information_ratio']:>8.3f}")
-        print(f"  Correlação:              {metricas['comparativas']['correlacao']:>8.3f}")
+        print(f"  Alpha (vs benchmark):    {metrics['comparativas']['alpha']*100:>8.2f}%")
+        print(f"  Beta:                    {metrics['comparativas']['beta']:>8.3f}")
+        print(f"  Tracking Error:          {metrics['comparativas']['tracking_error']*100:>8.2f}%")
+        print(f"  Information Ratio:       {metrics['comparativas']['information_ratio']:>8.3f}")
+        print(f"  Correlação:              {metrics['comparativas']['correlacao']:>8.3f}")
 
         # Interpretação
         print(f"\n{'─'*70}")
         print(f"💡 INTERPRETAÇÃO:")
         print(f"{'─'*70}")
 
-        alpha = metricas['comparativas']['alpha']
+        alpha = metrics['comparativas']['alpha']
         if alpha > 0.02:  # 2% ao ano
-            print(f"  ✅ Alpha positivo significativo: Carteira supera o benchmark")
+            print(f"  ✅ Alpha positivo significativo: portfolio supera o benchmark")
         elif alpha > 0:
-            print(f"  ✅ Alpha positivo: Carteira supera o benchmark marginalmente")
+            print(f"  ✅ Alpha positivo: portfolio supera o benchmark marginalmente")
         elif alpha > -0.02:
             print(f"  ⚠️  Alpha próximo de zero: Desempenho similar ao benchmark")
         else:
-            print(f"  ❌ Alpha negativo: Benchmark supera a carteira")
+            print(f"  ❌ Alpha negativo: Benchmark supera a portfolio")
 
-        beta = metricas['comparativas']['beta']
+        beta = metrics['comparativas']['beta']
         if beta > 1.2:
-            print(f"  ⚠️  Beta alto ({beta:.2f}): Carteira mais volátil que o mercado")
+            print(f"  ⚠️  Beta alto ({beta:.2f}): portfolio mais volátil que o mercado")
         elif beta > 0.8:
-            print(f"  ✅ Beta moderado ({beta:.2f}): Carteira com volatilidade similar ao mercado")
+            print(f"  ✅ Beta moderado ({beta:.2f}): portfolio com volatilidade similar ao mercado")
         else:
-            print(f"  ℹ️  Beta baixo ({beta:.2f}): Carteira menos volátil que o mercado")
+            print(f"  ℹ️  Beta baixo ({beta:.2f}): portfolio menos volátil que o mercado")
 
-        ir = metricas['comparativas']['information_ratio']
+        ir = metrics['comparativas']['information_ratio']
         if ir > 0.5:
             print(f"  ✅ Information Ratio alto: Excelente retorno ajustado por tracking error")
         elif ir > 0:
@@ -669,18 +643,11 @@ class BenchmarkComparison:
                                 file_name: str = None,
                                 benchmark_ticker: str = None) -> str:
         """
-        Gera gráfico comparando a carteira com o benchmark.
-
-        Args:
-            nome_arquivo: Nome do arquivo para salvar (opcional)
-            ticker_benchmark: Nome do benchmark para exibir no gráfico
-
-        Returns:
-            Caminho do arquivo salvo
+        Gera gráfico comparando a portfolio com o benchmark.
         """
         if self.benchmark_data is None or self.portfolio_data is None:
             raise ValueError(
-                "Execute calcular_metricas_comparativas() antes de gerar o gráfico."
+                "Execute calcular_metrics_comparativas() antes de gerar o gráfico."
             )
 
         print(f"\n{'='*70}")
@@ -689,7 +656,7 @@ class BenchmarkComparison:
 
         # Configurar figura com 3 subplots verticais
         fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(14, 16))
-        fig.suptitle('Comparação: Carteira vs Benchmark', fontsize=16, fontweight='bold')
+        fig.suptitle('Comparação: portfolio vs Benchmark', fontsize=16, fontweight='bold')
 
         datas = self.portfolio_data.index
 
@@ -698,10 +665,10 @@ class BenchmarkComparison:
         # ====================================================================
         ax1.plot(datas, self.portfolio_data['retorno_acumulado'] * 100,
                     linewidth=2.5, color='#2E86AB', marker='o', markersize=3,
-                    label='Carteira Otimizada')
+                    label='portfolio Otimizada')
         ax1.plot(datas, self.benchmark_data['retorno_acumulado'] * 100,
                     linewidth=2.5, color='#F18F01', marker='s', markersize=3,
-                    label=f'Benchmark ({ticker_benchmark or "Índice"})')
+                    label=f'Benchmark ({benchmark_ticker or "Índice"})')
         ax1.axhline(y=0, color='red', linestyle='--', alpha=0.5, linewidth=1)
         ax1.set_title('Retorno Acumulado ao Longo do Tempo', fontsize=12, fontweight='bold')
         ax1.set_xlabel('Data', fontsize=10)
@@ -714,7 +681,7 @@ class BenchmarkComparison:
         ret_final_cart = self.portfolio_data['retorno_acumulado'].iloc[-1] * 100
         ret_final_bench = self.benchmark_data['retorno_acumulado'].iloc[-1] * 100
 
-        ax1.annotate(f'Carteira: {ret_final_cart:+.2f}%',
+        ax1.annotate(f'portfolio: {ret_final_cart:+.2f}%',
                         xy=(datas[-1], ret_final_cart),
                         xytext=(10, 10), textcoords='offset points',
                         bbox=dict(boxstyle='round,pad=0.5', facecolor='#2E86AB', alpha=0.7),
@@ -741,10 +708,10 @@ class BenchmarkComparison:
 
         ax2.plot(datas, vol_cart_rolling,
                 linewidth=2.5, color='#2E86AB', marker='o', markersize=3,
-                label='Carteira Otimizada')
+                label='portfolio Otimizada')
         ax2.plot(datas, vol_bench_rolling,
                 linewidth=2.5, color='#F18F01', marker='s', markersize=3,
-                label=f'Benchmark ({ticker_benchmark or "Índice"})')
+                label=f'Benchmark ({benchmark_ticker or "Índice"})')
         ax2.set_title(f'Volatilidade Rolante ({janela} meses, anualizada)', fontsize=12, fontweight='bold')
         ax2.set_xlabel('Data', fontsize=10)
         ax2.set_ylabel('Volatilidade (%)', fontsize=10)
@@ -753,7 +720,7 @@ class BenchmarkComparison:
         ax2.tick_params(axis='x', rotation=45)
 
         # Adicionar anotações com volatilidade média
-        ax2.annotate(f'Média Carteira: {vol_media_cart:.2f}%',
+        ax2.annotate(f'Média portfolio: {vol_media_cart:.2f}%',
                     xy=(0.02, 0.95), xycoords='axes fraction',
                     bbox=dict(boxstyle='round,pad=0.5', facecolor='#2E86AB', alpha=0.7),
                     fontsize=8, fontweight='bold', color='white',
@@ -772,9 +739,9 @@ class BenchmarkComparison:
         width = 0.35
 
         ax3.bar(x - width/2, self.portfolio_data['retorno'] * 100, width,
-                   label='Carteira', color='#2E86AB', alpha=0.7)
+                   label='portfolio', color='#2E86AB', alpha=0.7)
         ax3.bar(x + width/2, self.benchmark_data['retorno'] * 100, width,
-                   label=f'Benchmark ({ticker_benchmark or "Índice"})', color='#F18F01', alpha=0.7)
+                   label=f'Benchmark ({benchmark_ticker or "Índice"})', color='#F18F01', alpha=0.7)
         ax3.axhline(y=0, color='black', linestyle='-', alpha=0.3)
         ax3.set_title('Retornos Mensais Comparados', fontsize=12, fontweight='bold')
         ax3.set_xlabel('Período', fontsize=10)
@@ -786,21 +753,21 @@ class BenchmarkComparison:
         plt.tight_layout()
 
         # Salvar gráfico
-        if nome_arquivo is None:
+        if file_name is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            nome_arquivo = f'comparacao_benchmark_{timestamp}.png'
+            file_name = f'comparacao_benchmark_{timestamp}.png'
 
         output_dir = Path('comparison_results')
         output_dir.mkdir(exist_ok=True)
 
-        caminho_completo = output_dir / nome_arquivo
-        plt.savefig(caminho_completo, dpi=300, bbox_inches='tight')
+        absolute_path = output_dir / file_name
+        plt.savefig(absolute_path, dpi=300, bbox_inches='tight')
         plt.close()
 
-        print(f"  ✅ Gráfico comparativo salvo em: {caminho_completo}")
+        print(f"  ✅ Gráfico comparativo salvo em: {absolute_path}")
         print(f"{'='*70}\n")
 
-        return caminho_completo
+        return absolute_path
 
     def generate_complete_report(self,
                                 portfolio: List[Dict],
@@ -809,40 +776,28 @@ class BenchmarkComparison:
                                 end_date: date,
                                 save_chart: bool = True) -> Dict:
         """
-        Gera relatório completo comparando a carteira com o benchmark.
-
-        Args:
-            carteira: Lista com composição da carteira
-            ticker_benchmark: Ticker do benchmark
-            data_inicio: Data inicial
-            data_fim: Data final
-            salvar_grafico: Se True, gera e salva gráfico
-
-        Returns:
-            Dicionário com todas as métricas
+        Gera relatório completo comparando a portfolio com o benchmark.
         """
         # Calcular métricas
-        metricas = self.calcular_metricas_comparativas(
-            carteira, ticker_benchmark, data_inicio, data_fim
-        )
+        metrics = self.calculate_comparative_metrics(portfolio, benchmark_ticker, start_date, end_date)
 
         # Gerar gráficos se solicitado
-        if salvar_grafico:
-            # Gráfico comparativo entre carteira e benchmark
-            caminho_grafico = self.gerar_grafico_comparacao(
-                ticker_benchmark=ticker_benchmark
+        if save_chart:
+            # Gráfico comparativo entre portfolio e benchmark
+            caminho_grafico = self.generate_comparison_chart(
+                benchmark_ticker=benchmark_ticker
             )
-            metricas['grafico_path'] = caminho_grafico
+            metrics['grafico_path'] = caminho_grafico
 
-            # Gráfico de evolução dos ativos individuais da carteira
-            caminho_grafico_ativos = self.gerar_grafico_evolucao_ativos(
-                carteira=carteira,
-                data_inicio=data_inicio,
-                data_fim=data_fim
+            # Gráfico de evolução dos ativos individuais da portfolio
+            assets_evolution_chart = self.generate_assets_evolution_chart(
+                portfolio=portfolio,
+                start_date=start_date,
+                end_date=end_date
             )
-            metricas['grafico_ativos_path'] = caminho_grafico_ativos
+            metrics['grafico_ativos_path'] = assets_evolution_chart
 
-        return metricas
+        return metrics
 
 
 def example_usage():
@@ -857,13 +812,13 @@ def example_usage():
     app = create_app()
 
     print("\n" + "=" * 70)
-    print("📊 EXEMPLO: Comparação de Carteira com Benchmark")
+    print("📊 EXEMPLO: Comparação de portfolio com Benchmark")
     print("=" * 70)
     print("💡 Os dados do benchmark serão obtidos via Yahoo Finance")
     print("   Não precisa cadastrar o índice no banco!\n")
 
-    # Exemplo de composição de carteira
-    carteira_exemplo = [
+    # Exemplo de composição de portfolio
+    portfolio_exemplo = [
         {'id_ativo': 1, 'ticker': 'PETR4', 'peso': 0.3},
         {'id_ativo': 2, 'ticker': 'VALE3', 'peso': 0.3},
         {'id_ativo': 3, 'ticker': 'ITUB4', 'peso': 0.4}
@@ -873,17 +828,17 @@ def example_usage():
     comparador = BenchmarkComparison(app)
 
     # Gerar relatório completo
-    metricas = comparador.gerar_relatorio_completo(
-        carteira=carteira_exemplo,
-        ticker_benchmark='^BVSP',  # Ibovespa - busca automática via yfinance
-        data_inicio=date(2020, 1, 1),
-        data_fim=date(2024, 12, 31),
-        salvar_grafico=True
+    metrics = comparador.generate_complete_report(
+        portfolio=portfolio_exemplo,
+        benchmark_ticker='^BVSP',  # Ibovespa - busca automática via yfinance
+        start_date=date(2020, 1, 1),
+        end_date=date(2024, 12, 31),
+        save_chart=True
     )
 
     print("\n✅ Relatório completo gerado com sucesso!")
-    return metricas
+    return metrics
 
 
 if __name__ == "__main__":
-    exemplo_uso()
+    example_usage()

@@ -803,7 +803,7 @@ class Nsga2OtimizacaoService:
             with self.app.app_context():
                 optimal_config = HyperparameterConfig.get_optimal_config(
                     num_ativos=num_assets,
-                    nivel_risco=self.risk_level
+                    risk_level=self.risk_level
                 )
 
                 if optimal_config:

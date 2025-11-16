@@ -92,22 +92,12 @@ class HyperparameterTuningService:
     ) -> Dict:
         """
         Analisa a convergência do algoritmo ao longo das gerações.
-
-        Args:
-            ids_assets: IDs dos ativos para otimização
-            risk_level: Perfil de risco ('conservador', 'moderado', 'arrojado')
-            max_generations: Número máximo de gerações para análise
-            population_size: Tamanho da população
-            n_runs: Número de execuções independentes
-
-        Returns:
-            Dicionário com resultados da análise de convergência
         """
         logger.info(f"Iniciando análise de convergência: {n_runs} execuções, "
                    f"{max_generations} gerações, população {population_size}")
 
         # Prepara dados para otimização
-        service = Nsga2OtimizacaoService(self.app, [], risk_level, 10)
+        service = Nsga2OtimizacaoService(self.app, [], risk_level, 10, asset_ids=ids_assets)
 
         # Múltiplas execuções para análise estatística
         all_runs = []
@@ -117,8 +107,7 @@ class HyperparameterTuningService:
             # Executa otimização com tracking de convergência
             convergence_tracker = ConvergenceTracker()
 
-            result = service.otimizar(
-                ids_ativos=ids_assets,
+            result = service.optimize(
                 population_size=population_size,
                 generations=max_generations,
                 convergence_tracker=convergence_tracker
@@ -226,17 +215,17 @@ class HyperparameterTuningService:
         """
         Executa uma única otimização com uma configuração específica.
         """
-        service = Nsga2OtimizacaoService(self.app, [], "moderado", ids_ativos=ids_assets)
+        service = Nsga2OtimizacaoService(self.app, [], "moderado", asset_ids=ids_assets)
         convergence_tracker = ConvergenceTracker()
 
         start_time = time.time()
 
         # Executa otimização
-        result = service.otimizar(
+        result = service.optimize(
             population_size=config.population_size,
             generations=config.generations,
             convergence_tracker=convergence_tracker,
-            max_ativos=max_assets
+            max_assets=max_assets
         )
 
         execution_time = time.time() - start_time
@@ -734,7 +723,7 @@ class HyperparameterTuningService:
                 # Verifica se já existe configuração para esta quantidade
                 existing = HyperparameterConfig.query.filter_by(
                     num_ativos=num_ativos,
-                    nivel_risco=nivel_risco
+                    risk_level=nivel_risco
                 ).first()
 
                 if existing:
@@ -745,7 +734,7 @@ class HyperparameterTuningService:
                 # Cria nova configuração
                 new_config = HyperparameterConfig(
                     num_ativos=num_ativos,
-                    nivel_risco=nivel_risco,
+                    risk_level=nivel_risco,
                     population_size=int(row['population_size']),
                     generations=int(row['generations']),
                     crossover_eta=float(row['crossover_eta']),

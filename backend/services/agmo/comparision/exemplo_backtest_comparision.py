@@ -6,7 +6,7 @@ from datetime import date
 from app import create_app
 from services.agmo.agmo_service import (
     Nsga2OtimizacaoService,
-    salvar_grafico_backtest
+    save_backtest_chart
 )
 from services.agmo.comparision.benchmark_comparison import BenchmarkComparison
 
@@ -28,55 +28,55 @@ def complete_example():
     print("─" * 80)
 
     # Data de referência para otimização (simula que estamos nessa data)
-    data_referencia = date(2015, 1, 1)
+    reference_date = date(2015, 1, 1)
 
     # Data final do backtest (avalia desempenho até essa data)
-    data_fim_backtest = date(2024, 12, 31)
+    end_date_backtest = date(2024, 12, 31)
 
     # Parâmetros da otimização
-    ids_ativos_restringidos = []  # Sem restrições de ativos
-    nivel_risco = 'arrojado'  # Perfil de risco
-    prazo_anos = 10  # Prazo de investimento
-    max_ativos_carteira = 10  # Máximo de ativos na carteira
+    restricted_asset_ids = []  # Sem restrições de ativos
+    risk_level = 'arrojado'  # Perfil de risco
+    years_period = 10  # Prazo de investimento
+    max_ativos_portfolio = 10  # Máximo de ativos na portfolio
 
     # Ticker do benchmark para comparação (dados obtidos via Yahoo Finance)
     ticker_benchmark = '^BVSP'  # Ibovespa - busca automática via yfinance
 
-    print(f"  Data de referência (otimização): {data_referencia}")
-    print(f"  Data final (backtest): {data_fim_backtest}")
-    print(f"  Perfil de risco: {nivel_risco}")
-    print(f"  Prazo: {prazo_anos} anos")
-    print(f"  Máximo de ativos: {max_ativos_carteira}")
+    print(f"  Data de referência (otimização): {reference_date}")
+    print(f"  Data final (backtest): {end_date_backtest}")
+    print(f"  Perfil de risco: {risk_level}")
+    print(f"  Prazo: {years_period} anos")
+    print(f"  Máximo de ativos: {max_ativos_portfolio}")
     print(f"  Benchmark: {ticker_benchmark}")
 
     # ========================================================================
-    # PASSO 2: OTIMIZAR CARTEIRA (usando dados até data_referencia)
+    # PASSO 2: OTIMIZAR portfolio (usando dados até reference_date)
     # ========================================================================
-    print("\n📊 PASSO 2: Otimizando carteira")
+    print("\n📊 PASSO 2: Otimizando portfolio")
     print("─" * 80)
 
     service = Nsga2OtimizacaoService(
         app=app,
-        ids_ativos_restringidos=ids_ativos_restringidos,
-        nivel_risco=nivel_risco,
-        prazo_anos=prazo_anos,
-        data_referencia=data_referencia  # ✅ Modo backtest ativado
+        restricted_asset_ids=restricted_asset_ids,
+        risk_level=risk_level,
+        years_period=years_period,
+        reference_date=reference_date
     )
 
-    resultado_otimizacao = service.otimizar(
-        max_ativos=max_ativos_carteira,
+    resultado_otimizacao = service.optimize(
+        max_assets=max_ativos_portfolio,
         use_optimal_config=False  # Usar config padrão para exemplo
     )
 
-    carteira_otimizada = resultado_otimizacao['composicao']
+    portfolio_otimizada = resultado_otimizacao['composicao']
 
-    print(f"\n  ✅ Carteira otimizada com {len(carteira_otimizada)} ativos")
+    print(f"\n  ✅ portfolio otimizada com {len(portfolio_otimizada)} ativos")
     print(f"  📅 Dados usados: {resultado_otimizacao['periodo_inicio']} até "
           f"{resultado_otimizacao['periodo_fim']}")
 
     # Mostrar composição
-    print(f"\n  💼 Composição da Carteira:")
-    for item in sorted(carteira_otimizada, key=lambda x: x['peso'], reverse=True):
+    print(f"\n  💼 Composição da portfolio:")
+    for item in sorted(portfolio_otimizada, key=lambda x: x['peso'], reverse=True):
         print(f"     {item['ticker']:8s} - {item['peso']*100:6.2f}%")
 
     # ========================================================================
@@ -85,13 +85,13 @@ def complete_example():
     print("\n📈 PASSO 3: Gerando gráfico de retorno e volatilidade")
     print("─" * 80)
 
-    caminho_grafico_backtest = salvar_grafico_backtest(
-        carteira=carteira_otimizada,
-        data_inicio=data_referencia,
-        data_fim=data_fim_backtest,
+    caminho_grafico_backtest = save_backtest_chart(
+        portfolio=portfolio_otimizada,
+        start_date=reference_date,
+        end_date=end_date_backtest,
         app=app,
-        nome_arquivo='backtest_retorno_volatilidade.png',
-        janela_volatilidade=6  # Janela de 6 meses para volatilidade rolling
+        file_name='backtest_retorno_volatilidade.png',
+        volatility_window=6  # Janela de 6 meses para volatilidade rolling
     )
 
     # ========================================================================
@@ -104,12 +104,12 @@ def complete_example():
 
     comparador = BenchmarkComparison(app)
 
-    metricas_comparativas = comparador.gerar_relatorio_completo(
-        carteira=carteira_otimizada,
-        ticker_benchmark=ticker_benchmark,
-        data_inicio=data_referencia,
-        data_fim=data_fim_backtest,
-        salvar_grafico=True
+    metricas_comparativas = comparador.generate_complete_report(
+        portfolio=portfolio_otimizada,
+        benchmark_ticker=ticker_benchmark,
+        start_date=reference_date,
+        end_date=end_date_backtest,
+        save_chart=True
     )
 
     # ========================================================================
@@ -119,11 +119,11 @@ def complete_example():
     print("✅ RESUMO FINAL")
     print("=" * 80)
 
-    print(f"\n📊 Desempenho da Carteira:")
-    print(f"   Retorno Total: {metricas_comparativas['carteira']['retorno_total']*100:+.2f}%")
-    print(f"   Retorno Anualizado: {metricas_comparativas['carteira']['retorno_anualizado']*100:+.2f}%")
-    print(f"   Volatilidade Anualizada: {metricas_comparativas['carteira']['volatilidade_anualizada']*100:.2f}%")
-    print(f"   Sharpe Ratio: {metricas_comparativas['carteira']['sharpe_ratio']:.3f}")
+    print(f"\n📊 Desempenho da portfolio:")
+    print(f"   Retorno Total: {metricas_comparativas['portfolio']['retorno_total']*100:+.2f}%")
+    print(f"   Retorno Anualizado: {metricas_comparativas['portfolio']['retorno_anualizado']*100:+.2f}%")
+    print(f"   Volatilidade Anualizada: {metricas_comparativas['portfolio']['volatilidade_anualizada']*100:.2f}%")
+    print(f"   Sharpe Ratio: {metricas_comparativas['portfolio']['sharpe_ratio']:.3f}")
 
     print(f"\n📈 Desempenho do Benchmark ({ticker_benchmark}):")
     print(f"   Retorno Total: {metricas_comparativas['benchmark']['retorno_total']*100:+.2f}%")
@@ -139,9 +139,9 @@ def complete_example():
     # Conclusão
     alpha = metricas_comparativas['comparativas']['alpha']
     if alpha > 0:
-        print(f"\n   ✅ A carteira SUPEROU o benchmark em {alpha*100:.2f}% ao ano!")
+        print(f"\n   ✅ A portfolio SUPEROU o benchmark em {alpha*100:.2f}% ao ano!")
     else:
-        print(f"\n   ⚠️  O benchmark SUPEROU a carteira em {abs(alpha)*100:.2f}% ao ano")
+        print(f"\n   ⚠️  O benchmark SUPEROU a portfolio em {abs(alpha)*100:.2f}% ao ano")
 
     print(f"\n📁 Arquivos Gerados:")
     print(f"   • Backtest (retorno/volatilidade): {caminho_grafico_backtest}")
@@ -153,7 +153,7 @@ def complete_example():
     print("=" * 80 + "\n")
 
     return {
-        'carteira': carteira_otimizada,
+        'portfolio': portfolio_otimizada,
         'metricas': metricas_comparativas,
         'graficos': {
             'backtest': caminho_grafico_backtest,
@@ -172,24 +172,24 @@ def simple_backtest_example():
     print("📊 EXEMPLO SIMPLES: BACKTEST COM GRÁFICO")
     print("=" * 80)
 
-    # Otimizar carteira
-    data_referencia = date(2020, 1, 1)
+    # Otimizar portfolio
+    reference_date = date(2020, 1, 1)
     service = Nsga2OtimizacaoService(
         app=app,
-        ids_ativos_restringidos=[],
-        nivel_risco='moderado',
-        prazo_anos=5,
-        data_referencia=data_referencia
+        restricted_asset_ids=[],
+        risk_level='moderado',
+        years_period=5,
+        reference_date=reference_date
     )
 
-    resultado = service.otimizar(max_ativos=10, use_optimal_config=False)
+    resultado = service.optimize(max_assets=10, use_optimal_config=False)
 
     # Gerar gráfico
-    data_fim = date(2024, 12, 31)
-    salvar_grafico_backtest(
-        carteira=resultado['composicao'],
-        data_inicio=data_referencia,
-        data_fim=data_fim,
+    end_date = date(2024, 12, 31)
+    save_backtest_chart(
+        portfolio=resultado['composicao'],
+        start_date=reference_date,
+        end_date=end_date,
         app=app
     )
 
@@ -209,8 +209,8 @@ def simple_comparison_example():
     print("🔍 EXEMPLO SIMPLES: COMPARAÇÃO COM BENCHMARK")
     print("=" * 80)
 
-    # Carteira exemplo (substitua pela sua carteira otimizada)
-    carteira_exemplo = [
+    # portfolio exemplo (substitua pela sua portfolio otimizada)
+    portfolio_exemplo = [
         {'id_ativo': 1, 'ticker': 'PETR4', 'peso': 0.3},
         {'id_ativo': 2, 'ticker': 'VALE3', 'peso': 0.3},
         {'id_ativo': 3, 'ticker': 'ITUB4', 'peso': 0.4}
@@ -218,12 +218,12 @@ def simple_comparison_example():
 
     # Comparar com Ibovespa - dados obtidos automaticamente do Yahoo Finance
     comparador = BenchmarkComparison(app)
-    metricas = comparador.gerar_relatorio_completo(
-        carteira=carteira_exemplo,
-        ticker_benchmark='^BVSP',  # Busca automática via yfinance
-        data_inicio=date(2020, 1, 1),
-        data_fim=date(2024, 12, 31),
-        salvar_grafico=True
+    metricas = comparador.generate_complete_report(
+        portfolio=portfolio_exemplo,
+        benchmark_ticker='^BVSP',  # Busca automática via yfinance
+        start_date=date(2020, 1, 1),
+        end_date=date(2024, 12, 31),
+        save_chart=True
     )
 
     print("\n✅ Comparação concluída! Verifique o gráfico gerado.\n")

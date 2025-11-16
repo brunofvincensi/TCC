@@ -130,12 +130,12 @@ class OtimizacaoService:
             # Cria instância do serviço AGMO
             service = Nsga2OtimizacaoService(
                 app=current_app._get_current_object(),  # Instância Flask
-                ids_ativos_restringidos=restricted_asset_ids,
-                nivel_risco=risk_profile,
-                prazo_anos=years_period,
-                data_referencia=None,  # Para backtest, usar parâmetro específico
-                data_inicio=None,
-                ids_ativos=asset_ids
+                restricted_asset_ids=restricted_asset_ids,
+                risk_level=risk_profile,
+                years_period=years_period,
+                reference_date=None,  # Para backtest, usar parâmetro específico
+                start_date=None,
+                asset_ids=asset_ids
             )
 
             # Executa otimização
@@ -143,7 +143,7 @@ class OtimizacaoService:
                 population_size=population_size,
                 generations=generations,
                 use_optimal_config=use_optimal_config,
-                max_ativos=max_assets
+                max_assets=max_assets
             )
 
             # ========== 4. FORMATAÇÃO DO RESULTADO ==========
