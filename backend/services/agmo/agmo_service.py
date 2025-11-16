@@ -67,7 +67,6 @@ class ConvergenceCallback(Callback):
         )
 
 class PersonalizedPortfolioProblem(ElementwiseProblem):
-
     """
     Problema de otimização de portfólio com 3 objetivos, personalizado
     pelo perfil de risco do usuário.
@@ -732,7 +731,7 @@ class Nsga2OtimizacaoService:
                 [0.3, 0.0, 0.0],  # Prioridade máxima: minimizar variância e CVaR
             ]),
             'moderado': np.array([
-                [0.0, 0.3, 0.3],  # Balanceado
+                [0.2, 0.3, 0.3],  # Balanceado
             ]),
             'arrojado': np.array([
                 [0.0, 0.3, 0.3],  # Bom retorno com risco alto
@@ -1086,7 +1085,7 @@ def optimize_current_portfolio(app):
 def backtest(app):
     from datetime import date
     backtest_date = date(2015, 1, 1)
-    backtest_service = Nsga2OtimizacaoService(app, [1, 10], "arrojado", 10, reference_date=backtest_date, show_chart=True)
+    backtest_service = Nsga2OtimizacaoService(app, [1, 10], "moderado", 10, reference_date=backtest_date, show_chart=True)
     backtest_portfolio = backtest_service.optimize(max_assets=10)
 
     # Informações do backtest

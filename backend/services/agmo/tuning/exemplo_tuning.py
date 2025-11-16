@@ -12,6 +12,8 @@ import os
 import logging
 from datetime import datetime
 
+from models.ativo import TipoAtivo
+
 # Adiciona o diretório raiz ao path para importações
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
@@ -94,7 +96,7 @@ def example_2_quick_test():
 
     # Busca ativos
     with app.app_context():
-        assets = db.session.query(Ativo).limit(5).all()
+        assets = db.session.query(Ativo).filter(Ativo.tipo == TipoAtivo.ACAO).limit(5).all()
         ids_assets = [a.id for a in assets]
         print(f"Usando apenas {len(ids_assets)} ativos para teste rápido\n")
 

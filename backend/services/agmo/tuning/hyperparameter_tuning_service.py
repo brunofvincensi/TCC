@@ -184,7 +184,8 @@ class HyperparameterTuningService:
                     result = self._run_single_optimization(
                         config=config,
                         ids_assets=ids_assets,
-                        run_number=run + 1
+                        run_number=run + 1,
+                        max_assets=10
                     )
                     results.append(result)
                     self.results.append(result)
