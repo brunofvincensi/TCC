@@ -291,16 +291,18 @@ def main_menu():
 
     choose = input("\nDigite o número do exemplo: ")
 
+    # Dicionário de funções (sem executá-las ainda - sem parênteses)
     examples = {
-        '1': example_1_convergence_analysis(),
-        '2': example_2_quick_test(),
-        '3': example_3_adaptive_tuning(),
-        '4': example_4_test_auto_lookup(),
+        '1': example_1_convergence_analysis,
+        '2': example_2_quick_test,
+        '3': example_3_adaptive_tuning,
+        '4': example_4_test_auto_lookup,
     }
 
     if choose in examples:
         try:
-            examples[choose]
+            # Agora sim, executa a função escolhida
+            examples[choose]()
         except KeyboardInterrupt:
             print("\n\n⚠️  Operação interrompida pelo usuário.")
         except Exception as e:
