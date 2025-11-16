@@ -5,7 +5,36 @@ from config import Config
 from models import db
 from routes import register_blueprints
 
-def create_app():
+# Variável global para manter referência ao scheduler
+_price_scheduler = None
+
+def _init_price_scheduler(app):
+    """
+    Inicializa o scheduler de atualização de preços.
+
+    Args:
+        app: Instância da aplicação Flask
+    """
+    global _price_scheduler
+
+    try:
+        from services.scheduler.price_scheduler import PriceUpdateScheduler
+        from commands import update_daily_prices
+
+        hour = app.config['PRICE_SCHEDULER_HOUR']
+        minute = app.config['PRICE_SCHEDULER_MINUTE']
+
+        _price_scheduler = PriceUpdateScheduler(app, update_daily_prices)
+        _price_scheduler.start(hour=hour, minute=minute)
+
+        print(f"✅ Scheduler de preços iniciado!")
+        print(f"   Horário: {hour:02d}:{minute:02d}")
+        print(f"   Próxima execução: {_price_scheduler.get_next_run_time()}")
+    except Exception as e:
+        print(f"⚠️  Erro ao inicializar scheduler de preços: {e}")
+        print(f"   A aplicação continuará rodando sem o scheduler.")
+
+def create_app(enable_scheduler=None):
     """Factory pattern para criar a aplicação"""
     app = Flask(__name__)
 
@@ -30,13 +59,21 @@ def create_app():
     with app.app_context():
         db.create_all()
 
+    # Inicializar scheduler de atualização de preços (se habilitado)
+    if enable_scheduler is None:
+        enable_scheduler = app.config['ENABLE_PRICE_SCHEDULER']
+
+    if enable_scheduler:
+        _init_price_scheduler(app)
+
     # Rota raiz com informações do projeto
     @app.route('/')
     def index():
         return jsonify({
             'projeto': app.config['APP_NAME'],
             'versao': app.config['APP_VERSION'],
-            'status': 'online'
+            'status': 'online',
+            'scheduler_ativo': _price_scheduler is not None and _price_scheduler.scheduler.running if _price_scheduler else False
         })
 
     # Tratamento de erros JWT

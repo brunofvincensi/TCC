@@ -51,3 +51,30 @@ def update_prices(app):
                 yfinance_processor.process(asset)
 
         print("\n✅ Atualização de preços mensais concluída!")
+
+def update_daily_prices(app):
+    """
+    Atualiza os preços dos ativos com os dados mais recentes do dia.
+    Esta função deve ser executada diariamente para manter os dados atualizados.
+    """
+    with app.app_context():
+        yfinance_processor = YFinanceProcessor()
+
+        assets = Ativo.query.all()
+        if not assets:
+            print("Nenhum ativo encontrado no banco.")
+            return
+
+        print(f"\n🔄 Iniciando atualização diária de preços...")
+
+        updated_count = 0
+        for asset in assets:
+            if asset.tipo == TipoAtivo.ACAO:
+                try:
+                    yfinance_processor.process_daily(asset)
+                    updated_count += 1
+                except Exception as e:
+                    print(f"  - ❌ Erro ao atualizar {asset.ticker}: {e}")
+                    continue
+
+        print(f"\n✅ Atualização diária concluída! {updated_count} ativos processados.")

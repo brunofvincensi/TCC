@@ -1,6 +1,8 @@
 import sys
+import time
 from app import create_app
-from commands import seed_assets, update_prices  # Importe as funções diretamente
+from commands import seed_assets, update_prices, update_daily_prices
+from services.scheduler.price_scheduler import PriceUpdateScheduler
 
 
 def print_help():
@@ -11,8 +13,11 @@ def print_help():
     print("----------------------------------------------------")
     print("Use: python manage.py [comando]")
     print("\nComandos disponíveis:")
-    print("  setup      - 🚀 Configura o ambiente pela primeira vez.")
-    print("  run        - ▶️  Inicia a API Flask em modo de desenvolvimento.")
+    print("  setup            - 🚀 Configura o ambiente pela primeira vez.")
+    print("  run              - ▶️  Inicia a API Flask (com scheduler automático).")
+    print("  update-daily     - 🔄 Atualiza os preços dos ativos com dados do dia.")
+    print("  start-scheduler  - ⏰ Inicia apenas o scheduler (sem servidor web).")
+    print("\n💡 Dica: O scheduler inicia automaticamente com 'run' se ENABLE_PRICE_SCHEDULER=true no .env")
     print("----------------------------------------------------")
 
 
@@ -37,6 +42,7 @@ def main():
         # Para rodar o servidor, usamos o método run do próprio app
         app.run(debug=True)
 
+        print("\n✅ Atualização diária concluída!")
     elif command == "help":
         print_help()
 
