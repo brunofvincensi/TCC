@@ -78,7 +78,6 @@ export default function CarteiraDetail({ id }) {
             <div><strong>Perfil:</strong> {carteira.parametros.perfil_risco_usado}</div>
             <div><strong>Horizonte:</strong> {carteira.parametros.horizonte_tempo_usado} anos</div>
             <div><strong>Capital:</strong> {carteira.parametros.capital_usado}</div>
-            {carteira.parametros.objetivos_usados && <div><strong>Objetivos:</strong> {carteira.parametros.objetivos_usados}</div>}
             {carteira.parametros.restricoes_ativos_tickers && carteira.parametros.restricoes_ativos_tickers.length > 0 && (
               <div className='mt-1'><strong>Ativos restringidos:</strong> {carteira.parametros.restricoes_ativos_tickers.join(', ')}</div>
             )}

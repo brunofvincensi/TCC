@@ -34,8 +34,7 @@ def optimize_and_create_portfolio():
             carteira=new_portfolio,
             perfil_risco_usado=parameters.get('perfil_risco'),
             horizonte_tempo_usado=parameters.get('horizonte_tempo'),
-            capital_usado=parameters.get('capital'),
-            objetivos_usados=parameters.get('objetivos')
+            capital_usado=parameters.get('capital')
         )
 
         # Salvar as restrições

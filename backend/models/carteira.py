@@ -66,7 +66,6 @@ class ParametrosOtimizacao(db.Model):
     perfil_risco_usado = db.Column(db.String(50))
     horizonte_tempo_usado = db.Column(db.Integer)
     capital_usado = db.Column(db.Numeric(15, 2))
-    objetivos_usados = db.Column(db.Text)
 
     # Relacionamento 1:1 com Carteira
     carteira = db.relationship('Carteira', back_populates='parametros')
@@ -79,7 +78,6 @@ class ParametrosOtimizacao(db.Model):
             'perfil_risco_usado': self.perfil_risco_usado,
             'horizonte_tempo_usado': self.horizonte_tempo_usado,
             'capital_usado': str(self.capital_usado) if self.capital_usado else None,
-            'objetivos_usados': self.objetivos_usados,
             # Retorna uma lista simples de IDs dos ativos restringidos
             'restricoes_ativos_ids': [restricao.id_ativo for restricao in self.restricoes]
         }

@@ -15,7 +15,6 @@ export default function OtimizarForm({ onCreated }) {
     horizonte_tempo: '',
     capital: '',
     quantidade_ativos: '',
-    objetivos: '',
     possiveis_ativos: []
   })
   const [submitting, setSubmitting] = useState(false)
@@ -107,7 +106,6 @@ export default function OtimizarForm({ onCreated }) {
         perfil_risco: form.perfil_risco,
         horizonte_tempo: form.horizonte_tempo,
         capital: form.capital,
-        objetivos: form.objetivos,
         restricoes_ativos: restricoes
       }
       parametros.max_ativos = form.quantidade_ativos
@@ -123,7 +121,7 @@ export default function OtimizarForm({ onCreated }) {
       const res = await api.post('/api/carteiras/otimizar', payload)
       setSuccess(res.data.mensagem || 'Carteira criada')
       const created = res.data.carteira
-  setForm({ nome: '', descricao: '', perfil_risco: 'medio', horizonte_tempo: 365, capital: '', quantidade_ativos: '', objetivos: '', possiveis_ativos: ativos.map(a => a.id) })
+  setForm({ nome: '', descricao: '', perfil_risco: 'medio', horizonte_tempo: 365, capital: '', quantidade_ativos: '', possiveis_ativos: ativos.map(a => a.id) })
       if (onCreated) onCreated(created)
       // limpa mensagem de sucesso após 4s
       timeoutRef.current = setTimeout(() => setSuccess(''), 4000)
@@ -159,16 +157,9 @@ export default function OtimizarForm({ onCreated }) {
         <Input label='Quantidade de ativos *' name='quantidade_ativos' type='number' value={form.quantidade_ativos} onChange={handleChange} placeholder='Ex: 10' />
       </div>
 
-      <div className='mt-4 grid grid-cols-1 md:grid-cols-2 gap-4'>
-        <div>
-          <label className='block text-sm muted mb-1'>Objetivos (opcional)</label>
-          <textarea name='objetivos' value={form.objetivos} onChange={handleChange} className='w-full p-2 h-10 bg-white/3 rounded border border-white/5 focus:border-teal-300 text-black placeholder:muted' rows={1} />
-        </div>
-
-        <div>
-          <label className='block text-sm muted mb-1'>Descrição (opcional)</label>
-          <textarea name='descricao' value={form.descricao} onChange={handleChange} className='w-full p-2 h-10 bg-white/3 rounded border border-white/5 focus:border-teal-300 text-black placeholder:muted' rows={1} />
-        </div>
+      <div className='mt-4'>
+        <label className='block text-sm muted mb-1'>Descrição (opcional)</label>
+        <textarea name='descricao' value={form.descricao} onChange={handleChange} className='w-full p-2 h-10 bg-white/3 rounded border border-white/5 focus:border-teal-300 text-black placeholder:muted' rows={1} />
       </div>
 
       <div className='mt-4'>
