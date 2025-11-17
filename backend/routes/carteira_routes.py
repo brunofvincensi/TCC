@@ -61,11 +61,18 @@ def optimize_and_create_portfolio():
         # para que nova_carteira.id esteja disponível.
         db.session.flush()  # Garante que nova_carteira.id seja gerado
 
+        # Obtém o capital usado para calcular o valor monetário de cada ativo
+        capital_usado = parameters.get('capital')
+
         for item in optimized_composition:
+            # Calcula o valor monetário alocado no ativo
+            valor_monetario = float(capital_usado) * float(item['peso']) if capital_usado else None
+
             association = CarteiraAtivo(
                 id_carteira=new_portfolio.id,
                 id_ativo=item['id_ativo'],
-                peso=item['peso']
+                peso=item['peso'],
+                valor_monetario=valor_monetario
             )
             db.session.add(association)
 

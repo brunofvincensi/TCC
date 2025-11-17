@@ -96,6 +96,7 @@ export default function CarteiraDetail({ id }) {
                       <th>Ticker</th>
                       <th>Nome</th>
                       <th>Peso</th>
+                      <th>Valor (R$)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -103,11 +104,13 @@ export default function CarteiraDetail({ id }) {
                       const raw = item.peso
                       let n = Number(String(raw).replace(',', '.')) || 0
                       if (n > 1) n = n / 100
+                      const valorMonetario = item.valor_monetario ? Number(String(item.valor_monetario).replace(',', '.')) : null
                       return (
                         <tr key={idx} className='border-t border-white/5'>
                           <td className='py-2'>{item.ticker}</td>
                           <td className='py-2'>{item.nome_ativo}</td>
                           <td className='py-2'>{(n * 100).toFixed(2)}%</td>
+                          <td className='py-2'>{valorMonetario !== null ? `R$ ${valorMonetario.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}</td>
                         </tr>
                       )
                     })}

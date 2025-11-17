@@ -7,6 +7,7 @@ class CarteiraAtivo(db.Model):
     id_carteira = db.Column(db.Integer, db.ForeignKey('carteiras.id'), primary_key=True)
     id_ativo = db.Column(db.Integer, db.ForeignKey('ativos.id'), primary_key=True)
     peso = db.Column(db.Numeric(5, 4), nullable=False)  # Ex: 0.2500 (representa 25%)
+    valor_monetario = db.Column(db.Numeric(15, 2), nullable=True)  # Valor monetário alocado no ativo
 
     ativo = db.relationship('Ativo', backref='carteiras_associadas')
     carteira = db.relationship('Carteira', back_populates='composicao')
@@ -15,7 +16,8 @@ class CarteiraAtivo(db.Model):
         return {
             'ticker': self.ativo.ticker,
             'nome_ativo': self.ativo.nome,
-            'peso': f"{float(self.peso):.4f}"
+            'peso': f"{float(self.peso):.4f}",
+            'valor_monetario': f"{float(self.valor_monetario):.2f}" if self.valor_monetario else None
         }
 
 
