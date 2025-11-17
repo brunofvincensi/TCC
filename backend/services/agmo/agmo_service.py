@@ -67,6 +67,7 @@ class ConvergenceCallback(Callback):
         )
 
 class PersonalizedPortfolioProblem(ElementwiseProblem):
+
     """
     Problema de otimização de portfólio com 3 objetivos, personalizado
     pelo perfil de risco do usuário.
@@ -483,6 +484,11 @@ class Nsga2OtimizacaoService:
     def _print_matrix(self, matrix, formato=".3f"):
         """
         Printa matriz formatada com cores
+
+        Args:
+            matrix: DataFrame pandas com a matriz
+            titulo: Título da matriz
+            formato: Formato dos números (ex: ".3f")
         """
         tickers = matrix.columns.tolist()
         n = len(tickers)
@@ -707,25 +713,6 @@ class Nsga2OtimizacaoService:
         crossover = SimplexCrossoverCardConstraint(max_assets=max_assets, eta=crossover_eta)
         mutation = SimplexMutationCardConstraint(max_assets=max_assets, eta=mutation_eta)
 
-        # Pontos de referência por perfil
-        # Cada linha é um ponto no espaço de objetivos [retorno_neg, variância, cvar]
-        # reference_points_config = {            'conservador': np.array([
-        #         [0.3, 0.0, 0.0],  # Prioridade máxima: minimizar variância e CVaR
-        #         [0.2, 0.1, 0.1],  # Aceitável: pequeno aumento de risco
-        #         [0.1, 0.2, 0.2],  # Tolerável: risco moderado
-        #     ]),
-        #     'moderado': np.array([
-        #         [0.1, 0.2, 0.2],  # Bom retorno com risco controlado
-        #         [0.2, 0.3, 0.3],  # Balanceado
-        #         [0.3, 0.1, 0.1],  # Foco em retorno quando risco é baixo
-        #     ]),
-        #     'arrojado': np.array([
-        #         [0.0, 0.3, 0.3],  # Prioridade máxima: maximizar retorno
-        #         [0.0, 0.5, 0.5],  # Aceita risco alto para máximo retorno
-        #         [0.1, 0.4, 0.4],  # Bom retorno com risco alto
-        #     ])
-        # }
-
         reference_points_config = {
             'conservador': np.array([
                 [0.3, 0.0, 0.0],  # Prioridade máxima: minimizar variância e CVaR
@@ -781,8 +768,8 @@ class Nsga2OtimizacaoService:
 
             with self.app.app_context():
                 optimal_config = HyperparameterConfig.get_optimal_config(
-                    num_assets=num_assets,
-                    risk_level=self.risk_level
+                    num_ativos=num_assets,
+                    nivel_risco=self.risk_level
                 )
 
                 if optimal_config:
@@ -829,7 +816,7 @@ class Nsga2OtimizacaoService:
             return termination
         else:
             print(f"  🎯 Gerações fixas: {generations} (do banco)")
-            return 'n_gen', generations
+            return ('n_gen', generations)
 
     def get_callback(self, convergence_tracker) -> ConvergenceCallback:
         if convergence_tracker is not None:
@@ -972,9 +959,20 @@ def save_backtest_chart(portfolio: List[Dict],
                             end_date,
                             app,
                             file_name: str = None,
-                            volatility_window: int = 6) -> str | None:
+                            volatility_window: int = 6) -> str:
     """
     Gera e salva gráfico mostrando o retorno acumulado e a volatilidade da carteira ao longo do tempo.
+
+    Args:
+        portfolio: Lista com composição da carteira otimizada
+        start_date: Data inicial do backtest
+        end_date: Data final do backtest
+        app: Instância da aplicação Flask
+        file_name: Nome do arquivo para salvar (opcional, gera automaticamente se None)
+        volatility_window: Janela em meses para cálculo da volatilidade rolling (padrão: 6)
+
+    Returns:
+        Caminho completo do arquivo salvo
     """
     import os
     from datetime import datetime
