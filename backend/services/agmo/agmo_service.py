@@ -736,7 +736,7 @@ class Nsga2OtimizacaoService:
             epsilon=0.01,  # Controla o tamanho da região de interesse em torno dos pontos de referência
             normalization='front',  # Normaliza baseado na fronteira atual
             extreme_points_as_reference_points=False,  # Usa apenas nossos pontos customizados
-            weights=np.array([0.5, 0.25, 0.25])  # Pesos para Achievement Scalarizing Function
+            weights=np.array([0.34, 0.33, 0.33])  # Pesos para Achievement Scalarizing Function
         )
 
         # return NSGA2(pop_size=population_size, crossover=crossover,
@@ -1083,7 +1083,7 @@ def optimize_current_portfolio(app):
 def backtest(app):
     from datetime import date
     backtest_date = date(2015, 1, 1)
-    backtest_service = Nsga2OtimizacaoService(app, [1, 10], "moderado", 10, reference_date=backtest_date, show_chart=True)
+    backtest_service = Nsga2OtimizacaoService(app, [1, 10], "arrojado", 10, reference_date=backtest_date, show_chart=True)
     backtest_portfolio = backtest_service.optimize(max_assets=10)
 
     # Informações do backtest

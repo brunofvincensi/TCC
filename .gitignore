@@ -49,3 +49,5 @@ wheels/
 .idea/
 .env
 backend/.idea/workspace.xml
+backend/routes/__pycache__/
+backend/.idea/

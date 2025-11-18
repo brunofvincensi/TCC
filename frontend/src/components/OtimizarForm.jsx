@@ -143,7 +143,7 @@ export default function OtimizarForm({ onCreated }) {
           <label className='block muted mb-1'>Perfil de risco *</label>
           <select name='perfil_risco' value={form.perfil_risco} onChange={handleChange} className='w-full p-2 bg-white/3 rounded border border-white/5 focus:border-teal-300 text-black'>
             <option value=''>Selecione...</option>
-            <option value='Conservador'>Conservador</option>
+            <option value='conservador'>Conservador</option>
             <option value='moderado'>Moderado</option>
             <option value='arrojado'>Arrojado</option>
           </select>

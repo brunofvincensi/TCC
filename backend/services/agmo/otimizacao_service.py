@@ -49,9 +49,6 @@ class OtimizacaoService:
                 - objetivos (list): Lista de objetivos (opcional)
                 - restricoes_ativos (list): Lista de IDs de ativos a serem excluídos
                 - max_ativos (int, opcional): Número máximo de ativos na carteira
-                - use_optimal_config (bool, opcional): Se deve usar configuração ótima do banco
-                - population_size (int, opcional): Tamanho da população do AG
-                - generations (int, opcional): Número de gerações do AG
 
         Returns:
             Tupla contendo:
@@ -106,11 +103,6 @@ class OtimizacaoService:
                 except (ValueError, TypeError):
                     return None, f"Número máximo de ativos inválido: {max_assets}"
 
-            # Hiperparâmetros opcionais do algoritmo genético
-            use_optimal_config = parameters.get('use_optimal_config', True)
-            population_size = parameters.get('population_size')  # None = auto
-            generations = parameters.get('generations')  # None = auto
-
             # Extrai IDs dos ativos disponíveis (para passar ao serviço AGMO)
             # Nota: O AGMO vai buscar todos os ativos do tipo ACAO automaticamente,
             # mas podemos passar uma lista específica se necessário
@@ -129,20 +121,16 @@ class OtimizacaoService:
 
             # Cria instância do serviço AGMO
             service = Nsga2OtimizacaoService(
-                app=current_app._get_current_object(),  # Instância Flask
+                app=current_app._get_current_object(),
                 restricted_asset_ids=restricted_asset_ids,
                 risk_level=risk_profile,
                 years_period=years_period,
-                reference_date=None,  # Para backtest, usar parâmetro específico
-                start_date=None,
                 asset_ids=asset_ids
             )
 
             # Executa otimização
             result = service.optimize(
-                population_size=population_size,
-                generations=generations,
-                use_optimal_config=use_optimal_config,
+                use_optimal_config=True,
                 max_assets=max_assets
             )
 

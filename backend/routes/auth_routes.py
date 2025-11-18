@@ -2,13 +2,15 @@ from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from services.auth.auth_service import AuthService
 from models import Usuario
+from app import limiter
 
 auth_bp = Blueprint('auth', __name__)
 
 
 @auth_bp.route('/login', methods=['POST'])
+@limiter.limit("10 per minute")
 def login():
-    """Endpoint de login"""
+    """Endpoint de login - Limitado a 10 requisições por minuto"""
     data = request.get_json()
 
     email = data.get('email') if data else None

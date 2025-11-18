@@ -1,12 +1,21 @@
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from config import Config
 from models import db
 from routes import register_blueprints
 
 # Variável global para manter referência ao scheduler
 _price_scheduler = None
+
+# Variável global para o rate limiter
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
 
 def _init_price_scheduler(app):
     """
@@ -48,6 +57,7 @@ def create_app(enable_scheduler=None):
     # Inicializar extensões
     db.init_app(app)
     jwt = JWTManager(app)
+    limiter.init_app(app)
 
     # Registrar blueprints
     register_blueprints(app)
