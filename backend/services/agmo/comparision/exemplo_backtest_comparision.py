@@ -34,7 +34,7 @@ def complete_example():
     restricted_asset_ids = []  # Sem restrições de ativos
     risk_level = 'arrojado'  # Perfil de risco
     years_period = 10  # Prazo de investimento
-    max_ativos_portfolio = 10  # Máximo de ativos na portfolio
+    max_assets = 10  # Máximo de ativos no portfolio
 
     # Ticker do benchmark para comparação (dados obtidos via Yahoo Finance)
     ticker_benchmark = '^BVSP'  # Ibovespa - busca automática via yfinance
@@ -43,7 +43,7 @@ def complete_example():
     print(f"  Data final (backtest): {end_date_backtest}")
     print(f"  Perfil de risco: {risk_level}")
     print(f"  Prazo: {years_period} anos")
-    print(f"  Máximo de ativos: {max_ativos_portfolio}")
+    print(f"  Máximo de ativos: {max_assets}")
     print(f"  Benchmark: {ticker_benchmark}")
 
     print("\n📊 PASSO 2: Otimizando portfolio")
@@ -58,7 +58,7 @@ def complete_example():
     )
 
     resultado_otimizacao = service.optimize(
-        max_assets=max_ativos_portfolio,
+        max_assets=max_assets,
         use_optimal_config=False  # Usar config padrão para exemplo
     )
 

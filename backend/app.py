@@ -14,7 +14,10 @@ _price_scheduler = None
 limiter = Limiter(
     key_func=get_remote_address,
     default_limits=["200 per day", "50 per hour"],
-    storage_uri="memory://"
+    storage_uri="memory://",
+    strategy="fixed-window",  # Estratégia de janela fixa
+    headers_enabled=True,  # Habilita headers X-RateLimit-*
+    swallow_errors=False  # Não silenciar erros do limiter para debug
 )
 
 def _init_price_scheduler(app):
@@ -95,6 +98,15 @@ def create_app(enable_scheduler=None):
     @jwt.unauthorized_loader
     def missing_token_callback(error):
         return jsonify({'erro': 'Token ausente'}), 401
+
+    # Tratamento de erro de rate limiting
+    @app.errorhandler(429)
+    def rate_limit_handler(e):
+        return jsonify({
+            'erro': 'Muitas requisições',
+            'mensagem': 'Você excedeu o limite de requisições. Tente novamente mais tarde.',
+            'detalhes': str(e.description) if hasattr(e, 'description') else 'Limite excedido'
+        }), 429
 
     return app
 
