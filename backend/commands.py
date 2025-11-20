@@ -1,6 +1,6 @@
 import csv
 from models import db
-from models.ativo import Ativo, TipoAtivo
+from models.ativo import Asset, AssetType
 from services.history_processor.yfinance_processor import YFinanceProcessor
 
 
@@ -12,13 +12,13 @@ def seed_assets(app):
             with open('ativos.csv', 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    asset = Ativo.query.filter_by(ticker=row['ticker']).first()
+                    asset = Asset.query.filter_by(ticker=row['ticker']).first()
                     if not asset:
-                        new_asset = Ativo(
+                        new_asset = Asset(
                             ticker=row['ticker'],
-                            nome=row['nome'],
-                            tipo=row['tipo'],
-                            setor=row.get('setor')
+                            name=row['nome'],
+                            type=row['tipo'],
+                            sector=row.get('setor')
                         )
                         db.session.add(new_asset)
                         print(f"-> Ativo {row['ticker']} adicionado.")
@@ -39,7 +39,7 @@ def update_prices(app):
         # Instancia as classes de processadores dos preços históricos
         yfinance_processor = YFinanceProcessor()
 
-        assets = Ativo.query.all()
+        assets = Asset.query.all()
         if not assets:
             print("Nenhum ativo encontrado no banco.")
             return
@@ -47,7 +47,7 @@ def update_prices(app):
         print(f"\nIniciando atualização de preços mensais...")
 
         for asset in assets:
-            if asset.tipo == TipoAtivo.ACAO:
+            if asset.type == AssetType.STOCK:
                 yfinance_processor.process(asset)
 
         print("\n✅ Atualização de preços mensais concluída!")
@@ -60,7 +60,7 @@ def update_daily_prices(app):
     with app.app_context():
         yfinance_processor = YFinanceProcessor()
 
-        assets = Ativo.query.all()
+        assets = Asset.query.all()
         if not assets:
             print("Nenhum ativo encontrado no banco.")
             return
@@ -69,7 +69,7 @@ def update_daily_prices(app):
 
         updated_count = 0
         for asset in assets:
-            if asset.tipo == TipoAtivo.ACAO:
+            if asset.type == AssetType.STOCK:
                 try:
                     yfinance_processor.process_daily(asset)
                     updated_count += 1

@@ -2,7 +2,7 @@ import yfinance as yf
 import pandas as pd
 from calendar import monthrange
 from models import db
-from models.ativo import HistoricoPrecos
+from models.ativo import PriceHistory
 
 
 class YFinanceProcessor:
@@ -91,26 +91,26 @@ class YFinanceProcessor:
         """
         Insere ou atualiza um registro de preço no banco de dados.
         """
-        existing = HistoricoPrecos.query.filter_by(
-            id_ativo=asset.id,
-            data=date
+        existing = PriceHistory.query.filter_by(
+            asset_id=asset.id,
+            date=date
         ).first()
 
         if existing:
             if update_if_exists:
-                existing.preco_fechamento = price
+                existing.closing_price = price
                 if variation is not None:
-                    existing.variacao_mensal = variation
+                    existing.monthly_variation = variation
                 db.session.commit()
                 return 'updated'
             return 'skipped'
 
         # Criar novo registro
-        new_price = HistoricoPrecos(
-            id_ativo=asset.id,
-            data=date,
-            preco_fechamento=price,
-            variacao_mensal=variation
+        new_price = PriceHistory(
+            asset_id=asset.id,
+            date=date,
+            closing_price=price,
+            monthly_variation=variation
         )
         db.session.add(new_price)
         return 'inserted'

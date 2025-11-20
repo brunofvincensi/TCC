@@ -12,13 +12,13 @@ import os
 import logging
 from datetime import datetime
 
-from models.ativo import TipoAtivo
+from models.ativo import AssetType
 
 # Adiciona o diretório raiz ao path para importações
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from app import create_app
-from models import db, Ativo
+from models import db, Asset
 from services.agmo.tuning.hyperparameter_tuning_service import HyperparameterTuningService
 
 # Configuração de logging
@@ -45,7 +45,7 @@ def example_1_convergence_analysis():
 
     # Busca alguns ativos para teste
     with app.app_context():
-        ativos = db.session.query(Ativo).limit(10).all()
+        ativos = db.session.query(Asset).limit(10).all()
         ids_ativos = [a.id for a in ativos]
         print(f"Usando {len(ids_ativos)} ativos para análise: {[a.ticker for a in ativos]}\n")
 
@@ -96,7 +96,7 @@ def example_2_quick_test():
 
     # Busca ativos
     with app.app_context():
-        assets = db.session.query(Ativo).filter(Ativo.tipo == TipoAtivo.ACAO).limit(5).all()
+        assets = db.session.query(Asset).filter(Asset.type == AssetType.STOCK).limit(5).all()
         ids_assets = [a.id for a in assets]
         print(f"Usando apenas {len(ids_assets)} ativos para teste rápido\n")
 

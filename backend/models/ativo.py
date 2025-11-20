@@ -1,55 +1,53 @@
 from . import db
 import enum
 
-class TipoAtivo(enum.Enum):
-    ACAO = "Ação"
-    RENDA_FIXA = "Renda Fixa"
-    INDEFINIDO = "Indefinito"
+class AssetType(enum.Enum):
+    STOCK = "Stock"
+    FIXED_INCOME = "Fixed Income"
+    UNDEFINED = "Undefined"
 
 
-class Ativo(db.Model):
-    __tablename__ = 'ativos'
+class Asset(db.Model):
+    __tablename__ = 'assets'
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     ticker = db.Column(db.String(20), unique=True, nullable=False)
-    nome = db.Column(db.String(100), nullable=False)
-    tipo = db.Column(db.Enum(TipoAtivo), nullable=False, default=TipoAtivo.INDEFINIDO)
-    setor = db.Column(db.String(100))
-    moeda = db.Column(db.String(10), default='BRL')
+    name = db.Column(db.String(100), nullable=False)
+    type = db.Column(db.Enum(AssetType), nullable=False, default=AssetType.UNDEFINED)
+    sector = db.Column(db.String(100))
 
-    historico_precos = db.relationship('HistoricoPrecos', back_populates='ativo', lazy=True,
+    price_history = db.relationship('PriceHistory', back_populates='asset', lazy=True,
                                        cascade="all, delete-orphan")
 
     def to_dict(self):
         return {
             'id': self.id,
             'ticker': self.ticker,
-            'nome': self.nome,
-            # Ao converter para dicionário, pegamos o valor (a string) do enum
-            'tipo': self.tipo.value,
-            'setor': self.setor,
-            'moeda': self.moeda
+            'name': self.name,
+            # When converting to dictionary, we get the value (the string) from the enum
+            'type': self.type.value,
+            'sector': self.sector
         }
 
-class HistoricoPrecos(db.Model):
-    __tablename__ = 'historico_precos'
+class PriceHistory(db.Model):
+    __tablename__ = 'price_history'
 
     # Chave primária composta
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     # A data representará o último dia do mês para o qual o preço foi fechado
-    data = db.Column(db.Date, nullable=False)
-    preco_fechamento = db.Column(db.Numeric(10, 2), nullable=False)
     # Armazena a rentabilidade percentual do mês (ex: 0.05 para 5%)
-    variacao_mensal = db.Column(db.Numeric(10, 6), nullable=True)
-    id_ativo = db.Column(db.Integer, db.ForeignKey('ativos.id'), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    closing_price = db.Column(db.Numeric(10, 2), nullable=False)
+    monthly_variation = db.Column(db.Numeric(10, 6), nullable=True)
+    asset_id = db.Column(db.Integer, db.ForeignKey('assets.id'), nullable=False)
 
     # Relacionamento com Ativo
-    ativo = db.relationship('Ativo', back_populates='historico_precos')
+    asset = db.relationship('Asset', back_populates='price_history')
 
     def to_dict(self):
         return {
-            'id_ativo': self.id_ativo,
-            'data': self.data.isoformat(),
-            'preco_fechamento': str(self.preco_fechamento),
-            'variacao_mensal': f"{float(self.variacao_mensal):.6f}" if self.variacao_mensal is not None else None
+            'asset_id': self.asset_id,
+            'date': self.date.isoformat(),
+            'closing_price': str(self.closing_price),
+            'monthly_variation': f"{float(self.monthly_variation):.6f}" if self.monthly_variation is not None else None
         }

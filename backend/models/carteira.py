@@ -1,85 +1,85 @@
 from . import db
 
 # Tabela de associação para o relacionamento N:N entre Carteira e Ativo
-class CarteiraAtivo(db.Model):
-    __tablename__ = 'carteira_ativos'
+class PortfolioAsset(db.Model):
+    __tablename__ = 'portfolio_assets'
 
-    id_carteira = db.Column(db.Integer, db.ForeignKey('carteiras.id'), primary_key=True)
-    id_ativo = db.Column(db.Integer, db.ForeignKey('ativos.id'), primary_key=True)
-    peso = db.Column(db.Numeric(5, 4), nullable=False)  # Ex: 0.2500 (representa 25%)
-    valor_monetario = db.Column(db.Numeric(15, 2), nullable=True)  # Valor monetário alocado no ativo
+    portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolios.id'), primary_key=True)
+    asset_id = db.Column(db.Integer, db.ForeignKey('assets.id'), primary_key=True)
+    weight = db.Column(db.Numeric(5, 4), nullable=False)  # Ex: 0.2500 (represents 25%)
+    monetary_value = db.Column(db.Numeric(15, 2), nullable=True)  # Monetary value allocated in the asset
 
-    ativo = db.relationship('Ativo', backref='carteiras_associadas')
-    carteira = db.relationship('Carteira', back_populates='composicao')
+    asset = db.relationship('Asset', backref='associated_portfolios')
+    portfolio = db.relationship('Portfolio', back_populates='composition')
 
     def to_dict(self):
         return {
-            'ticker': self.ativo.ticker,
-            'nome_ativo': self.ativo.nome,
-            'peso': f"{float(self.peso):.4f}",
-            'valor_monetario': f"{float(self.valor_monetario):.2f}" if self.valor_monetario else None
+            'ticker': self.asset.ticker,
+            'asset_name': self.asset.name,
+            'weight': f"{float(self.weight):.4f}",
+            'monetary_value': f"{float(self.monetary_value):.2f}" if self.monetary_value else None
         }
 
 
-class Carteira(db.Model):
-    __tablename__ = 'carteiras'
+class Portfolio(db.Model):
+    __tablename__ = 'portfolios'
 
     id = db.Column(db.Integer, primary_key=True)
-    id_usuario = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=False)
-    nome = db.Column(db.String(100), nullable=False)
-    descricao = db.Column(db.Text)
-    data_criacao = db.Column(db.DateTime, server_default=db.func.now())
-
     # Relacionamentos
-    usuario = db.relationship('Usuario', back_populates='carteiras')
-    parametros = db.relationship('ParametrosOtimizacao', back_populates='carteira', uselist=False,
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+    user = db.relationship('User', back_populates='portfolios')
+    parameters = db.relationship('OptimizationParameters', back_populates='portfolio', uselist=False,
                                  cascade="all, delete-orphan")
-    composicao = db.relationship('CarteiraAtivo', back_populates='carteira', cascade="all, delete-orphan")
+    composition = db.relationship('PortfolioAsset', back_populates='portfolio', cascade="all, delete-orphan")
 
     def to_dict(self):
         return {
             'id': self.id,
-            'id_usuario': self.id_usuario,
-            'nome': self.nome,
-            'descricao': self.descricao,
-            'data_criacao': self.data_criacao.isoformat(),
-            'parametros': self.parametros.to_dict() if self.parametros else None,
-            'composicao': [item.to_dict() for item in self.composicao]
+            'user_id': self.user_id,
+            'name': self.name,
+            'description': self.description,
+            'created_at': self.created_at.isoformat(),
+            'parameters': self.parameters.to_dict() if self.parameters else None,
+            'composition': [item.to_dict() for item in self.composition]
         }
 
 
-class ParametrosRestricaoAtivo(db.Model):
-    __tablename__ = 'parametros_restricoes_ativos'
+class ParameterAssetRestriction(db.Model):
+    __tablename__ = 'parameter_asset_restrictions'
 
-    # Chave primária composta com chaves estrangeiras
-    id_parametros = db.Column(db.Integer, db.ForeignKey('parametros_otimizacao.id'), primary_key=True)
-    id_ativo = db.Column(db.Integer, db.ForeignKey('ativos.id'), primary_key=True)
+    # Composite primary key with foreign keys
+    parameters_id = db.Column(db.Integer, db.ForeignKey('optimization_parameters.id'), primary_key=True)
+    asset_id = db.Column(db.Integer, db.ForeignKey('assets.id'), primary_key=True)
 
-    # Relacionamentos para facilitar o acesso
-    ativo = db.relationship('Ativo')
-    parametros = db.relationship('ParametrosOtimizacao', back_populates='restricoes')
+    # Relationships to facilitate access
+    asset = db.relationship('Asset')
+    parameters = db.relationship('OptimizationParameters', back_populates='restrictions')
 
 
-class ParametrosOtimizacao(db.Model):
-    __tablename__ = 'parametros_otimizacao'
+class OptimizationParameters(db.Model):
+    __tablename__ = 'optimization_parameters'
 
     id = db.Column(db.Integer, primary_key=True)
-    id_carteira = db.Column(db.Integer, db.ForeignKey('carteiras.id'), nullable=False, unique=True)
-    perfil_risco_usado = db.Column(db.String(50))
-    horizonte_tempo_usado = db.Column(db.Integer)
-    capital_usado = db.Column(db.Numeric(15, 2))
+    portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolios.id'), nullable=False, unique=True)
+    risk_profile_used = db.Column(db.String(50))
+    time_horizon_used = db.Column(db.Integer)
+    capital_used = db.Column(db.Numeric(15, 2))
 
     # Relacionamento 1:1 com Carteira
-    carteira = db.relationship('Carteira', back_populates='parametros')
+    portfolio = db.relationship('Portfolio', back_populates='parameters')
 
     # Relacionamento 1:N com a tabela de associação
-    restricoes = db.relationship('ParametrosRestricaoAtivo', back_populates='parametros', cascade="all, delete-orphan")
+    restrictions = db.relationship('ParameterAssetRestriction', back_populates='parameters', cascade="all, delete-orphan")
 
     def to_dict(self):
         return {
-            'perfil_risco_usado': self.perfil_risco_usado,
-            'horizonte_tempo_usado': self.horizonte_tempo_usado,
-            'capital_usado': str(self.capital_usado) if self.capital_usado else None,
-            # Retorna uma lista simples de IDs dos ativos restringidos
-            'restricoes_ativos_ids': [restricao.id_ativo for restricao in self.restricoes]
+            'risk_profile_used': self.risk_profile_used,
+            'time_horizon_used': self.time_horizon_used,
+            'capital_used': str(self.capital_used) if self.capital_used else None,
+            # Returns a simple list of restricted asset IDs
+            'restricted_asset_ids': [restriction.asset_id for restriction in self.restrictions]
         }

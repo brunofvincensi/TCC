@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
-from models import db, Ativo
+from models import db, Asset
 
 ativo_bp = Blueprint('ativos', __name__)
 
@@ -13,15 +13,14 @@ def create_asset():
     if not data or not data.get('ticker') or not data.get('nome') or not data.get('tipo'):
         return jsonify({'erro': 'Ticker, nome e tipo são obrigatórios'}), 400
 
-    if Ativo.query.filter_by(ticker=data['ticker']).first():
+    if Asset.query.filter_by(ticker=data['ticker']).first():
         return jsonify({'erro': 'Ticker já cadastrado'}), 409
 
-    new_asset = Ativo(
+    new_asset = Asset(
         ticker=data['ticker'],
-        nome=data['nome'],
-        tipo=data['tipo'],
-        setor=data.get('setor'),
-        moeda=data.get('moeda', 'BRL')
+        name=data['nome'],
+        type=data['tipo'],
+        sector=data.get('setor')
     )
 
     db.session.add(new_asset)
@@ -37,5 +36,5 @@ def create_asset():
 @ativo_bp.route('/ativos', methods=['GET'])
 @jwt_required()
 def list_assets():
-    assets = Ativo.query.all()
+    assets = Asset.query.all()
     return jsonify([asset.to_dict() for asset in assets]), 200

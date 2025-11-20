@@ -19,7 +19,7 @@ from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
 
 from app import create_app
-from models import db, Ativo, HistoricoPrecos
+from models import db, Asset, PriceHistory
 
 
 class BenchmarkComparison:
@@ -170,21 +170,21 @@ class BenchmarkComparison:
             DataFrame com retornos mensais da portfolio
         """
         with self.app.app_context():
-            ids_ativos = [item['id_ativo'] for item in portfolio]
+            ids_ativos = [item['asset_id'] for item in portfolio]
             pesos_dict = {item['ticker']: item['peso'] for item in portfolio}
 
             # Buscar retornos dos ativos
             query = db.session.query(
-                HistoricoPrecos.data,
-                HistoricoPrecos.variacao_mensal,
-                Ativo.ticker
-            ).join(Ativo, HistoricoPrecos.id_ativo == Ativo.id) \
+                PriceHistory.date,
+                PriceHistory.monthly_variation,
+                Asset.ticker
+            ).join(Asset, PriceHistory.asset_id == Asset.id) \
                 .filter(
-                    HistoricoPrecos.id_ativo.in_(ids_ativos),
-                    HistoricoPrecos.data >= start_date,
-                    HistoricoPrecos.data <= end_date
+                    PriceHistory.asset_id.in_(ids_ativos),
+                    PriceHistory.date >= start_date,
+                    PriceHistory.date <= end_date
                 ) \
-                .order_by(HistoricoPrecos.data)
+                .order_by(PriceHistory.date)
 
             df = pd.read_sql(query.statement, con=db.session.connection())
 
@@ -193,9 +193,9 @@ class BenchmarkComparison:
 
             # Pivot para ter retornos por ativo
             df_retornos = df.pivot(
-                index='data',
+                index='date',
                 columns='ticker',
-                values='variacao_mensal'
+                values='monthly_variation'
             )
 
             # Calcular retorno ponderado da portfolio
@@ -239,13 +239,13 @@ class BenchmarkComparison:
             - Lista com informações dos ativos ordenados por peso decrescente
         """
         with self.app.app_context():
-            ids_ativos = [item['id_ativo'] for item in portfolio]
+            ids_ativos = [item['asset_id'] for item in portfolio]
 
             # Criar dicionário com informações completas dos ativos
             ativos_info = {
                 item['ticker']: {
                     'ticker': item['ticker'],
-                    'nome': item.get('nome', item['ticker']),
+                    'nome': item.get('name', item['ticker']),
                     'peso': item['peso']
                 }
                 for item in portfolio
@@ -253,16 +253,16 @@ class BenchmarkComparison:
 
             # Buscar retornos dos ativos
             query = db.session.query(
-                HistoricoPrecos.data,
-                HistoricoPrecos.variacao_mensal,
-                Ativo.ticker
-            ).join(Ativo, HistoricoPrecos.id_ativo == Ativo.id) \
+                PriceHistory.date,
+                PriceHistory.monthly_variation,
+                Asset.ticker
+            ).join(Asset, PriceHistory.asset_id == Asset.id) \
                 .filter(
-                    HistoricoPrecos.id_ativo.in_(ids_ativos),
-                    HistoricoPrecos.data >= start_date,
-                    HistoricoPrecos.data <= end_date
+                    PriceHistory.asset_id.in_(ids_ativos),
+                    PriceHistory.date >= start_date,
+                    PriceHistory.date <= end_date
                 ) \
-                .order_by(HistoricoPrecos.data)
+                .order_by(PriceHistory.date)
 
             df = pd.read_sql(query.statement, con=db.session.connection())
 
@@ -271,9 +271,9 @@ class BenchmarkComparison:
 
             # Pivot para ter retornos por ativo
             df_retornos = df.pivot(
-                index='data',
+                index='date',
                 columns='ticker',
-                values='variacao_mensal'
+                values='monthly_variation'
             )
 
             # Ordenar ativos por peso decrescente
@@ -819,9 +819,9 @@ def example_usage():
 
     # Exemplo de composição de portfolio
     portfolio_exemplo = [
-        {'id_ativo': 1, 'ticker': 'PETR4', 'peso': 0.3},
-        {'id_ativo': 2, 'ticker': 'VALE3', 'peso': 0.3},
-        {'id_ativo': 3, 'ticker': 'ITUB4', 'peso': 0.4}
+        {'asset_id': 1, 'ticker': 'PETR4', 'peso': 0.3},
+        {'asset_id': 2, 'ticker': 'VALE3', 'peso': 0.3},
+        {'asset_id': 3, 'ticker': 'ITUB4', 'peso': 0.4}
     ]
 
     # Criar serviço de comparação

@@ -616,10 +616,10 @@ class HyperparameterTuningService:
 
             # Busca ativos do banco para teste
             with self.app.app_context():
-                from models import db, Ativo
-                from models.ativo import TipoAtivo
+                from models import db, Asset
+                from models.ativo import AssetType
 
-                assets = db.session.query(Ativo).filter(Ativo.tipo == TipoAtivo.ACAO).limit(num_assets).all()
+                assets = db.session.query(Asset).filter(Asset.type == AssetType.STOCK).limit(num_assets).all()
 
                 if len(assets) < num_assets:
                     logger.warning(f"Apenas {len(assets)} ativos disponíveis. "

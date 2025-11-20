@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, Usuario
+from models import db, User
 
 usuario_bp = Blueprint('usuarios', __name__)
 
@@ -14,12 +14,12 @@ def create_user():
         return jsonify({'erro': 'Nome, email e senha são obrigatórios'}), 400
 
     # Verificar se email já existe
-    if Usuario.query.filter_by(email=data['email']).first():
+    if User.query.filter_by(email=data['email']).first():
         return jsonify({'erro': 'Email já cadastrado'}), 409
 
     # Criar novo usuário
-    user = Usuario(
-        nome=data['nome'],
+    user = User(
+        name=data['nome'],
         email=data['email']
     )
     user.set_password(data['senha'])
@@ -40,7 +40,7 @@ def create_user():
 @jwt_required()
 def list_users():
     """READ - Listar todos os usuários"""
-    users = Usuario.query.all()
+    users = User.query.all()
     return jsonify({
         'usuarios': [u.to_dict() for u in users]
     }), 200
@@ -50,7 +50,7 @@ def list_users():
 @jwt_required()
 def get_user(id):
     """READ - Buscar usuário por ID"""
-    user = Usuario.query.get(id)
+    user = User.query.get(id)
 
     if not user:
         return jsonify({'erro': 'Usuário não encontrado'}), 404
@@ -63,7 +63,7 @@ def get_user(id):
 def update_user():
     """UPDATE - Atualizar usuário"""
     user_id = get_jwt_identity()
-    user = Usuario.query.get(user_id)
+    user = User.query.get(user_id)
 
     if not user:
         return jsonify({'erro': 'Usuário não encontrado'}), 404
@@ -72,13 +72,13 @@ def update_user():
 
     # Atualizar campos
     if 'nome' in data:
-        user.nome = data['nome']
+        user.name = data['nome']
 
     if 'email' in data:
         # Verificar se o novo email já existe em outro usuário
-        email_exists = Usuario.query.filter(
-            Usuario.email == data['email'],
-            Usuario.id != user_id
+        email_exists = User.query.filter(
+            User.email == data['email'],
+            User.id != user_id
         ).first()
 
         if email_exists:
@@ -90,7 +90,7 @@ def update_user():
         user.set_password(data['senha'])
 
     if 'ativo' in data:
-        user.ativo = data['ativo']
+        user.active = data['ativo']
 
     try:
         db.session.commit()
@@ -108,7 +108,7 @@ def update_user():
 def delete_user():
     """DELETE - Deletar usuário"""
     user_id = get_jwt_identity()
-    user = Usuario.query.get(user_id)
+    user = User.query.get(user_id)
 
     if not user:
         return jsonify({'erro': 'Usuário não encontrado'}), 404

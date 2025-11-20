@@ -1,8 +1,8 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models.ativo import Ativo
+from models.ativo import Asset
 from services.agmo.otimizacao_service import OtimizacaoService
-from models import db, Carteira, ParametrosOtimizacao, CarteiraAtivo, ParametrosRestricaoAtivo
+from models import db, Portfolio, OptimizationParameters, PortfolioAsset, ParameterAssetRestriction
 
 carteira_bp = Blueprint('carteiras', __name__)
 
@@ -24,32 +24,32 @@ def optimize_and_create_portfolio():
         return jsonify({'erro': message}), 500
 
     try:
-        new_portfolio = Carteira(
-            id_usuario=user_id,
-            nome=portfolio_info['nome'],
-            descricao=portfolio_info.get('descricao')
+        new_portfolio = Portfolio(
+            user_id=user_id,
+            name=portfolio_info['nome'],
+            description=portfolio_info.get('descricao')
         )
 
-        new_parameters = ParametrosOtimizacao(
-            carteira=new_portfolio,
-            perfil_risco_usado=parameters.get('perfil_risco'),
-            horizonte_tempo_usado=parameters.get('horizonte_tempo'),
-            capital_usado=parameters.get('capital')
+        new_parameters = OptimizationParameters(
+            portfolio=new_portfolio,
+            risk_profile_used=parameters.get('perfil_risco'),
+            time_horizon_used=parameters.get('horizonte_tempo'),
+            capital_used=parameters.get('capital')
         )
 
         # Salvar as restrições
         restricted_ids = parameters.get('restricoes_ativos', [])
         if restricted_ids:
             # Validação: Garante que todos os IDs fornecidos realmente existem no banco.
-            restricted_assets = Ativo.query.filter(Ativo.id.in_(restricted_ids)).all()
+            restricted_assets = Asset.query.filter(Asset.id.in_(restricted_ids)).all()
             if len(restricted_assets) != len(restricted_ids):
                 return jsonify({'erro': 'Um ou mais IDs de ativos para restrição são inválidos.'}), 400
 
             # Cria as associações
             for asset_obj in restricted_assets:
-                restriction = ParametrosRestricaoAtivo(
-                    parametros=new_parameters,  # Associa ao objeto de parâmetros
-                    ativo=asset_obj  # Associa ao objeto do ativo
+                restriction = ParameterAssetRestriction(
+                    parameters=new_parameters,  # Associate with parameters object
+                    asset=asset_obj  # Associate with asset object
                 )
                 db.session.add(restriction)
 
@@ -59,7 +59,7 @@ def optimize_and_create_portfolio():
 
         # Adiciona a composição (ativos e pesos) - precisa ser feito após o commit inicial
         # para que nova_carteira.id esteja disponível.
-        db.session.flush()  # Garante que nova_carteira.id seja gerado
+        db.session.flush()  # Ensures that new_portfolio.id is generated
 
         # Obtém o capital usado para calcular o valor monetário de cada ativo
         capital_usado = parameters.get('capital')
@@ -68,11 +68,11 @@ def optimize_and_create_portfolio():
             # Calcula o valor monetário alocado no ativo
             valor_monetario = float(capital_usado) * float(item['peso']) if capital_usado else None
 
-            association = CarteiraAtivo(
-                id_carteira=new_portfolio.id,
-                id_ativo=item['id_ativo'],
-                peso=item['peso'],
-                valor_monetario=valor_monetario
+            association = PortfolioAsset(
+                portfolio_id=new_portfolio.id,
+                asset_id=item['id_ativo'],
+                weight=item['peso'],
+                monetary_value=valor_monetario
             )
             db.session.add(association)
 
@@ -93,8 +93,8 @@ def optimize_and_create_portfolio():
 def list_user_portfolios():
     """Lista todas as carteiras do usuário logado."""
     user_id = get_jwt_identity()
-    portfolios = Carteira.query.filter_by(id_usuario=user_id).all()
-    return jsonify([{"nome": c.nome, "id": c.id} for c in portfolios]), 200
+    portfolios = Portfolio.query.filter_by(user_id=user_id).all()
+    return jsonify([{"nome": c.name, "id": c.id} for c in portfolios]), 200
 
 
 @carteira_bp.route('/carteiras/<int:id_carteira>', methods=['GET'])
@@ -102,7 +102,7 @@ def list_user_portfolios():
 def get_portfolio(id_carteira):
     """Busca uma carteira específica pelo ID."""
     user_id = get_jwt_identity()
-    portfolio = Carteira.query.filter_by(id=id_carteira, id_usuario=user_id).first()
+    portfolio = Portfolio.query.filter_by(id=id_carteira, user_id=user_id).first()
 
     if not portfolio:
         return jsonify({'erro': 'Carteira não encontrada ou não pertence a este usuário'}), 404
@@ -115,7 +115,7 @@ def get_portfolio(id_carteira):
 def delete_portfolio(id_carteira):
     """Deleta uma carteira específica."""
     user_id = get_jwt_identity()
-    portfolio = Carteira.query.filter_by(id=id_carteira, id_usuario=user_id).first()
+    portfolio = Portfolio.query.filter_by(id=id_carteira, user_id=user_id).first()
 
     if not portfolio:
         return jsonify({'erro': 'Carteira não encontrada ou não pertence a este usuário'}), 404

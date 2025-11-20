@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from services.auth.auth_service import AuthService
-from models import Usuario
+from models import User
 from extensions import limiter
 import logging
 
@@ -35,7 +35,7 @@ def login():
 def profile():
     """Retorna o perfil do usuário logado"""
     user_id = get_jwt_identity()
-    user = Usuario.query.get(user_id)
+    user = User.query.get(user_id)
 
     if not user:
         return jsonify({'erro': 'Usuário não encontrado'}), 404

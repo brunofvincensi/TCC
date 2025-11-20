@@ -18,8 +18,8 @@ from pymoo.optimize import minimize
 from pymoo.core.callback import Callback
 
 from app import create_app
-from models import db, Ativo, HistoricoPrecos
-from models.ativo import TipoAtivo
+from models import db, Asset, PriceHistory
+from models.ativo import AssetType
 
 DEFAULT_GEN_SIZE = 100
 DEFAULT_POPULATION_SIZE = 100
@@ -222,12 +222,12 @@ class Nsga2OtimizacaoService:
 
         """Busca dados e aplica o ajuste de risco pelo prazo."""
         with self.app.app_context():
-            assets_query = db.session.query(Ativo).filter(
-                ~Ativo.id.in_(self.restricted_asset_ids),
-                Ativo.tipo == TipoAtivo.ACAO
+            assets_query = db.session.query(Asset).filter(
+                ~Asset.id.in_(self.restricted_asset_ids),
+                Asset.type == AssetType.STOCK
             )
             if self.asset_ids:
-                assets_query = assets_query.filter(Ativo.id.in_(self.asset_ids))
+                assets_query = assets_query.filter(Asset.id.in_(self.asset_ids))
 
             self.assets_to_optimize = assets_query.all()
             if len(self.assets_to_optimize) < MIN_ATIVOS:  # Mínimo para 3 objetivos
@@ -235,21 +235,21 @@ class Nsga2OtimizacaoService:
 
             ids_to_optimize = [a.id for a in self.assets_to_optimize]
             history_query = db.session.query(
-                HistoricoPrecos.data,
-                HistoricoPrecos.variacao_mensal,
-                Ativo.ticker
-            ).join(Ativo, HistoricoPrecos.id_ativo == Ativo.id) \
-                .filter(HistoricoPrecos.id_ativo.in_(ids_to_optimize))
+                PriceHistory.date,
+                PriceHistory.monthly_variation,
+                Asset.ticker
+            ).join(Asset, PriceHistory.asset_id == Asset.id) \
+                .filter(PriceHistory.asset_id.in_(ids_to_optimize))
 
             # BACKTEST: Se reference_date foi fornecida, filtra apenas dados até essa data
             if self.reference_date is not None:
                 if self.start_date is not None:
-                    history_query = history_query.filter(HistoricoPrecos.data >= self.start_date)
+                    history_query = history_query.filter(PriceHistory.date >= self.start_date)
 
-                history_query = history_query.filter(HistoricoPrecos.data <= self.reference_date)
+                history_query = history_query.filter(PriceHistory.date <= self.reference_date)
                 print(f"  📅 MODO BACKTEST: Usando dados até {self.reference_date}")
 
-            history_query = history_query.order_by(HistoricoPrecos.data)
+            history_query = history_query.order_by(PriceHistory.date)
 
             df_history = pd.read_sql(
                 history_query.statement,
@@ -273,9 +273,9 @@ class Nsga2OtimizacaoService:
 
             # Pivot sem dropna para analisar cada ativo
             df_returns_complete = df_history.pivot(
-                index='data',
+                index='date',
                 columns='ticker',
-                values='variacao_mensal'
+                values='monthly_variation'
             )
 
             # Analisa quantidade de dados por ativo
@@ -324,9 +324,9 @@ class Nsga2OtimizacaoService:
             # Agora faz o pivot e dropna com segurança
             # Todos os ativos têm histórico >= mínimo, então dropna é consistente
             df_returns = df_history_filtered.pivot(
-                index='data',
+                index='date',
                 columns='ticker',
-                values='variacao_mensal'
+                values='monthly_variation'
             ).dropna()
 
             self.tickers = df_returns.columns.tolist()
@@ -624,9 +624,9 @@ class Nsga2OtimizacaoService:
             weight = weights_by_ticker.get(asset.ticker, 0)
             if weight > 0.001:  # Ignora pesos insignificantes
                 final_composition.append({
-                    'id_ativo': asset.id,
+                    'asset_id': asset.id,
                     'ticker': asset.ticker,
-                    'nome': asset.nome,
+                    'name': asset.name,
                     'peso': weight
                 })
 
@@ -668,8 +668,8 @@ class Nsga2OtimizacaoService:
                 'generations': generations,
                 'crossover_eta': crossover_eta,
                 'mutation_eta': mutation_eta,
-                'num_ativos': num_assets,
-                'max_ativos': max_assets
+                'num_assets': num_assets,
+                'max_assets': max_assets
             }
         }
 
@@ -768,8 +768,8 @@ class Nsga2OtimizacaoService:
 
             with self.app.app_context():
                 optimal_config = HyperparameterConfig.get_optimal_config(
-                    num_ativos=num_assets,
-                    nivel_risco=self.risk_level
+                    num_assets=num_assets,
+                    risk_level=self.risk_level
                 )
 
                 if optimal_config:
@@ -899,19 +899,19 @@ def _calculate_portfolio_return(app, portfolio: List[Dict],
     """
     with app.app_context():
         # Buscar retornos dos ativos no período
-        asset_ids = [item['id_ativo'] for item in portfolio]
+        asset_ids = [item['asset_id'] for item in portfolio]
 
         query = db.session.query(
-            HistoricoPrecos.data,
-            HistoricoPrecos.variacao_mensal,
-            Ativo.ticker
-        ).join(Ativo, HistoricoPrecos.id_ativo == Ativo.id) \
+            PriceHistory.date,
+            PriceHistory.monthly_variation,
+            Asset.ticker
+        ).join(Asset, PriceHistory.asset_id == Asset.id) \
             .filter(
-            HistoricoPrecos.id_ativo.in_(asset_ids),
-            HistoricoPrecos.data > start_date,
-            HistoricoPrecos.data <= end_date
+            PriceHistory.asset_id.in_(asset_ids),
+            PriceHistory.date > start_date,
+            PriceHistory.date <= end_date
         ) \
-            .order_by(HistoricoPrecos.data)
+            .order_by(PriceHistory.date)
 
         df = pd.read_sql(query.statement, con=db.session.connection())
 
@@ -920,9 +920,9 @@ def _calculate_portfolio_return(app, portfolio: List[Dict],
 
         # Pivot para ter retornos por ativo
         df_returns = df.pivot(
-            index='data',
+            index='date',
             columns='ticker',
-            values='variacao_mensal'
+            values='monthly_variation'
         )
 
         # Calcular retorno ponderado da carteira

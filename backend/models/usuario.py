@@ -1,30 +1,30 @@
 from . import db
 from werkzeug.security import generate_password_hash, check_password_hash
 
-class Usuario(db.Model):
-    __tablename__ = 'usuarios'
+class User(db.Model):
+    __tablename__ = 'users'
 
     id = db.Column(db.Integer, primary_key=True)
-    nome = db.Column(db.String(100), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    senha_hash = db.Column(db.String(255), nullable=False)
-    ativo = db.Column(db.Boolean, default=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    active = db.Column(db.Boolean, default=True)
 
-    carteiras = db.relationship('Carteira', back_populates='usuario', cascade="all, delete-orphan")
+    portfolios = db.relationship('Portfolio', back_populates='user', cascade="all, delete-orphan")
 
-    def set_password(self, senha):
-        """Criptografa e define a senha do usuário"""
-        self.senha_hash = generate_password_hash(senha)
+    """Criptografa e define a senha do usuário"""
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
 
-    def check_password(self, senha):
         """Verifica se a senha está correta"""
-        return check_password_hash(self.senha_hash, senha)
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
 
     def to_dict(self):
         """Converte o objeto para dicionário"""
         return {
             'id': self.id,
-            'nome': self.nome,
+            'name': self.name,
             'email': self.email,
-            'ativo': self.ativo
+            'active': self.active
         }

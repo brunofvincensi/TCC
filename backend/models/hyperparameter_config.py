@@ -23,67 +23,67 @@ class HyperparameterConfig(db.Model):
 
     # Constraint: apenas uma configuração ótima por quantidade de ativos e perfil
     __table_args__ = (
-        UniqueConstraint('num_ativos', 'nivel_risco', name='uq_num_ativos_nivel_risco'),
+        UniqueConstraint('num_assets', 'risk_level', name='uq_num_assets_risk_level'),
     )
 
     # Campos principais
     id = db.Column(db.Integer, primary_key=True)
-    num_ativos = db.Column(db.Integer, nullable=False, index=True,
-                          comment='Número de ativos para o qual esta configuração é ótima')
-    nivel_risco = db.Column(db.String(20), nullable=False, default='neutro',
-                           comment='Perfil de risco (conservador, moderado, arrojado, neutro)')
+    num_assets = db.Column(db.Integer, nullable=False, index=True,
+                          comment='Number of assets for which this configuration is optimal')
+    risk_level = db.Column(db.String(20), nullable=False, default='neutral',
+                           comment='Risk profile (conservative, moderate, aggressive, neutral)')
 
     # Hiperparâmetros ótimos
     population_size = db.Column(db.Integer, nullable=False,
-                               comment='Tamanho ótimo da população')
+                               comment='Optimal population size')
     generations = db.Column(db.Integer, nullable=False,
-                           comment='Número ótimo de gerações')
+                           comment='Optimal number of generations')
     crossover_eta = db.Column(db.Float, nullable=False, default=15.0,
-                             comment='Parâmetro eta do crossover')
+                             comment='Crossover eta parameter')
     mutation_eta = db.Column(db.Float, nullable=False, default=20.0,
-                            comment='Parâmetro eta da mutação')
+                            comment='Mutation eta parameter')
 
     # Métricas de qualidade obtidas
     hypervolume_mean = db.Column(db.Float, nullable=True,
-                                comment='Hypervolume médio obtido')
+                                comment='Average Hypervolume obtained')
     hypervolume_std = db.Column(db.Float, nullable=True,
-                               comment='Desvio padrão do Hypervolume')
+                               comment='Hypervolume standard deviation')
     spread_mean = db.Column(db.Float, nullable=True,
-                           comment='Spread médio')
+                           comment='Average Spread')
     spread_std = db.Column(db.Float, nullable=True,
-                          comment='Desvio padrão do Spread')
+                          comment='Spread standard deviation')
     spacing_mean = db.Column(db.Float, nullable=True,
-                            comment='Spacing médio')
+                            comment='Average Spacing')
     spacing_std = db.Column(db.Float, nullable=True,
-                           comment='Desvio padrão do Spacing')
+                           comment='Spacing standard deviation')
     pareto_size_mean = db.Column(db.Float, nullable=True,
-                                comment='Tamanho médio da fronteira de Pareto')
+                                comment='Average Pareto frontier size')
 
-    # Informações de performance
+    # Performance information
     execution_time_mean = db.Column(db.Float, nullable=True,
-                                   comment='Tempo médio de execução (segundos)')
+                                   comment='Average execution time (seconds)')
     execution_time_std = db.Column(db.Float, nullable=True,
-                                  comment='Desvio padrão do tempo de execução')
+                                  comment='Execution time standard deviation')
     convergence_generation_mean = db.Column(db.Float, nullable=True,
-                                           comment='Geração média de convergência')
+                                           comment='Average convergence generation')
 
     # Metadados do tuning
     n_runs = db.Column(db.Integer, nullable=True,
-                      comment='Número de execuções utilizadas no tuning')
+                      comment='Number of runs used in tuning')
     n_configurations_tested = db.Column(db.Integer, nullable=True,
-                                       comment='Número total de configurações testadas')
+                                       comment='Total number of configurations tested')
     tuning_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow,
-                           comment='Data em que o tuning foi realizado')
+                           comment='Date when tuning was performed')
 
     # Informações adicionais
     notes = db.Column(db.Text, nullable=True,
-                     comment='Observações sobre o tuning')
+                     comment='Observations about the tuning')
     is_active = db.Column(db.Boolean, nullable=False, default=True,
-                         comment='Se esta configuração está ativa para uso')
+                         comment='Whether this configuration is active for use')
 
     def __repr__(self):
-        return (f"<HyperparameterConfig(num_ativos={self.num_ativos}, "
-                f"nivel_risco={self.nivel_risco}, "
+        return (f"<HyperparameterConfig(num_assets={self.num_assets}, "
+                f"risk_level={self.risk_level}, "
                 f"pop={self.population_size}, gen={self.generations}, "
                 f"HV={self.hypervolume_mean:.4f})>")
 
@@ -91,8 +91,8 @@ class HyperparameterConfig(db.Model):
         """Converte para dicionário."""
         return {
             'id': self.id,
-            'num_ativos': self.num_ativos,
-            'nivel_risco': self.nivel_risco,
+            'num_assets': self.num_assets,
+            'risk_level': self.risk_level,
             'population_size': self.population_size,
             'generations': self.generations,
             'crossover_eta': self.crossover_eta,
@@ -115,7 +115,7 @@ class HyperparameterConfig(db.Model):
         }
 
     @staticmethod
-    def get_optimal_config(num_assets: int, risk_level: str = 'neutro'):
+    def get_optimal_config(num_assets: int, risk_level: str = 'neutral'):
         """
         Busca a configuração ótima para um número específico de ativos.
 
@@ -128,8 +128,8 @@ class HyperparameterConfig(db.Model):
         """
         # Busca configuração exata
         config = HyperparameterConfig.query.filter_by(
-            num_ativos=num_assets,
-            nivel_risco=risk_level,
+            num_assets=num_assets,
+            risk_level=risk_level,
             is_active=True
         ).first()
 
@@ -140,22 +140,22 @@ class HyperparameterConfig(db.Model):
         # Tenta +/- 2 ativos
         for offset in [0, 1, -1, 2, -2]:
             config = HyperparameterConfig.query.filter_by(
-                num_ativos=num_assets + offset,
-                nivel_risco=risk_level,
+                num_assets=num_assets + offset,
+                risk_level=risk_level,
                 is_active=True
             ).first()
             if config:
                 return config
 
         # Se ainda não encontrar, busca configuração neutra
-        if risk_level != 'neutro':
-            return HyperparameterConfig.get_optimal_config(num_assets, 'neutro')
+        if risk_level != 'neutral':
+            return HyperparameterConfig.get_optimal_config(num_assets, 'neutral')
 
         # Última tentativa: qualquer configuração próxima
         config = HyperparameterConfig.query.filter_by(
             is_active=True
         ).order_by(
-            db.func.abs(HyperparameterConfig.num_ativos - num_assets)
+            db.func.abs(HyperparameterConfig.num_assets - num_assets)
         ).first()
 
         return config
@@ -173,9 +173,9 @@ class HyperparameterConfig(db.Model):
         Útil quando um novo tuning é realizado e queremos substituir
         a configuração antiga.
         """
-        query = HyperparameterConfig.query.filter_by(num_ativos=num_assets)
+        query = HyperparameterConfig.query.filter_by(num_assets=num_assets)
         if risk_level:
-            query = query.filter_by(nivel_risco=risk_level)
+            query = query.filter_by(risk_level=risk_level)
 
         configs = query.all()
         for config in configs:
