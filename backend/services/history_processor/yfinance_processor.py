@@ -47,15 +47,11 @@ class YFinanceProcessor:
         """
         value = row[column]
 
-        # Se vier MultiIndex ou Series, pega o primeiro valor
-        if isinstance(value, (pd.Series, list, tuple)) or hasattr(value, "__len__") and not isinstance(value,
-                                                                                                       (float, int)):
-            try:
-                value = value.iloc[0]
-            except Exception:
-                value = value[0]
+        # Se for Series, pega o primeiro valor
+        if isinstance(value, pd.Series):
+            value = value.iloc[0]
 
-        # Se ainda não for número, converte
+        # Converte para float se não for NaN
         if pd.isna(value):
             return None
 
