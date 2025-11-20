@@ -22,6 +22,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import seaborn as sns
 from dataclasses import dataclass, asdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .quality_metrics import QualityMetrics, ConvergenceTracker
 from services.agmo.agmo_service import Nsga2OtimizacaoService
@@ -554,6 +555,94 @@ class HyperparameterTuningService:
 
         return best_config
 
+    def _tune_single_asset_quantity(
+        self,
+        num_assets: int,
+        risk_level: str,
+        population_sizes: List[int],
+        generation_counts: List[int],
+        n_runs: int
+    ) -> Optional[Dict]:
+        """
+        Executa tuning para uma quantidade específica de ativos.
+
+        Esta função é projetada para ser executada em paralelo.
+
+        Args:
+            num_assets: Quantidade de ativos a testar
+            risk_level: Perfil de risco
+            population_sizes: Lista de tamanhos de população
+            generation_counts: Lista de números de gerações
+            n_runs: Número de execuções por configuração
+
+        Returns:
+            Dicionário com configuração ótima ou None em caso de erro
+        """
+        logger.info(f"\n{'='*70}")
+        logger.info(f"🔄 [Thread {num_assets}] Testando com {num_assets} ativos")
+        logger.info(f"{'='*70}")
+
+        try:
+            # Busca ativos do banco para teste
+            with self.app.app_context():
+                from models import db, Asset
+                from models.ativo import AssetType
+
+                assets = db.session.query(Asset).filter(Asset.type == AssetType.STOCK).limit(num_assets).all()
+
+                if len(assets) < num_assets:
+                    logger.warning(f"⚠️  [Thread {num_assets}] Apenas {len(assets)} ativos disponíveis. Pulando.")
+                    return None
+
+                ids_assets = [a.id for a in assets]
+
+            # Executa grid search para esta quantidade de ativos
+            logger.info(f"🚀 [Thread {num_assets}] Iniciando grid search...")
+            start_time = time.time()
+
+            summary = self.grid_search(
+                ids_assets=ids_assets,
+                population_sizes=population_sizes,
+                generation_counts=generation_counts,
+                n_runs=n_runs
+            )
+
+            elapsed = time.time() - start_time
+            logger.info(f"✅ [Thread {num_assets}] Grid search concluído em {elapsed/60:.1f} minutos")
+
+            # Extrai melhor configuração
+            if not summary.empty:
+                best = summary.iloc[0]
+
+                optimal_config = {
+                    'num_assets': num_assets,
+                    'risk_level': risk_level,
+                    'population_size': int(best['population_size']),
+                    'generations': int(best['generations']),
+                    'crossover_eta': 15.0,
+                    'mutation_eta': 20.0,
+                    'hypervolume_mean': float(best['final_hypervolume_mean']),
+                    'execution_time_mean': float(best['execution_time_mean']),
+                    'convergence_generation_mean': float(best.get('convergence_generation_mean', 0)) if pd.notna(best.get('convergence_generation_mean')) else None
+                }
+
+                logger.info(f"\n🏆 [Thread {num_assets}] Melhor configuração:")
+                logger.info(f"   População: {optimal_config['population_size']}")
+                logger.info(f"   Gerações: {optimal_config['generations']}")
+                logger.info(f"   Hypervolume: {optimal_config['hypervolume_mean']:.6e}")
+                logger.info(f"   Tempo: {optimal_config['execution_time_mean']:.2f}s")
+                logger.info(f"   Eficiência: {optimal_config['hypervolume_mean']/optimal_config['execution_time_mean']:.6e}")
+
+                return optimal_config
+            else:
+                logger.warning(f"⚠️  [Thread {num_assets}] Nenhum resultado obtido")
+                return None
+
+        except Exception as e:
+            logger.error(f"❌ [Thread {num_assets}] Erro: {e}")
+            logger.exception(f"Detalhes do erro para {num_assets} ativos:")
+            return None
+
     def adaptive_tuning_by_num_assets(
         self,
         asset_ranges: List[int] = None,
@@ -594,70 +683,54 @@ class HyperparameterTuningService:
         if generation_counts is None:
             generation_counts = [25, 50, 75, 100, 150, 200]
 
-        logger.info(f"Iniciando Tuning Adaptativo por Quantidade de Ativos")
+        logger.info(f"Iniciando Tuning Adaptativo por Quantidade de Ativos (PARALELO)")
         logger.info(f"  Quantidades de ativos: {asset_ranges}")
         logger.info(f"  Populações: {population_sizes}")
         logger.info(f"  Gerações: {generation_counts}")
         logger.info(f"  Execuções por config: {n_runs}")
         logger.info(f"  Perfil de risco: {risk_level}")
+        logger.info(f"  🚀 Threads paralelas: {len(asset_ranges)}")
 
         optimal_configs = []
 
-        for num_assets in asset_ranges:
-            logger.info(f"\n{'='*70}")
-            logger.info(f"Testando com {num_assets} ativos")
-            logger.info(f"{'='*70}")
+        # Usa ThreadPoolExecutor para executar tunings em paralelo
+        # Cada quantidade de ativos roda em uma thread separada
+        with ThreadPoolExecutor(max_workers=len(asset_ranges)) as executor:
+            # Submete todas as tarefas
+            future_to_num_assets = {
+                executor.submit(
+                    self._tune_single_asset_quantity,
+                    num_assets,
+                    risk_level,
+                    population_sizes,
+                    generation_counts,
+                    n_runs
+                ): num_assets
+                for num_assets in asset_ranges
+            }
 
-            # Busca ativos do banco para teste
-            with self.app.app_context():
-                from models import db, Asset
-                from models.ativo import AssetType
+            logger.info(f"\n🚀 Todas as {len(asset_ranges)} threads iniciadas!")
+            logger.info(f"⏳ Aguardando conclusão... (isso pode levar várias horas)")
 
-                assets = db.session.query(Asset).filter(Asset.type == AssetType.STOCK).limit(num_assets).all()
+            # Coleta resultados conforme vão sendo completados
+            completed_count = 0
+            for future in as_completed(future_to_num_assets):
+                num_assets = future_to_num_assets[future]
+                completed_count += 1
 
-                if len(assets) < num_assets:
-                    logger.warning(f"Apenas {len(assets)} ativos disponíveis. "
-                                 f"Pulando testes com {num_assets} ativos.")
-                    continue
+                try:
+                    result = future.result()
+                    if result:
+                        optimal_configs.append(result)
+                        logger.info(f"\n📊 Progresso: {completed_count}/{len(asset_ranges)} testes concluídos")
+                    else:
+                        logger.warning(f"⚠️  Thread {num_assets}: Sem resultado")
+                except Exception as e:
+                    logger.error(f"❌ Thread {num_assets}: Exceção - {e}")
+                    logger.exception(f"Detalhes da exceção:")
 
-                ids_assets = [a.id for a in assets]
-
-            # Executa grid search para esta quantidade de ativos
-            try:
-                summary = self.grid_search(
-                    ids_assets=ids_assets,
-                    population_sizes=population_sizes,
-                    generation_counts=generation_counts,
-                    n_runs=n_runs
-                )
-
-                # Extrai melhor configuração (apenas métricas essenciais)
-                if not summary.empty:
-                    best = summary.iloc[0]
-
-                    optimal_config = {
-                        'num_assets': num_assets,
-                        'risk_level': risk_level,
-                        'population_size': int(best['population_size']),
-                        'generations': int(best['generations']),
-                        'crossover_eta': 15.0,
-                        'mutation_eta': 20.0,
-                        'hypervolume_mean': float(best['final_hypervolume_mean']),
-                        'execution_time_mean': float(best['execution_time_mean']),
-                        'convergence_generation_mean': float(best.get('convergence_generation_mean', 0)) if pd.notna(best.get('convergence_generation_mean')) else None
-                    }
-
-                    optimal_configs.append(optimal_config)
-
-                    logger.info(f"\n✅ Melhor configuração para {num_assets} ativos:")
-                    logger.info(f"   População: {optimal_config['population_size']}")
-                    logger.info(f"   Gerações: {optimal_config['generations']}")
-                    logger.info(f"   Hypervolume: {optimal_config['hypervolume_mean']:.6e}")
-                    logger.info(f"   Tempo: {optimal_config['execution_time_mean']:.2f}s")
-
-            except Exception as e:
-                logger.error(f"Erro ao testar {num_assets} ativos: {e}")
-                continue
+        logger.info(f"\n✅ Todas as threads finalizadas!")
+        logger.info(f"   Configurações encontradas: {len(optimal_configs)}/{len(asset_ranges)}")
 
         # Converte para DataFrame
         df_optimal = pd.DataFrame(optimal_configs)

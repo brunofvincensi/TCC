@@ -138,19 +138,25 @@ def example_2_quick_test():
 
 def example_3_adaptive_tuning():
     """
-    Exemplo 3: Tuning Adaptativo por Quantidade de Ativos
+    Exemplo 3: Tuning Adaptativo por Quantidade de Ativos (PARALELO)
 
     Este é o exemplo MAIS IMPORTANTE para otimização de performance!
     Determina automaticamente a melhor configuração para cada quantidade
     de ativos, salvando no banco para uso futuro.
+
+    🚀 NOVIDADE: Agora executa em PARALELO - múltiplas quantidades de ativos
+    são testadas simultaneamente, reduzindo o tempo total drasticamente!
     """
     print("\n" + "=" * 80)
-    print("EXEMPLO 3: TUNING ADAPTATIVO POR QUANTIDADE DE ATIVOS")
+    print("EXEMPLO 3: TUNING ADAPTATIVO POR QUANTIDADE DE ATIVOS (PARALELO 🚀)")
     print("=" * 80)
     print("\nObjetivo: Determinar configuração ótima para diferentes números de ativos\n")
     print("⚡ ESTE EXEMPLO OTIMIZA O TEMPO DE EXECUÇÃO FUTURO!")
     print("   Depois de executar, o sistema automaticamente usará a")
-    print("   configuração ótima baseada no número de ativos.\n")
+    print("   configuração ótima baseada no número de ativos.")
+    print("\n🚀 EXECUÇÃO PARALELA:")
+    print("   Todas as quantidades de ativos são testadas SIMULTANEAMENTE")
+    print("   em threads separadas, reduzindo DRASTICAMENTE o tempo total!\n")
 
     app = create_app()
 
@@ -172,12 +178,14 @@ def example_3_adaptive_tuning():
     print(f"   - Populações: {population_sizes}")
     print(f"   - Gerações: {generation_counts}")
     print(f"   - Execuções por configuração: {n_runs}")
-    print(f"\n   Total de otimizações:")
-    print(f"   {len(asset_ranges)} ativos × {len(population_sizes)} pop × "
-          f"{len(generation_counts)} gen × {n_runs} runs")
-    print(f"   = {len(asset_ranges) * len(population_sizes) * len(generation_counts) * n_runs} execuções")
-    print(f"\n⏱️  Estimativa de tempo: 4-8 HORAS")
-    print(f"   Recomendação: Execute durante a noite ou fim de semana\n")
+    print(f"\n   Total de otimizações POR quantidade de ativos:")
+    print(f"   {len(population_sizes)} pop × {len(generation_counts)} gen × {n_runs} runs")
+    print(f"   = {len(population_sizes) * len(generation_counts) * n_runs} execuções")
+    print(f"\n   🚀 Threads paralelas: {len(asset_ranges)}")
+    print(f"\n⏱️  Estimativa de tempo COM PARALELIZAÇÃO:")
+    print(f"   ~{1.5 * len(population_sizes) * len(generation_counts) * n_runs / 60:.1f}-{3 * len(population_sizes) * len(generation_counts) * n_runs / 60:.1f} HORAS")
+    print(f"   (Anteriormente seria {4}-{8} horas sequenciais)")
+    print(f"   💡 Speedup esperado: ~{len(asset_ranges)}x mais rápido!\n")
 
     answer = input("Deseja continuar? (s/n): ")
     if answer.lower() != 's':
