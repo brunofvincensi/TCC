@@ -203,9 +203,9 @@ def example_3_adaptive_tuning():
         print("=" * 80)
 
         if not df_optimal.empty:
-            print("\n📊 Configurações Ótimas Encontradas:\n")
+            print("\n📊 Configurações Ótimas Encontradas (Métricas Essenciais):\n")
             print(df_optimal[[
-                'num_ativos', 'population_size', 'generations',
+                'num_assets', 'population_size', 'generations',
                 'hypervolume_mean', 'execution_time_mean'
             ]].to_string(index=False))
 

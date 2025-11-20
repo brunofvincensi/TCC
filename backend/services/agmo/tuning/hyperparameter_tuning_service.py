@@ -48,16 +48,12 @@ class HyperparameterConfig:
 
 @dataclass
 class TuningResult:
-    """Resultado de uma execução de tuning."""
+    """Resultado de uma execução de tuning (simplificado - apenas métricas essenciais)."""
     config: HyperparameterConfig
     run_number: int
     execution_time: float
     final_hypervolume: float
-    final_spread: float
-    final_spacing: float
-    pareto_size: int
     convergence_generation: Optional[int]
-    convergence_history: dict
 
     def to_dict(self):
         """Converte para dicionário."""
@@ -216,7 +212,7 @@ class HyperparameterTuningService:
         """
         Executa uma única otimização com uma configuração específica.
         """
-        service = Nsga2OtimizacaoService(self.app, [], "moderado", asset_ids=ids_assets)
+        service = Nsga2OtimizacaoService(self.app, [], "moderado", asset_ids=ids_assets, years_period=3)
         convergence_tracker = ConvergenceTracker()
 
         start_time = time.time()
@@ -231,7 +227,7 @@ class HyperparameterTuningService:
 
         execution_time = time.time() - start_time
 
-        # Extrai métricas finais
+        # Extrai apenas as métricas essenciais
         history = convergence_tracker.get_history()
 
         return TuningResult(
@@ -239,11 +235,7 @@ class HyperparameterTuningService:
             run_number=run_number,
             execution_time=execution_time,
             final_hypervolume=history['hypervolume'][-1] if history['hypervolume'] else 0,
-            final_spread=history['spread'][-1] if history['spread'] else 0,
-            final_spacing=history['spacing'][-1] if history['spacing'] else 0,
-            pareto_size=history['pareto_size'][-1] if history['pareto_size'] else 0,
-            convergence_generation=convergence_tracker.get_convergence_generation(),
-            convergence_history=history
+            convergence_generation=convergence_tracker.get_convergence_generation()
         )
 
     def _analyze_convergence_runs(self, all_runs: List[Dict]) -> Dict:
@@ -309,7 +301,7 @@ class HyperparameterTuningService:
 
     def _create_summary_statistics(self, df_results: pd.DataFrame) -> pd.DataFrame:
         """
-        Cria estatísticas sumarizadas do grid search.
+        Cria estatísticas sumarizadas do grid search (apenas métricas essenciais).
 
         Args:
             df_results: DataFrame com resultados brutos
@@ -321,23 +313,15 @@ class HyperparameterTuningService:
         df_results['population_size'] = df_results['config'].str.extract(r'pop(\d+)').astype(int)
         df_results['generations'] = df_results['config'].str.extract(r'gen(\d+)').astype(int)
 
-        # Agrupa por configuração
+        # Agrupa por configuração - apenas métricas essenciais
         summary = df_results.groupby(['population_size', 'generations']).agg({
-            'final_hypervolume': ['mean', 'std', 'min', 'max'],
-            'final_spread': ['mean', 'std'],
-            'final_spacing': ['mean', 'std'],
-            'pareto_size': ['mean', 'std'],
-            'execution_time': ['mean', 'std'],
-            'convergence_generation': ['mean', 'std', lambda x: x.notna().sum()]
+            'final_hypervolume': ['mean', 'std'],
+            'execution_time': ['mean'],
+            'convergence_generation': ['mean']
         }).reset_index()
 
         # Renomeia colunas
         summary.columns = ['_'.join(col).strip('_') for col in summary.columns.values]
-
-        # Renomeia a coluna lambda
-        summary.rename(columns={
-            'convergence_generation_<lambda>': 'convergence_count'
-        }, inplace=True)
 
         # Ordena por hypervolume médio (decrescente)
         summary = summary.sort_values('final_hypervolume_mean', ascending=False)
@@ -637,7 +621,7 @@ class HyperparameterTuningService:
                     n_runs=n_runs
                 )
 
-                # Extrai melhor configuração
+                # Extrai melhor configuração (apenas métricas essenciais)
                 if not summary.empty:
                     best = summary.iloc[0]
 
@@ -649,17 +633,8 @@ class HyperparameterTuningService:
                         'crossover_eta': 15.0,
                         'mutation_eta': 20.0,
                         'hypervolume_mean': float(best['final_hypervolume_mean']),
-                        'hypervolume_std': float(best['final_hypervolume_std']),
-                        'spread_mean': float(best['final_spread_mean']),
-                        'spread_std': float(best['final_spread_std']),
-                        'spacing_mean': float(best['final_spacing_mean']),
-                        'spacing_std': float(best['final_spacing_std']),
-                        'pareto_size_mean': float(best['pareto_size_mean']),
                         'execution_time_mean': float(best['execution_time_mean']),
-                        'execution_time_std': float(best['execution_time_std']),
-                        'convergence_generation_mean': float(best.get('convergence_generation_mean', 0)) if pd.notna(best.get('convergence_generation_mean')) else None,
-                        'n_runs': n_runs,
-                        'n_configurations_tested': len(population_sizes) * len(generation_counts)
+                        'convergence_generation_mean': float(best.get('convergence_generation_mean', 0)) if pd.notna(best.get('convergence_generation_mean')) else None
                     }
 
                     optimal_configs.append(optimal_config)
@@ -667,10 +642,8 @@ class HyperparameterTuningService:
                     logger.info(f"\n✅ Melhor configuração para {num_assets} ativos:")
                     logger.info(f"   População: {optimal_config['population_size']}")
                     logger.info(f"   Gerações: {optimal_config['generations']}")
-                    logger.info(f"   Hypervolume: {optimal_config['hypervolume_mean']:.6f} "
-                              f"(±{optimal_config['hypervolume_std']:.6f})")
-                    logger.info(f"   Tempo: {optimal_config['execution_time_mean']:.2f}s "
-                              f"(±{optimal_config['execution_time_std']:.2f}s)")
+                    logger.info(f"   Hypervolume: {optimal_config['hypervolume_mean']:.6e}")
+                    logger.info(f"   Tempo: {optimal_config['execution_time_mean']:.2f}s")
 
             except Exception as e:
                 logger.error(f"Erro ao testar {num_assets} ativos: {e}")
@@ -732,7 +705,7 @@ class HyperparameterTuningService:
                     existing.is_active = False
                     updated_count += 1
 
-                # Cria nova configuração
+                # Cria nova configuração (apenas campos essenciais)
                 new_config = HyperparameterConfig(
                     num_assets=num_assets,
                     risk_level=risk_level,
@@ -741,19 +714,10 @@ class HyperparameterTuningService:
                     crossover_eta=float(row['crossover_eta']),
                     mutation_eta=float(row['mutation_eta']),
                     hypervolume_mean=float(row['hypervolume_mean']),
-                    hypervolume_std=float(row['hypervolume_std']),
-                    spread_mean=float(row['spread_mean']),
-                    spread_std=float(row['spread_std']),
-                    spacing_mean=float(row['spacing_mean']),
-                    spacing_std=float(row['spacing_std']),
-                    pareto_size_mean=float(row['pareto_size_mean']),
                     execution_time_mean=float(row['execution_time_mean']),
-                    execution_time_std=float(row['execution_time_std']),
                     convergence_generation_mean=float(row['convergence_generation_mean']) if pd.notna(row.get('convergence_generation_mean')) else None,
-                    n_runs=int(row['n_runs']),
-                    n_configurations_tested=int(row['n_configurations_tested']),
                     tuning_date=datetime.utcnow(),
-                    notes=f"Adaptive tuning - automated configuration",
+                    notes=f"Adaptive tuning - simplified metrics",
                     is_active=True
                 )
 
@@ -768,7 +732,7 @@ class HyperparameterTuningService:
 
     def _plot_adaptive_tuning_results(self, df_optimal: pd.DataFrame):
         """
-        Gera visualizações dos resultados do tuning adaptativo.
+        Gera visualizações simplificadas dos resultados do tuning adaptativo.
 
         Args:
             df_optimal: DataFrame com configurações ótimas
@@ -780,49 +744,44 @@ class HyperparameterTuningService:
         output_dir.mkdir(exist_ok=True)
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
-        fig, axes = plt.subplots(2, 2, figsize=(15, 12))
-        fig.suptitle('Tuning Adaptativo por Quantidade de Ativos',
+        # Gráfico simplificado: 3 subplots em vez de 4
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+        fig.suptitle('Tuning Adaptativo - Métricas Essenciais',
                     fontsize=14, fontweight='bold')
 
         # 1. População ótima vs Número de ativos
-        ax = axes[0, 0]
+        ax = axes[0]
         ax.plot(df_optimal['num_assets'], df_optimal['population_size'],
                'o-', markersize=10, linewidth=2, color='steelblue')
         ax.set_xlabel('Número de Ativos')
         ax.set_ylabel('População Ótima')
-        ax.set_title('População Ótima por Número de Ativos')
+        ax.set_title('População Ótima')
         ax.grid(True, alpha=0.3)
 
         # 2. Gerações ótimas vs Número de ativos
-        ax = axes[0, 1]
+        ax = axes[1]
         ax.plot(df_optimal['num_assets'], df_optimal['generations'],
                'o-', markersize=10, linewidth=2, color='forestgreen')
         ax.set_xlabel('Número de Ativos')
         ax.set_ylabel('Gerações Ótimas')
-        ax.set_title('Gerações Ótimas por Número de Ativos')
+        ax.set_title('Gerações Ótimas')
         ax.grid(True, alpha=0.3)
 
-        # 3. Hypervolume vs Número de ativos
-        ax = axes[1, 0]
-        ax.errorbar(df_optimal['num_assets'], df_optimal['hypervolume_mean'],
-                   yerr=df_optimal['hypervolume_std'],
-                   fmt='o-', markersize=10, linewidth=2, capsize=5,
-                   color='crimson')
-        ax.set_xlabel('Número de Ativos')
-        ax.set_ylabel('Hypervolume')
-        ax.set_title('Qualidade da Solução (Hypervolume)')
+        # 3. Hypervolume vs Tempo (Trade-off Qualidade × Velocidade)
+        ax = axes[2]
+        scatter = ax.scatter(df_optimal['execution_time_mean'],
+                           df_optimal['hypervolume_mean'],
+                           s=df_optimal['num_assets']*20,  # Tamanho = num ativos
+                           c=df_optimal['num_assets'],     # Cor = num ativos
+                           cmap='viridis', alpha=0.7, edgecolors='black')
+        ax.set_xlabel('Tempo de Execução (s)')
+        ax.set_ylabel('Hypervolume (Qualidade)')
+        ax.set_title('Trade-off Qualidade × Velocidade')
         ax.grid(True, alpha=0.3)
 
-        # 4. Tempo de execução vs Número de ativos
-        ax = axes[1, 1]
-        ax.errorbar(df_optimal['num_assets'], df_optimal['execution_time_mean'],
-                   yerr=df_optimal['execution_time_std'],
-                   fmt='o-', markersize=10, linewidth=2, capsize=5,
-                   color='darkorange')
-        ax.set_xlabel('Número de Ativos')
-        ax.set_ylabel('Tempo de Execução (s)')
-        ax.set_title('Custo Computacional')
-        ax.grid(True, alpha=0.3)
+        # Adiciona colorbar para mostrar número de ativos
+        cbar = plt.colorbar(scatter, ax=ax)
+        cbar.set_label('Nº Ativos')
 
         plt.tight_layout()
 

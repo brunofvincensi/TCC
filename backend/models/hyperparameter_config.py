@@ -43,35 +43,15 @@ class HyperparameterConfig(db.Model):
     mutation_eta = db.Column(db.Float, nullable=False, default=20.0,
                             comment='Mutation eta parameter')
 
-    # Métricas de qualidade obtidas
+    # Métricas principais (apenas as 3 mais importantes!)
     hypervolume_mean = db.Column(db.Float, nullable=True,
-                                comment='Average Hypervolume obtained')
-    hypervolume_std = db.Column(db.Float, nullable=True,
-                               comment='Hypervolume standard deviation')
-    spread_mean = db.Column(db.Float, nullable=True,
-                           comment='Average Spread')
-    spread_std = db.Column(db.Float, nullable=True,
-                          comment='Spread standard deviation')
-    spacing_mean = db.Column(db.Float, nullable=True,
-                            comment='Average Spacing')
-    spacing_std = db.Column(db.Float, nullable=True,
-                           comment='Spacing standard deviation')
-    pareto_size_mean = db.Column(db.Float, nullable=True,
-                                comment='Average Pareto frontier size')
-
-    # Performance information
+                                comment='Average Hypervolume - Quality metric')
     execution_time_mean = db.Column(db.Float, nullable=True,
-                                   comment='Average execution time (seconds)')
-    execution_time_std = db.Column(db.Float, nullable=True,
-                                  comment='Execution time standard deviation')
+                                   comment='Average execution time in seconds')
     convergence_generation_mean = db.Column(db.Float, nullable=True,
-                                           comment='Average convergence generation')
+                                           comment='Average generation where convergence occurred')
 
     # Metadados do tuning
-    n_runs = db.Column(db.Integer, nullable=True,
-                      comment='Number of runs used in tuning')
-    n_configurations_tested = db.Column(db.Integer, nullable=True,
-                                       comment='Total number of configurations tested')
     tuning_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow,
                            comment='Date when tuning was performed')
 
@@ -82,13 +62,13 @@ class HyperparameterConfig(db.Model):
                          comment='Whether this configuration is active for use')
 
     def __repr__(self):
-        return (f"<HyperparameterConfig(num_assets={self.num_assets}, "
-                f"risk_level={self.risk_level}, "
+        hv_str = f"{self.hypervolume_mean:.6e}" if self.hypervolume_mean else "N/A"
+        return (f"<HyperparameterConfig(assets={self.num_assets}, "
                 f"pop={self.population_size}, gen={self.generations}, "
-                f"HV={self.hypervolume_mean:.4f})>")
+                f"HV={hv_str})>")
 
     def to_dict(self):
-        """Converte para dicionário."""
+        """Converte para dicionário (apenas campos essenciais)."""
         return {
             'id': self.id,
             'num_assets': self.num_assets,
@@ -98,17 +78,8 @@ class HyperparameterConfig(db.Model):
             'crossover_eta': self.crossover_eta,
             'mutation_eta': self.mutation_eta,
             'hypervolume_mean': self.hypervolume_mean,
-            'hypervolume_std': self.hypervolume_std,
-            'spread_mean': self.spread_mean,
-            'spread_std': self.spread_std,
-            'spacing_mean': self.spacing_mean,
-            'spacing_std': self.spacing_std,
-            'pareto_size_mean': self.pareto_size_mean,
             'execution_time_mean': self.execution_time_mean,
-            'execution_time_std': self.execution_time_std,
             'convergence_generation_mean': self.convergence_generation_mean,
-            'n_runs': self.n_runs,
-            'n_configurations_tested': self.n_configurations_tested,
             'tuning_date': self.tuning_date.isoformat() if self.tuning_date else None,
             'notes': self.notes,
             'is_active': self.is_active
