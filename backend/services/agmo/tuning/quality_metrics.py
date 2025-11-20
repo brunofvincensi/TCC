@@ -34,7 +34,8 @@ class QualityMetrics:
         """
         self.reference_point = reference_point
 
-    def calculate_hypervolume(self, pareto_front: np.ndarray) -> float:
+    def calculate_hypervolume(self, pareto_front: np.ndarray,
+                              ideal_point: Optional[np.ndarray] = None) -> float:
         """
         Calcula o Hypervolume da fronteira de Pareto.
 
@@ -72,13 +73,14 @@ class QualityMetrics:
 
         # Para 3 objetivos, usa método de Monte Carlo simplificado
         if pareto_front.shape[1] == 3:
-            return self._hypervolume_monte_carlo(pareto_front, ref_point)
+            return self._hypervolume_monte_carlo(pareto_front, ref_point, ideal_point)
         else:
             # Para outros casos, usa aproximação por dominância
-            return self._hypervolume_dominated_space(pareto_front, ref_point)
+            return self._hypervolume_dominated_space(pareto_front, ref_point, ideal_point)
 
     def _hypervolume_monte_carlo(self, pareto_front: np.ndarray,
                                   ref_point: np.ndarray,
+                                  ideal_point: Optional[np.ndarray] = None,
                                   n_samples: int = 10000) -> float:
         """
         Calcula Hypervolume usando Monte Carlo sampling.
@@ -89,15 +91,18 @@ class QualityMetrics:
         Args:
             pareto_front: Fronteira de Pareto
             ref_point: Ponto de referência (pior caso - valores altos)
+            ideal_point: Ponto ideal (melhor caso - valores baixos). Se None, usa min da fronteira.
             n_samples: Número de amostras para Monte Carlo
 
         Returns:
             Estimativa do hypervolume
         """
-        # Para cálculo correto do HV, usamos ponto ideal como limite inferior
-        # Em minimização, o ideal é 0 (ou valores muito pequenos)
-        # Isso garante que quanto menores as soluções, maior o HV
-        ideal_point = np.zeros(pareto_front.shape[1])
+        # Usa ideal_point passado, ou min da fronteira atual como fallback
+        if ideal_point is None:
+            ideal_point = np.min(pareto_front, axis=0)
+            logger.debug(f"Ideal point não fornecido, usando min da fronteira: {ideal_point}")
+        else:
+            logger.debug(f"Usando ideal point GLOBAL fornecido: {ideal_point}")
 
         # Verifica se o ponto de referência é válido
         dimensions = ref_point - ideal_point
@@ -153,7 +158,8 @@ class QualityMetrics:
         return False
 
     def _hypervolume_dominated_space(self, pareto_front: np.ndarray,
-                                     ref_point: np.ndarray) -> float:
+                                     ref_point: np.ndarray,
+                                     ideal_point: Optional[np.ndarray] = None) -> float:
         """
         Aproximação simplificada do hypervolume baseada em espaço dominado.
 
@@ -163,6 +169,7 @@ class QualityMetrics:
         Args:
             pareto_front: Fronteira de Pareto
             ref_point: Ponto de referência (pior caso)
+            ideal_point: Não usado neste método (mantido para consistência de API)
 
         Returns:
             Aproximação do hypervolume
@@ -290,18 +297,20 @@ class QualityMetrics:
         """
         return len(pareto_front)
 
-    def calculate_all_metrics(self, pareto_front: np.ndarray) -> dict:
+    def calculate_all_metrics(self, pareto_front: np.ndarray,
+                              ideal_point: Optional[np.ndarray] = None) -> dict:
         """
         Calcula todas as métricas de qualidade.
 
         Args:
             pareto_front: Array (n_solutions, n_objectives)
+            ideal_point: Ponto ideal para cálculo de hypervolume
 
         Returns:
             Dicionário com todas as métricas
         """
         metrics = {
-            'hypervolume': self.calculate_hypervolume(pareto_front),
+            'hypervolume': self.calculate_hypervolume(pareto_front, ideal_point),
             'spread': self.calculate_spread(pareto_front),
             'spacing': self.calculate_spacing(pareto_front),
             'pareto_size': self.calculate_pareto_size(pareto_front),
@@ -354,6 +363,8 @@ class ConvergenceTracker:
         }
         self.reference_point = reference_point
         self.reference_point_set = reference_point is not None
+        self.ideal_point = None  # Melhores valores já vistos (global)
+        self.ideal_point_set = False
         self.metrics_calculator = QualityMetrics(reference_point=reference_point)
 
     def update(self, generation: int, pareto_front: np.ndarray,
@@ -366,19 +377,37 @@ class ConvergenceTracker:
             pareto_front: Fronteira de Pareto atual
             population_fitness: Fitness de toda a população
         """
-        # Define ponto de referência fixo na primeira geração
+        # Define ponto de referência fixo na primeira geração (PIOR CASO)
         if not self.reference_point_set and len(pareto_front) > 0:
-            # IMPORTANTE: Ponto de referência = PIOR CASO (nadir point)
-            # Para minimização: usa valores MÁXIMOS (piores) + margem
-            # Isso garante que HV CRESCE quando soluções MELHORAM (valores diminuem)
             max_values = np.max(pareto_front, axis=0)
             self.reference_point = np.maximum(max_values * 1.5, max_values + 1.0)
             self.metrics_calculator.reference_point = self.reference_point
             self.reference_point_set = True
 
-            logger.info(f"📍 Ponto de referência fixo definido (PIOR CASO): {self.reference_point}")
+            logger.info(f"📍 Ponto de referência FIXO (nadir/pior caso): {self.reference_point}")
             logger.info(f"   Baseado em max da geração 0: {max_values}")
-            logger.info(f"   ✅ HV vai CRESCER conforme soluções melhoram (valores diminuem)")
+
+        # Atualiza ponto ideal GLOBAL (MELHOR CASO acumulado de todas as gerações)
+        if len(pareto_front) > 0:
+            min_values = np.min(pareto_front, axis=0)
+
+            if not self.ideal_point_set:
+                # Primeira geração: inicializa ideal point
+                self.ideal_point = min_values.copy()
+                self.ideal_point_set = True
+                logger.info(f"🎯 Ponto ideal INICIAL (melhor caso gen 0): {self.ideal_point}")
+            else:
+                # Atualiza ideal point com os MELHORES valores já vistos
+                # Em minimização: min é melhor
+                old_ideal = self.ideal_point.copy()
+                self.ideal_point = np.minimum(self.ideal_point, min_values)
+
+                if not np.array_equal(old_ideal, self.ideal_point):
+                    logger.info(f"🎯 Ponto ideal ATUALIZADO: {self.ideal_point}")
+                    logger.info(f"   Melhoria: {old_ideal - self.ideal_point}")
+
+            logger.info(f"   ✅ Box HV: entre ideal {self.ideal_point} e ref {self.reference_point}")
+            logger.info(f"   ✅ HV vai CRESCER conforme ideal_point melhora (diminui)")
 
         # Debug: Log estatísticas da fronteira de Pareto
         if len(pareto_front) > 0:
@@ -393,7 +422,8 @@ class ConvergenceTracker:
                 logger.error(f"⚠️ Valores inválidos detectados na fronteira de Pareto!")
                 logger.error(f"NaN: {np.sum(np.isnan(pareto_front))}, Inf: {np.sum(np.isinf(pareto_front))}")
 
-        metrics = self.metrics_calculator.calculate_all_metrics(pareto_front)
+        # Calcula métricas usando o ideal_point GLOBAL
+        metrics = self.metrics_calculator.calculate_all_metrics(pareto_front, self.ideal_point)
 
         # Debug: Log métricas calculadas
         logger.debug(f"Hypervolume: {metrics['hypervolume']:.6e}")

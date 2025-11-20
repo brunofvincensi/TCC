@@ -727,21 +727,21 @@ class Nsga2OtimizacaoService:
 
         ref_points = reference_points_config.get(self.risk_level)
 
-        return RNSGA2(
-            ref_points=ref_points,
-            pop_size=population_size,
-            crossover=crossover,
-            mutation=mutation,
-            sampling=sampling,
-            epsilon=0.01,  # Controla o tamanho da região de interesse em torno dos pontos de referência
-            normalization='front',  # Normaliza baseado na fronteira atual
-            extreme_points_as_reference_points=False,  # Usa apenas nossos pontos customizados
-            weights=np.array([0.34, 0.33, 0.33])  # Pesos para Achievement Scalarizing Function
-        )
-
-        # return NSGA2(pop_size=population_size, crossover=crossover,
+        # return RNSGA2(
+        #     ref_points=ref_points,
+        #     pop_size=population_size,
+        #     crossover=crossover,
         #     mutation=mutation,
-        #     sampling=sampling)
+        #     sampling=sampling,
+        #     epsilon=0.01,  # Controla o tamanho da região de interesse em torno dos pontos de referência
+        #     normalization='front',  # Normaliza baseado na fronteira atual
+        #     extreme_points_as_reference_points=False,  # Usa apenas nossos pontos customizados
+        #     weights=np.array([0.34, 0.33, 0.33])  # Pesos para Achievement Scalarizing Function
+        # )
+
+        return NSGA2(pop_size=population_size, crossover=crossover,
+            mutation=mutation,
+            sampling=sampling)
 
     def get_hyperparameters(self, generations: int | None, num_assets: int, population_size: int | None,
                            use_optimal_config: bool):

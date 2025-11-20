@@ -45,7 +45,7 @@ def example_1_convergence_analysis():
 
     # Busca alguns ativos para teste
     with app.app_context():
-        assets = db.session.query(Asset).limit(10).all()
+        assets = db.session.query(Asset).all()
         ids_assets = [a.id for a in assets]
         print(f"Usando {len(ids_assets)} ativos para análise: {[a.ticker for a in assets]}\n")
 
@@ -63,7 +63,7 @@ def example_1_convergence_analysis():
         resultados = tuning_service.convergence_analysis(
             ids_assets=ids_assets,
             risk_level='moderado',
-            max_generations=50,
+            max_generations=200,
             population_size=100,
             n_runs=1
         )
@@ -104,7 +104,7 @@ def example_2_quick_test():
 
     # Busca ativos
     with app.app_context():
-        assets = db.session.query(Asset).filter(Asset.type == AssetType.STOCK).limit(5).all()
+        assets = db.session.query(Asset).filter(Asset.type == AssetType.STOCK).all()
         ids_assets = [a.id for a in assets]
         print(f"Usando apenas {len(ids_assets)} ativos para teste rápido\n")
 
@@ -120,7 +120,7 @@ def example_2_quick_test():
         summary = tuning_service.grid_search(
             ids_assets=ids_assets,
             population_sizes=[50, 100],
-            generation_counts=[25, 50],
+            generation_counts=[50, 100],
             n_runs=2
         )
 
