@@ -41,11 +41,16 @@ class QualityMetrics:
         O Hypervolume mede o volume do espaço de objetivos dominado pela
         fronteira de Pareto. Valores maiores indicam melhor qualidade.
 
+        COMPORTAMENTO CORRETO PARA MINIMIZAÇÃO:
+        - Quanto MENORES os valores das soluções, MAIOR o hypervolume
+        - HV deve CRESCER ao longo das gerações conforme o algoritmo melhora
+        - Ponto de referência fixo representa o pior caso possível
+
         Args:
             pareto_front: Array (n_solutions, n_objectives) com objetivos
 
         Returns:
-            Valor do hypervolume
+            Valor do hypervolume (maior = melhor qualidade)
         """
         if len(pareto_front) == 0:
             return 0.0
@@ -78,36 +83,42 @@ class QualityMetrics:
         """
         Calcula Hypervolume usando Monte Carlo sampling.
 
+        Para minimização: HV mede o volume ENTRE as soluções e o ponto de referência (pior).
+        Quanto MENORES os valores das soluções, MAIOR o hypervolume.
+
         Args:
             pareto_front: Fronteira de Pareto
-            ref_point: Ponto de referência
+            ref_point: Ponto de referência (pior caso - valores altos)
             n_samples: Número de amostras para Monte Carlo
 
         Returns:
             Estimativa do hypervolume
         """
-        # Encontra os limites (melhor valor em cada objetivo)
-        min_bounds = np.min(pareto_front, axis=0)
+        # Para cálculo correto do HV, usamos ponto ideal como limite inferior
+        # Em minimização, o ideal é 0 (ou valores muito pequenos)
+        # Isso garante que quanto menores as soluções, maior o HV
+        ideal_point = np.zeros(pareto_front.shape[1])
 
         # Verifica se o ponto de referência é válido
-        dimensions = ref_point - min_bounds
+        dimensions = ref_point - ideal_point
         if np.any(dimensions <= 0):
             logger.warning(f"Dimensões inválidas para hypervolume: {dimensions}")
-            logger.warning(f"Min bounds: {min_bounds}, Ref point: {ref_point}")
+            logger.warning(f"Ideal point: {ideal_point}, Ref point: {ref_point}")
             return 0.0
 
-        # Volume total da caixa de referência
+        # Volume total da caixa de referência (FIXA - não muda com as soluções)
         box_volume = np.prod(dimensions)
-        logger.debug(f"Box volume: {box_volume:.6e}, Dimensions: {dimensions}")
+        logger.debug(f"Box volume (FIXO): {box_volume:.6e}, Dimensions: {dimensions}")
 
-        # Gera pontos aleatórios na caixa
+        # Gera pontos aleatórios na caixa FIXA
         random_points = np.random.uniform(
-            low=min_bounds,
-            high=ref_point,
+            low=ideal_point,    # Ponto ideal (0,0,0) - FIXO
+            high=ref_point,     # Ponto de referência (pior caso) - FIXO
             size=(n_samples, pareto_front.shape[1])
         )
 
         # Conta quantos pontos são dominados por alguma solução da fronteira
+        # Quanto MELHORES as soluções (valores menores), MAIS pontos elas dominam
         dominated_count = 0
         for point in random_points:
             # Um ponto é dominado se existe alguma solução que é melhor em todos os objetivos
@@ -115,9 +126,11 @@ class QualityMetrics:
                 dominated_count += 1
 
         # Hypervolume é a fração de pontos dominados vezes o volume total
+        # Soluções melhores (menores) → dominam mais pontos → HV maior ✅
         hypervolume = (dominated_count / n_samples) * box_volume
 
         logger.debug(f"Dominated points: {dominated_count}/{n_samples} ({100*dominated_count/n_samples:.1f}%)")
+        logger.debug(f"HV = {hypervolume:.6e} (quanto maior, melhor a fronteira)")
 
         return hypervolume
 
@@ -144,24 +157,36 @@ class QualityMetrics:
         """
         Aproximação simplificada do hypervolume baseada em espaço dominado.
 
+        Para minimização: calcula o volume entre cada solução e o ponto de referência.
+        Quanto menores as soluções, maior o hypervolume.
+
         Args:
             pareto_front: Fronteira de Pareto
-            ref_point: Ponto de referência
+            ref_point: Ponto de referência (pior caso)
 
         Returns:
             Aproximação do hypervolume
         """
         # Soma dos volumes individuais (superestimativa devido a sobreposições)
+        # Cada solução contribui com o volume entre ela e o ponto de referência
         total_volume = 0.0
         for solution in pareto_front:
             # Volume da caixa entre a solução e o ponto de referência
+            # Quanto menor a solução, maior o volume → HV maior ✅
             dimensions = ref_point - solution
             if np.all(dimensions > 0):
                 volume = np.prod(dimensions)
                 total_volume += volume
+            else:
+                # Solução está fora do espaço de referência (pior que ref_point)
+                logger.warning(f"Solução fora do espaço: {solution} (ref: {ref_point})")
 
         # Normaliza pelo número de soluções para evitar viés
-        return total_volume / len(pareto_front) if len(pareto_front) > 0 else 0.0
+        avg_volume = total_volume / len(pareto_front) if len(pareto_front) > 0 else 0.0
+
+        logger.debug(f"HV aproximado = {avg_volume:.6e} (média de {len(pareto_front)} soluções)")
+
+        return avg_volume
 
     def calculate_spread(self, pareto_front: np.ndarray) -> float:
         """
@@ -343,14 +368,17 @@ class ConvergenceTracker:
         """
         # Define ponto de referência fixo na primeira geração
         if not self.reference_point_set and len(pareto_front) > 0:
-            # Usa os valores máximos da primeira geração + margem generosa
+            # IMPORTANTE: Ponto de referência = PIOR CASO (nadir point)
+            # Para minimização: usa valores MÁXIMOS (piores) + margem
+            # Isso garante que HV CRESCE quando soluções MELHORAM (valores diminuem)
             max_values = np.max(pareto_front, axis=0)
             self.reference_point = np.maximum(max_values * 1.5, max_values + 1.0)
             self.metrics_calculator.reference_point = self.reference_point
             self.reference_point_set = True
 
-            logger.info(f"📍 Ponto de referência fixo definido: {self.reference_point}")
+            logger.info(f"📍 Ponto de referência fixo definido (PIOR CASO): {self.reference_point}")
             logger.info(f"   Baseado em max da geração 0: {max_values}")
+            logger.info(f"   ✅ HV vai CRESCER conforme soluções melhoram (valores diminuem)")
 
         # Debug: Log estatísticas da fronteira de Pareto
         if len(pareto_front) > 0:

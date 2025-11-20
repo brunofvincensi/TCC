@@ -163,15 +163,15 @@ def example_3_adaptive_tuning():
     tuning_service = HyperparameterTuningService(app)
 
     # Configurações do tuning
-    asset_ranges = [10, 15, 20]  # Quantidades de ativos a testar
-    population_sizes = [50, 100, 200, 300]
-    generation_counts = [25, 50, 100, 200]
+    # asset_ranges = [10, 15, 20]  # Quantidades de ativos a testar
+    # population_sizes = [50, 100, 200, 300]
+    # generation_counts = [25, 50, 100, 200]
 
-    # asset_ranges = [5, 10]  # Quantidades de ativos a testar
-    # population_sizes = [50, 100]
-    # generation_counts = [25, 50]
+    asset_ranges = [10, 15]  # Quantidades de ativos a testar
+    population_sizes = [50, 100]
+    generation_counts = [25, 50]
 
-    n_runs = 3  # Para análise estatística robusta
+    n_runs = 1  # Para análise estatística robusta
 
     print("📋 Configuração do Tuning Adaptativo:")
     print(f"   - Quantidades de ativos: {asset_ranges}")
