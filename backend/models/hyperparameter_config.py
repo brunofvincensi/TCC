@@ -85,10 +85,23 @@ class HyperparameterConfig(db.Model):
             'is_active': self.is_active
         }
 
+    def get_efficiency_score(self) -> float:
+        """
+        Calcula o score de eficiência (trade-off qualidade × velocidade).
+
+        Returns:
+            Score de eficiência (hypervolume / tempo)
+        """
+        if self.execution_time_mean and self.execution_time_mean > 0:
+            return self.hypervolume_mean / self.execution_time_mean
+        return 0.0
+
     @staticmethod
     def get_optimal_config(num_assets: int, risk_level: str = 'neutral'):
         """
         Busca a configuração ótima para um número específico de ativos.
+
+        Prioriza configurações com melhor trade-off qualidade × velocidade.
 
         Args:
             num_assets: Número de ativos

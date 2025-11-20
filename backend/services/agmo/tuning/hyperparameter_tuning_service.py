@@ -508,33 +508,49 @@ class HyperparameterTuningService:
 
     def get_best_configuration(self) -> Optional[HyperparameterConfig]:
         """
-        Retorna a melhor configuração baseada nos resultados.
+        Retorna a melhor configuração baseada no trade-off qualidade × velocidade.
+
+        A eficiência é calculada como: hypervolume / tempo_execução
+        Isso favorece configurações que têm boa qualidade mas são rápidas.
 
         Returns:
-            Melhor configuração de hiperparâmetros
+            Melhor configuração de hiperparâmetros (melhor custo-benefício)
         """
         if not self.results:
             return None
 
-        # Encontra configuração com melhor hypervolume médio
+        # Agrupa resultados por configuração
         config_scores = {}
         for result in self.results:
             config_str = str(result.config)
             if config_str not in config_scores:
                 config_scores[config_str] = {
                     'config': result.config,
-                    'hypervolumes': []
+                    'hypervolumes': [],
+                    'execution_times': []
                 }
             config_scores[config_str]['hypervolumes'].append(result.final_hypervolume)
+            config_scores[config_str]['execution_times'].append(result.execution_time)
 
+        # Calcula eficiência (qualidade / tempo) para cada configuração
         best_config = None
-        best_mean_hv = -float('inf')
+        best_efficiency = -float('inf')
 
         for config_str, data in config_scores.items():
             mean_hv = np.mean(data['hypervolumes'])
-            if mean_hv > best_mean_hv:
-                best_mean_hv = mean_hv
+            mean_time = np.mean(data['execution_times'])
+
+            # Eficiência = Hypervolume / Tempo (maior é melhor)
+            efficiency = mean_hv / mean_time if mean_time > 0 else 0
+
+            logger.debug(f"Config {config_str}: HV={mean_hv:.6e}, Time={mean_time:.2f}s, Efficiency={efficiency:.6e}")
+
+            if efficiency > best_efficiency:
+                best_efficiency = efficiency
                 best_config = data['config']
+
+        logger.info(f"✅ Melhor configuração (trade-off): {best_config}")
+        logger.info(f"   Eficiência (HV/tempo): {best_efficiency:.6e}")
 
         return best_config
 
