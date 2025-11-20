@@ -54,7 +54,8 @@ class RNSGA2TuningService:
         population_sizes: List[int],
         generation_counts: List[int],
         n_runs: int = 3,
-        risk_level: str = 'moderado'
+        risk_level: str = 'moderado',
+        save_to_db: bool = True
     ) -> pd.DataFrame:
         """
         Executa grid search testando todas combinações de hiperparâmetros.
@@ -69,6 +70,7 @@ class RNSGA2TuningService:
             generation_counts: Lista de números de gerações
             n_runs: Número de execuções por configuração
             risk_level: Perfil de risco
+            save_to_db: Se deve salvar configurações ótimas no banco de dados
 
         Returns:
             DataFrame com resultados consolidados
@@ -149,12 +151,16 @@ class RNSGA2TuningService:
         # Converte para DataFrame
         df_results = pd.DataFrame(results)
 
-        # Salva resultados
+        # Salva resultados em arquivos
         self._save_results(df_results)
 
         # Gera gráficos
         self._plot_hv_evolution(df_results)
         self._plot_summary_comparison(df_results)
+
+        # Salva configurações ótimas no banco de dados
+        if save_to_db:
+            self._save_to_database(df_results, risk_level)
 
         logger.info(f"\n{'='*70}")
         logger.info("TUNING CONCLUÍDO!")
@@ -372,3 +378,114 @@ class RNSGA2TuningService:
         with open(filename_json, 'w') as f:
             json.dump(hv_histories, f, indent=2)
         logger.info(f"💾 Históricos HV salvos: {filename_json}")
+
+    def _save_to_database(self, df_results: pd.DataFrame, risk_level: str):
+        """
+        Identifica configurações ótimas e salva no banco de dados.
+
+        Para cada quantidade de ativos, seleciona a configuração com melhor
+        eficiência (final_hv / execution_time) e salva no banco.
+
+        Args:
+            df_results: DataFrame com todos os resultados
+            risk_level: Perfil de risco usado
+        """
+        logger.info(f"\n{'='*70}")
+        logger.info("SALVANDO CONFIGURAÇÕES ÓTIMAS NO BANCO DE DADOS")
+        logger.info(f"{'='*70}")
+
+        if not self.app:
+            logger.warning("App não disponível. Não é possível salvar no banco.")
+            return
+
+        # Calcula médias por configuração
+        summary = df_results.groupby(['num_assets', 'population_size', 'generations']).agg({
+            'final_hv': 'mean',
+            'max_hv': 'mean',
+            'execution_time': 'mean',
+            'convergence_generation': 'mean'
+        }).reset_index()
+
+        # Para cada quantidade de ativos, encontra melhor configuração
+        optimal_configs = []
+
+        for num_assets in summary['num_assets'].unique():
+            subset = summary[summary['num_assets'] == num_assets]
+
+            # Calcula eficiência (HV / tempo)
+            subset['efficiency'] = subset['final_hv'] / subset['execution_time']
+
+            # Melhor = maior eficiência
+            best_row = subset.loc[subset['efficiency'].idxmax()]
+
+            optimal_config = {
+                'num_assets': int(best_row['num_assets']),
+                'risk_level': risk_level,
+                'population_size': int(best_row['population_size']),
+                'generations': int(best_row['generations']),
+                'crossover_eta': 15.0,  # Valores padrão do R-NSGA-II
+                'mutation_eta': 20.0,
+                'hypervolume_mean': float(best_row['final_hv']),
+                'execution_time_mean': float(best_row['execution_time']),
+                'convergence_generation_mean': float(best_row['convergence_generation']) if pd.notna(best_row['convergence_generation']) else None,
+            }
+
+            optimal_configs.append(optimal_config)
+
+            logger.info(f"\n✨ Melhor config para {num_assets} ativos:")
+            logger.info(f"   Pop={optimal_config['population_size']}, Gen={optimal_config['generations']}")
+            logger.info(f"   HV={optimal_config['hypervolume_mean']:.6f}")
+            logger.info(f"   Tempo={optimal_config['execution_time_mean']:.2f}s")
+            logger.info(f"   Eficiência={best_row['efficiency']:.6f}")
+
+        # Salva no banco
+        with self.app.app_context():
+            from models import db, HyperparameterConfig
+
+            saved_count = 0
+            updated_count = 0
+
+            for config in optimal_configs:
+                num_assets = config['num_assets']
+                risk = config['risk_level']
+
+                # Verifica se já existe
+                existing = HyperparameterConfig.query.filter_by(
+                    num_assets=num_assets,
+                    risk_level=risk
+                ).first()
+
+                if existing:
+                    # Desativa a antiga
+                    existing.is_active = False
+                    updated_count += 1
+                    logger.debug(f"Desativando config existente para {num_assets} ativos, risco {risk}")
+
+                # Cria nova configuração
+                new_config = HyperparameterConfig(
+                    num_assets=num_assets,
+                    risk_level=risk,
+                    population_size=config['population_size'],
+                    generations=config['generations'],
+                    crossover_eta=config['crossover_eta'],
+                    mutation_eta=config['mutation_eta'],
+                    hypervolume_mean=config['hypervolume_mean'],
+                    execution_time_mean=config['execution_time_mean'],
+                    convergence_generation_mean=config['convergence_generation_mean'],
+                    tuning_date=datetime.utcnow(),
+                    notes=f"R-NSGA-II tuning - Efficiency-based selection",
+                    is_active=True
+                )
+
+                db.session.add(new_config)
+                saved_count += 1
+
+            db.session.commit()
+
+            logger.info(f"\n{'='*70}")
+            logger.info("✅ CONFIGURAÇÕES SALVAS NO BANCO COM SUCESSO!")
+            logger.info(f"{'='*70}")
+            logger.info(f"   Novas configurações: {saved_count}")
+            logger.info(f"   Configurações atualizadas: {updated_count}")
+            logger.info(f"\n💡 O sistema agora usará automaticamente estas configurações")
+            logger.info(f"   quando otimizar carteiras com estas quantidades de ativos.")

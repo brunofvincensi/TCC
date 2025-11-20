@@ -91,7 +91,7 @@ def main():
         generation_counts = [25, 50]
         n_runs = 2
     elif choice == '2':
-        asset_quantities = [20, 50]
+        asset_quantities = [90]
         population_sizes = [50, 100, 150]
         generation_counts = [25, 50, 100]
         n_runs = 1
@@ -146,7 +146,8 @@ def main():
             population_sizes=population_sizes,
             generation_counts=generation_counts,
             n_runs=n_runs,
-            risk_level='moderado'
+            risk_level='moderado',
+            save_to_db=True  # Salva configurações ótimas no banco
         )
 
         print()
@@ -179,11 +180,16 @@ def main():
             print("   - rnsga2_tuning_results/summary_comparison_*.png")
             print()
 
+            print("💾 BANCO DE DADOS:")
+            print("   - Configurações ótimas salvas na tabela hyperparameter_configs")
+            print("   - Sistema usará automaticamente para otimizações futuras")
+            print()
+
             print("💡 PRÓXIMOS PASSOS:")
             print("   1. Analise os gráficos de evolução de HV")
             print("   2. Identifique o ponto de convergência em cada configuração")
             print("   3. Compare HV máximo vs HV final (normal diferença no R-NSGA-II)")
-            print("   4. Escolha configuração com melhor trade-off qualidade/tempo")
+            print("   4. As melhores configurações já estão salvas no banco!")
             print()
 
     except Exception as e:
