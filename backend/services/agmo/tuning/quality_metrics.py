@@ -50,9 +50,18 @@ class QualityMetrics:
         if len(pareto_front) == 0:
             return 0.0
 
+        # Verifica valores inválidos
+        if np.any(np.isnan(pareto_front)) or np.any(np.isinf(pareto_front)):
+            logger.warning("Fronteira de Pareto contém valores NaN ou Inf. Hypervolume = 0.")
+            return 0.0
+
         # Se não há ponto de referência, usa o pior valor em cada objetivo + margem
         if self.reference_point is None:
-            ref_point = np.max(pareto_front, axis=0) * 1.1
+            # Usa max + 10% de margem, mas garante um valor mínimo
+            max_values = np.max(pareto_front, axis=0)
+            ref_point = np.maximum(max_values * 1.1, max_values + 0.1)
+
+            logger.debug(f"Ponto de referência calculado: {ref_point}")
         else:
             ref_point = self.reference_point
 
@@ -80,8 +89,16 @@ class QualityMetrics:
         # Encontra os limites (melhor valor em cada objetivo)
         min_bounds = np.min(pareto_front, axis=0)
 
+        # Verifica se o ponto de referência é válido
+        dimensions = ref_point - min_bounds
+        if np.any(dimensions <= 0):
+            logger.warning(f"Dimensões inválidas para hypervolume: {dimensions}")
+            logger.warning(f"Min bounds: {min_bounds}, Ref point: {ref_point}")
+            return 0.0
+
         # Volume total da caixa de referência
-        box_volume = np.prod(ref_point - min_bounds)
+        box_volume = np.prod(dimensions)
+        logger.debug(f"Box volume: {box_volume:.6e}, Dimensions: {dimensions}")
 
         # Gera pontos aleatórios na caixa
         random_points = np.random.uniform(
@@ -99,6 +116,8 @@ class QualityMetrics:
 
         # Hypervolume é a fração de pontos dominados vezes o volume total
         hypervolume = (dominated_count / n_samples) * box_volume
+
+        logger.debug(f"Dominated points: {dominated_count}/{n_samples} ({100*dominated_count/n_samples:.1f}%)")
 
         return hypervolume
 
@@ -292,8 +311,14 @@ class ConvergenceTracker:
     Rastreia a convergência do algoritmo ao longo das gerações.
     """
 
-    def __init__(self):
-        """Inicializa o rastreador."""
+    def __init__(self, reference_point: Optional[np.ndarray] = None):
+        """
+        Inicializa o rastreador.
+
+        Args:
+            reference_point: Ponto de referência fixo para cálculo de hypervolume.
+                           Se None, será determinado na primeira geração.
+        """
         self.history = {
             'generation': [],
             'hypervolume': [],
@@ -302,7 +327,9 @@ class ConvergenceTracker:
             'pareto_size': [],
             'best_fitness': [],
         }
-        self.metrics_calculator = QualityMetrics()
+        self.reference_point = reference_point
+        self.reference_point_set = reference_point is not None
+        self.metrics_calculator = QualityMetrics(reference_point=reference_point)
 
     def update(self, generation: int, pareto_front: np.ndarray,
                population_fitness: np.ndarray):
@@ -314,7 +341,36 @@ class ConvergenceTracker:
             pareto_front: Fronteira de Pareto atual
             population_fitness: Fitness de toda a população
         """
+        # Define ponto de referência fixo na primeira geração
+        if not self.reference_point_set and len(pareto_front) > 0:
+            # Usa os valores máximos da primeira geração + margem generosa
+            max_values = np.max(pareto_front, axis=0)
+            self.reference_point = np.maximum(max_values * 1.5, max_values + 1.0)
+            self.metrics_calculator.reference_point = self.reference_point
+            self.reference_point_set = True
+
+            logger.info(f"📍 Ponto de referência fixo definido: {self.reference_point}")
+            logger.info(f"   Baseado em max da geração 0: {max_values}")
+
+        # Debug: Log estatísticas da fronteira de Pareto
+        if len(pareto_front) > 0:
+            logger.debug(f"\n=== Geração {generation} ===")
+            logger.debug(f"Tamanho da fronteira: {len(pareto_front)}")
+            logger.debug(f"Objetivos - Min: {np.min(pareto_front, axis=0)}")
+            logger.debug(f"Objetivos - Max: {np.max(pareto_front, axis=0)}")
+            logger.debug(f"Objetivos - Média: {np.mean(pareto_front, axis=0)}")
+
+            # Verifica valores inválidos
+            if np.any(np.isnan(pareto_front)) or np.any(np.isinf(pareto_front)):
+                logger.error(f"⚠️ Valores inválidos detectados na fronteira de Pareto!")
+                logger.error(f"NaN: {np.sum(np.isnan(pareto_front))}, Inf: {np.sum(np.isinf(pareto_front))}")
+
         metrics = self.metrics_calculator.calculate_all_metrics(pareto_front)
+
+        # Debug: Log métricas calculadas
+        logger.debug(f"Hypervolume: {metrics['hypervolume']:.6e}")
+        logger.debug(f"Spread: {metrics['spread']:.4f}")
+        logger.debug(f"Spacing: {metrics['spacing']:.6e}")
 
         # Melhor fitness individual (menor valor no primeiro objetivo)
         best_fitness = np.min(population_fitness[:, 0]) if len(population_fitness) > 0 else 0

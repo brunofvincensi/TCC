@@ -23,7 +23,7 @@ from services.agmo.tuning.hyperparameter_tuning_service import HyperparameterTun
 
 # Configuração de logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,  # Alterado para DEBUG para mais detalhes
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -71,9 +71,17 @@ def example_1_convergence_analysis():
         print("\n✅ Análise concluída!")
         print(f"\n📊 Resultados:")
         print(f"   - Número de execuções: {resultados['n_runs']}")
-        print(f"   - Geração média de convergência: {resultados['convergence_mean']:.1f}")
-        print(f"   - Desvio padrão: {resultados['convergence_std']:.1f}")
-        print(f"\n💡 Recomendação: Use pelo menos {int(resultados['convergence_mean'] + resultados['convergence_std'])} gerações")
+
+        # Trata caso onde convergência não foi detectada
+        if resultados['convergence_mean'] is not None:
+            print(f"   - Geração média de convergência: {resultados['convergence_mean']:.1f}")
+            print(f"   - Desvio padrão: {resultados['convergence_std']:.1f}")
+            recommended_gens = int(resultados['convergence_mean'] + resultados['convergence_std'])
+            print(f"\n💡 Recomendação: Use pelo menos {recommended_gens} gerações")
+        else:
+            print(f"   - Convergência: Não detectada nas 50 gerações testadas")
+            print(f"\n💡 Recomendação: Considere aumentar o número de gerações ou ajustar os critérios de convergência")
+
         print(f"\n📁 Gráficos salvos em: tuning_results/")
 
     except Exception as e:
