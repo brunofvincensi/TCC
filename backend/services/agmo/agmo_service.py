@@ -156,7 +156,7 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         # print(f"   Min: {x.min():.6f}")
         # print(f"   Max: {x.max():.6f}")
         #
-        # print(f"\n💼 Mapeamento x → Ativos:")
+        # print(f"\n Mapeamento x → Ativos:")
         # for i, (ticker, peso_raw) in enumerate(zip(self.tickers, x)):
         #     print(f"   x[{i}] = {peso_raw:.6f} → {ticker}")
 
@@ -627,13 +627,13 @@ class Nsga2OtimizacaoService:
                     'asset_id': asset.id,
                     'ticker': asset.ticker,
                     'name': asset.name,
-                    'peso': weight
+                    'weight': weight
                 })
 
         # Normalizar pesos para soma = 1
-        weights_sum = sum(item['peso'] for item in final_composition)
+        weights_sum = sum(item['weight'] for item in final_composition)
         for item in final_composition:
-            item['peso'] = item['peso'] / weights_sum
+            item['weight'] = item['weight'] / weights_sum
 
         # Calcula métricas da carteira otimizada
         expected_return = np.dot(optimal_weights, self.mean_returns.values)
@@ -844,12 +844,12 @@ class Nsga2OtimizacaoService:
         print(f"{'─'*80}")
 
         # Ordena por peso (maior para menor)
-        sorted_composition = sorted(composition, key=lambda x: x['peso'], reverse=True)
+        sorted_composition = sorted(composition, key=lambda x: x['weight'], reverse=True)
 
         for i, asset in enumerate(sorted_composition, 1):
             ticker = asset['ticker']
-            name = asset['nome'][:32] + '...' if len(asset['nome']) > 35 else asset['nome']
-            weight = asset['peso']
+            name = asset['name'][:32] + '...' if len(asset['name']) > 35 else asset['name']
+            weight = asset['weight']
             weight_pct = weight * 100
 
             # Barra visual
@@ -926,7 +926,7 @@ def _calculate_portfolio_return(app, portfolio: List[Dict],
         )
 
         # Calcular retorno ponderado da carteira
-        weights_dict = {item['ticker']: item['peso'] for item in portfolio}
+        weights_dict = {item['ticker']: item['weight'] for item in portfolio}
 
         monthly_returns = []
         dates = []
@@ -1070,7 +1070,7 @@ def save_backtest_chart(portfolio: List[Dict],
 
 
 def optimize_current_portfolio(app):
-    service = Nsga2OtimizacaoService(app, [1], "arrojado", 10, show_chart=True)
+    service = Nsga2OtimizacaoService(app, [], "conservador", 15, show_chart=True)
     result = service.optimize(max_assets=10, use_optimal_config=False)
 
     # Informações adicionais
@@ -1083,7 +1083,7 @@ def optimize_current_portfolio(app):
 def backtest(app):
     from datetime import date
     backtest_date = date(2015, 1, 1)
-    backtest_service = Nsga2OtimizacaoService(app, [1, 10], "arrojado", 10, reference_date=backtest_date, show_chart=True)
+    backtest_service = Nsga2OtimizacaoService(app, [1, 10], "conservador", 10, reference_date=backtest_date, show_chart=True)
     backtest_portfolio = backtest_service.optimize(max_assets=10)
 
     # Informações do backtest
@@ -1119,10 +1119,10 @@ def main():
     app = create_app()
 
     # Exemplo 1: Otimização normal (sem backtest)
- #   optimize_current_portfolio(app)
+    optimize_current_portfolio(app)
 
     # Exemplo 2: Otimização com backtest (usando dados até uma data específica)
-    backtest(app)
+  #  backtest(app)
 
 
 if __name__ == "__main__":

@@ -1,3 +1,6 @@
+import random
+import time
+
 import yfinance as yf
 import pandas as pd
 from calendar import monthrange
@@ -44,11 +47,15 @@ class YFinanceProcessor:
         """
         value = row[column]
 
-        # Se for Series, pega o primeiro valor
-        if isinstance(value, pd.Series):
-            value = value.iloc[0]
+        # Se vier MultiIndex ou Series, pega o primeiro valor
+        if isinstance(value, (pd.Series, list, tuple)) or hasattr(value, "__len__") and not isinstance(value,
+                                                                                                       (float, int)):
+            try:
+                value = value.iloc[0]
+            except Exception:
+                value = value[0]
 
-        # Converte para float se não for NaN
+        # Se ainda não for número, converte
         if pd.isna(value):
             return None
 
@@ -201,7 +208,7 @@ class YFinanceProcessor:
                 return
 
             # Pegar último dia útil
-            last_row = data.iloc[-1]
+            last_row = data.tail(1).reset_index(drop=True).iloc[0]
 
             # Extrair data
             date_col = last_row['Date']

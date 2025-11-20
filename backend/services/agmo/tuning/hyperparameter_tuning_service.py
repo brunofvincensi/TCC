@@ -642,8 +642,8 @@ class HyperparameterTuningService:
                     best = summary.iloc[0]
 
                     optimal_config = {
-                        'num_ativos': num_assets,
-                        'nivel_risco': risk_level,
+                        'num_assets': num_assets,
+                        'risk_level': risk_level,
                         'population_size': int(best['population_size']),
                         'generations': int(best['generations']),
                         'crossover_eta': 15.0,
@@ -718,13 +718,13 @@ class HyperparameterTuningService:
             updated_count = 0
 
             for _, row in df_optimal.iterrows():
-                num_ativos = int(row['num_ativos'])
-                nivel_risco = row['nivel_risco']
+                num_assets = int(row['num_assets'])
+                risk_level = row['risk_level']
 
                 # Verifica se já existe configuração para esta quantidade
                 existing = HyperparameterConfig.query.filter_by(
-                    num_ativos=num_ativos,
-                    risk_level=nivel_risco
+                    num_assets=num_assets,
+                    risk_level=risk_level
                 ).first()
 
                 if existing:
@@ -734,8 +734,8 @@ class HyperparameterTuningService:
 
                 # Cria nova configuração
                 new_config = HyperparameterConfig(
-                    num_ativos=num_ativos,
-                    risk_level=nivel_risco,
+                    num_assets=num_assets,
+                    risk_level=risk_level,
                     population_size=int(row['population_size']),
                     generations=int(row['generations']),
                     crossover_eta=float(row['crossover_eta']),
@@ -786,7 +786,7 @@ class HyperparameterTuningService:
 
         # 1. População ótima vs Número de ativos
         ax = axes[0, 0]
-        ax.plot(df_optimal['num_ativos'], df_optimal['population_size'],
+        ax.plot(df_optimal['num_assets'], df_optimal['population_size'],
                'o-', markersize=10, linewidth=2, color='steelblue')
         ax.set_xlabel('Número de Ativos')
         ax.set_ylabel('População Ótima')
@@ -795,7 +795,7 @@ class HyperparameterTuningService:
 
         # 2. Gerações ótimas vs Número de ativos
         ax = axes[0, 1]
-        ax.plot(df_optimal['num_ativos'], df_optimal['generations'],
+        ax.plot(df_optimal['num_assets'], df_optimal['generations'],
                'o-', markersize=10, linewidth=2, color='forestgreen')
         ax.set_xlabel('Número de Ativos')
         ax.set_ylabel('Gerações Ótimas')
@@ -804,7 +804,7 @@ class HyperparameterTuningService:
 
         # 3. Hypervolume vs Número de ativos
         ax = axes[1, 0]
-        ax.errorbar(df_optimal['num_ativos'], df_optimal['hypervolume_mean'],
+        ax.errorbar(df_optimal['num_assets'], df_optimal['hypervolume_mean'],
                    yerr=df_optimal['hypervolume_std'],
                    fmt='o-', markersize=10, linewidth=2, capsize=5,
                    color='crimson')
@@ -815,7 +815,7 @@ class HyperparameterTuningService:
 
         # 4. Tempo de execução vs Número de ativos
         ax = axes[1, 1]
-        ax.errorbar(df_optimal['num_ativos'], df_optimal['execution_time_mean'],
+        ax.errorbar(df_optimal['num_assets'], df_optimal['execution_time_mean'],
                    yerr=df_optimal['execution_time_std'],
                    fmt='o-', markersize=10, linewidth=2, capsize=5,
                    color='darkorange')

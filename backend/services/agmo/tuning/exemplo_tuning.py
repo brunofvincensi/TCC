@@ -45,9 +45,9 @@ def example_1_convergence_analysis():
 
     # Busca alguns ativos para teste
     with app.app_context():
-        ativos = db.session.query(Asset).limit(10).all()
-        ids_ativos = [a.id for a in ativos]
-        print(f"Usando {len(ids_ativos)} ativos para análise: {[a.ticker for a in ativos]}\n")
+        assets = db.session.query(Asset).limit(10).all()
+        ids_assets = [a.id for a in assets]
+        print(f"Usando {len(ids_assets)} ativos para análise: {[a.ticker for a in assets]}\n")
 
     # Cria o serviço de tuning
     tuning_service = HyperparameterTuningService(app)
@@ -61,7 +61,7 @@ def example_1_convergence_analysis():
 
     try:
         resultados = tuning_service.convergence_analysis(
-            ids_assets=ids_ativos,
+            ids_assets=ids_assets,
             risk_level='moderado',
             max_generations=50,
             population_size=100,
