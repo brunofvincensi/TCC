@@ -70,8 +70,8 @@ def complete_example():
 
     # Mostrar composição
     print(f"\n  💼 Composição da portfolio:")
-    for item in sorted(portfolio_otimizada, key=lambda x: x['peso'], reverse=True):
-        print(f"     {item['ticker']:8s} - {item['peso']*100:6.2f}%")
+    for item in sorted(portfolio_otimizada, key=lambda x: x['weight'], reverse=True):
+        print(f"     {item['ticker']:8s} - {item['weight']*100:6.2f}%")
 
     print("\n📈 PASSO 3: Gerando gráfico de retorno e volatilidade")
     print("─" * 80)

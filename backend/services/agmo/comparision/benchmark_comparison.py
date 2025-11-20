@@ -171,7 +171,7 @@ class BenchmarkComparison:
         """
         with self.app.app_context():
             ids_ativos = [item['asset_id'] for item in portfolio]
-            pesos_dict = {item['ticker']: item['peso'] for item in portfolio}
+            pesos_dict = {item['ticker']: item['weight'] for item in portfolio}
 
             # Buscar retornos dos ativos
             query = db.session.query(
@@ -246,7 +246,7 @@ class BenchmarkComparison:
                 item['ticker']: {
                     'ticker': item['ticker'],
                     'nome': item.get('name', item['ticker']),
-                    'peso': item['peso']
+                    'weight': item['weight']
                 }
                 for item in portfolio
             }
@@ -279,7 +279,7 @@ class BenchmarkComparison:
             # Ordenar ativos por peso decrescente
             ativos_ordenados = sorted(
                 ativos_info.values(),
-                key=lambda x: x['peso'],
+                key=lambda x: x['weight'],
                 reverse=True
             )
 
@@ -396,7 +396,7 @@ class BenchmarkComparison:
         # Listar ativos
         for i, ativo_info in enumerate(ativos_ordenados, start=1):
             ticker = ativo_info['ticker']
-            peso = ativo_info['peso']
+            weight = ativo_info['weight']
             cor = ticker_cor[ticker]
             retorno = retorno_final_por_ticker.get(ticker, 0)
 
@@ -416,14 +416,14 @@ class BenchmarkComparison:
                            transform=ax_sumario.transAxes)
 
             # Peso percentual
-            ax_sumario.text(0.70, y_pos, f"{peso*100:.2f}%", ha='right', va='top',
+            ax_sumario.text(0.70, y_pos, f"{weight*100:.2f}%", ha='right', va='top',
                            fontsize=8, color='black',
                            transform=ax_sumario.transAxes)
 
             # Barra de peso (usando caracteres Unicode)
             # Normalizar peso para escala de 0 a 15 caracteres
             max_chars = 12
-            num_chars = int(peso * 100 / (max([a['peso'] for a in ativos_ordenados]) * 100) * max_chars)
+            num_chars = int(weight * 100 / (max([a['weight'] for a in ativos_ordenados]) * 100) * max_chars)
             barra = '█' * max(num_chars, 1)  # Mínimo 1 caractere
 
             ax_sumario.text(0.80, y_pos, barra, ha='left', va='top',
@@ -436,7 +436,7 @@ class BenchmarkComparison:
         ax_sumario.plot([0.1, 0.9], [y_pos + y_step * 0.2, y_pos + y_step * 0.2],
                        'k-', lw=0.5, transform=ax_sumario.transAxes)
 
-        total_peso = sum([a['peso'] for a in ativos_ordenados])
+        total_peso = sum([a['weight'] for a in ativos_ordenados])
         ax_sumario.text(0.5, y_pos, f"Total: {total_peso*100:.2f}%",
                        ha='center', va='top', fontsize=9, fontweight='bold',
                        transform=ax_sumario.transAxes)
@@ -819,9 +819,9 @@ def example_usage():
 
     # Exemplo de composição de portfolio
     portfolio_exemplo = [
-        {'asset_id': 1, 'ticker': 'PETR4', 'peso': 0.3},
-        {'asset_id': 2, 'ticker': 'VALE3', 'peso': 0.3},
-        {'asset_id': 3, 'ticker': 'ITUB4', 'peso': 0.4}
+        {'asset_id': 1, 'ticker': 'PETR4', 'weight': 0.3},
+        {'asset_id': 2, 'ticker': 'VALE3', 'weight': 0.3},
+        {'asset_id': 3, 'ticker': 'ITUB4', 'weight': 0.4}
     ]
 
     # Criar serviço de comparação

@@ -15,7 +15,7 @@ from flask import current_app
 from typing import Dict, List, Tuple, Optional
 import logging
 
-from .agmo_service import Nsga2OtimizacaoService, MIN_ATIVOS
+from .agmo_service import Nsga2OtimizacaoService, MIN_ASSETS
 
 logger = logging.getLogger(__name__)
 
@@ -95,10 +95,10 @@ class OtimizacaoService:
             if max_assets is not None:
                 try:
                     max_assets = int(max_assets)
-                    if max_assets < MIN_ATIVOS:
+                    if max_assets < MIN_ASSETS:
                         return None, (
                             f"Número máximo de ativos ({max_assets}) não pode ser menor que "
-                            f"o mínimo necessário ({MIN_ATIVOS})."
+                            f"o mínimo necessário ({MIN_ASSETS})."
                         )
                 except (ValueError, TypeError):
                     return None, f"Número máximo de ativos inválido: {max_assets}"

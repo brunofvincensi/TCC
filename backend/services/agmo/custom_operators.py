@@ -57,7 +57,7 @@ def _enforce_cardinality(weights: np.ndarray, max_assets: int) -> np.ndarray:
 
     # Precisa reduzir: mantém top-K ativos por peso
     # Ordena índices por peso decrescente
-    sorted_indices = np.argsort(-weights)  # Negativo para ordem decrescente
+    sorted_indices = np.argsort(-weights)
 
     # Cria novo vetor zerado
     new_weights = np.zeros(n_var)
@@ -313,9 +313,9 @@ class SimplexMutationCardConstraint(Mutation):
                     individual[remove_idx] = 0.0
 
             else:
-                # Mutação por transferência: move peso entre ativos ativos
+                # Mutação por transferência: move peso entre ativos
                 if n_active >= 2:
-                    # Escolhe dois ativos ativos
+                    # Escolhe dois ativos
                     idx1, idx2 = np.random.choice(active_indices, 2, replace=False)
                 else:
                     # Se menos de 2 ativos, escolhe qualquer par

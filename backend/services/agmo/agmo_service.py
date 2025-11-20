@@ -24,7 +24,7 @@ from models.ativo import AssetType
 DEFAULT_GEN_SIZE = 100
 DEFAULT_POPULATION_SIZE = 100
 
-MIN_ATIVOS = 5
+MIN_ASSETS = 5
 
 class ConvergenceCallback(Callback):
     """
@@ -230,8 +230,8 @@ class Nsga2OtimizacaoService:
                 assets_query = assets_query.filter(Asset.id.in_(self.asset_ids))
 
             self.assets_to_optimize = assets_query.all()
-            if len(self.assets_to_optimize) < MIN_ATIVOS:  # Mínimo para 3 objetivos
-                raise ValueError(f"São necessários pelo menos {MIN_ATIVOS} ativos do tipo 'Ação' para a otimização.")
+            if len(self.assets_to_optimize) < MIN_ASSETS:
+                raise ValueError(f"São necessários pelo menos {MIN_ASSETS} ativos para a otimização.")
 
             ids_to_optimize = [a.id for a in self.assets_to_optimize]
             history_query = db.session.query(
@@ -241,13 +241,13 @@ class Nsga2OtimizacaoService:
             ).join(Asset, PriceHistory.asset_id == Asset.id) \
                 .filter(PriceHistory.asset_id.in_(ids_to_optimize))
 
-            # BACKTEST: Se reference_date foi fornecida, filtra apenas dados até essa data
+            # Se reference_date foi fornecida, filtra apenas dados até essa data
             if self.reference_date is not None:
                 if self.start_date is not None:
                     history_query = history_query.filter(PriceHistory.date >= self.start_date)
 
                 history_query = history_query.filter(PriceHistory.date <= self.reference_date)
-                print(f"  📅 MODO BACKTEST: Usando dados até {self.reference_date}")
+                print(f"Usando dados até {self.reference_date}")
 
             history_query = history_query.order_by(PriceHistory.date)
 
@@ -259,11 +259,7 @@ class Nsga2OtimizacaoService:
                 raise ValueError("Sem histórico para os ativos selecionados.")
 
             # Filtrar ações antes do pivot baseado no horizonte de investimento
-            ABSOLUTE_MINIMUM_MONTHS = 24  # Mínimo de 2 anos mesmo para prazos curtos
-            minimum_history_months = max(
-                int(self.years_period * 12),
-                ABSOLUTE_MINIMUM_MONTHS
-            )
+            minimum_history_months = int(self.years_period * 12)
 
             print(f"\n{'=' * 70}")
             print(f"🔍 FILTRANDO ATIVOS POR HISTÓRICO MÍNIMO")
@@ -301,15 +297,8 @@ class Nsga2OtimizacaoService:
 
                 print(f"  {ticker:<12} {available_months:>8} {status:<20}")
 
-            if len(valid_assets) < MIN_ATIVOS:
-                raise ValueError(
-                    f"Ativos insuficientes após filtro de histórico!\n"
-                    f"  Requerido: {MIN_ATIVOS} ativos\n"
-                    f"  Disponível: {len(valid_assets)} ativos\n"
-                    f"  Histórico mínimo: {minimum_history_months} meses\n\n"
-                    f"Sugestões:\n"
-                    f"  1. Reduza o prazo de investimento (atual: {self.years_period} anos)\n"
-                )
+            if len(valid_assets) < MIN_ASSETS:
+                raise ValueError(f" Reduza o prazo de investimento (atual: {self.years_period} anos)\n")
 
             print(f"\n  ✅ Resultado do filtro:")
             print(f"     Ativos incluídos: {len(valid_assets)}")
@@ -354,20 +343,10 @@ class Nsga2OtimizacaoService:
 
             # Validação de dados suficientes
             if len(df_returns) < minimum_history_months:
-                raise ValueError(
-                    f"Dados históricos insuficientes após alinhamento!\n"
-                    f"  Encontrados: {len(df_returns)} meses\n"
-                    f"  Necessário: {minimum_history_months} meses\n\n"
-                    f"Isso geralmente acontece quando o período de sobreposição entre "
-                    f"os ativos é muito curto."
-                )
+                raise ValueError(f"Dados históricos insuficientes após alinhamento!")
 
             if self.reference_date is not None:
-                print(f"\n{'=' * 70}")
-                print(f"📅 MODO BACKTEST ATIVADO")
-                print(f"{'=' * 70}")
-                print(f"  Data de referência: {self.reference_date}")
-                print(f"  ⚠️  Usando APENAS dados históricos até essa data")
+                print(f"Usando APENAS dados históricos até a data {self.reference_date}")
 
             print(f"\n  ✅ Período histórico: {len(df_returns)} meses")
             print(f"  📅 De {df_returns.index.min()} até {df_returns.index.max()}")
@@ -447,13 +426,10 @@ class Nsga2OtimizacaoService:
         """Seleciona a melhor carteira da Fronteira de Pareto com base no perfil de risco."""
         print(f"Selecionando a melhor solução para o perfil '{self.risk_level}'...")
 
-        # Normaliza os objetivos para que fiquem na mesma escala (0 a 1)
-        # Obj 0 (Retorno) é negativo, então invertemos o sinal para normalizar
-        # Inverte retorno (era negativo)
+        # Normaliza os objetivos para que fiquem na mesma escala (0 a 1). Obj 0 (Retorno) é negativo, então invertemos o sinal para normalizar
         objectives = objectives.copy()
         objectives[:, 0] = -objectives[:, 0]
 
-        # Normalização mais robusta
         normalized_objectives = np.zeros_like(objectives)
         for i in range(objectives.shape[1]):
             col = objectives[:, i]
@@ -473,7 +449,6 @@ class Nsga2OtimizacaoService:
         weights = profile_weights[self.risk_level]
 
         # Calcula um "score" para cada carteira.
-        # Queremos maximizar o retorno (objetivo 0) e minimizar os outros (1 e 2).
         scores = ((normalized_objectives[:, 0] * weights[0]) - (normalized_objectives[:, 1] * weights[1])
                   - (normalized_objectives[:, 2] * weights[2]))
 
@@ -522,8 +497,8 @@ class Nsga2OtimizacaoService:
                  convergence_tracker=None, use_optimal_config: bool = True,
                  enable_early_stopping=False, max_assets: int = 20):
 
-        if max_assets is not None and max_assets < MIN_ATIVOS:
-            raise ValueError(f"São necessários pelo menos {MIN_ATIVOS} ativos do tipo 'Ação' para a otimização.")
+        if max_assets is not None and max_assets < MIN_ASSETS:
+            raise ValueError(f"São necessários pelo menos {MIN_ASSETS} ativos para a otimização.")
 
         self._prepare_data()
 
@@ -727,21 +702,21 @@ class Nsga2OtimizacaoService:
 
         ref_points = reference_points_config.get(self.risk_level)
 
-        # return RNSGA2(
-        #     ref_points=ref_points,
-        #     pop_size=population_size,
-        #     crossover=crossover,
-        #     mutation=mutation,
-        #     sampling=sampling,
-        #     epsilon=0.01,  # Controla o tamanho da região de interesse em torno dos pontos de referência
-        #     normalization='front',  # Normaliza baseado na fronteira atual
-        #     extreme_points_as_reference_points=False,  # Usa apenas nossos pontos customizados
-        #     weights=np.array([0.34, 0.33, 0.33])  # Pesos para Achievement Scalarizing Function
-        # )
-
-        return NSGA2(pop_size=population_size, crossover=crossover,
+        return RNSGA2(
+            ref_points=ref_points,
+            pop_size=population_size,
+            crossover=crossover,
             mutation=mutation,
-            sampling=sampling)
+            sampling=sampling,
+            epsilon=0.01,  # Controla o tamanho da região de interesse em torno dos pontos de referência
+            normalization='front',  # Normaliza baseado na fronteira atual
+            extreme_points_as_reference_points=False,  # Usa apenas nossos pontos customizados
+            weights=np.array([0.34, 0.33, 0.33])  # Pesos para Achievement Scalarizing Function
+        )
+
+        # return NSGA2(pop_size=population_size, crossover=crossover,
+        #     mutation=mutation,
+        #     sampling=sampling)
 
     def get_hyperparameters(self, generations: int | None, num_assets: int, population_size: int | None,
                            use_optimal_config: bool):
