@@ -19,7 +19,13 @@ import logging
 import time
 import json
 from pathlib import Path
+
+# Configurar matplotlib para usar backend não-interativo (thread-safe)
+# IMPORTANTE: Deve ser configurado ANTES de importar pyplot
+import matplotlib
+matplotlib.use('Agg')  # Backend sem GUI, seguro para threads
 import matplotlib.pyplot as plt
+
 import seaborn as sns
 from dataclasses import dataclass, asdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
