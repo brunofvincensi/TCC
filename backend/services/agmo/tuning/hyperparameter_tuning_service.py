@@ -432,7 +432,7 @@ class HyperparameterTuningService:
     def _plot_grid_search_results(self, df_results: pd.DataFrame,
                                   summary: pd.DataFrame):
         """
-        Gera visualizações dos resultados do grid search.
+        Gera visualizações simplificadas dos resultados do grid search.
 
         Args:
             df_results: DataFrame com resultados brutos
@@ -446,8 +446,8 @@ class HyperparameterTuningService:
         pivot_hv = summary.pivot(index='generations', columns='population_size',
                                  values='final_hypervolume_mean')
 
-        fig, ax = plt.subplots(figsize=(12, 8))
-        sns.heatmap(pivot_hv, annot=True, fmt='.4f', cmap='YlGnBu', ax=ax)
+        fig, ax = plt.subplots(figsize=(10, 6))
+        sns.heatmap(pivot_hv, annot=True, fmt='.6e', cmap='YlGnBu', ax=ax)
         ax.set_title('Hypervolume Médio por Configuração', fontsize=14, fontweight='bold')
         ax.set_xlabel('Tamanho da População')
         ax.set_ylabel('Número de Gerações')
@@ -457,19 +457,13 @@ class HyperparameterTuningService:
         logger.info(f"Heatmap salvo em: {filename}")
         plt.close()
 
-        # 2. Trade-off Qualidade vs Tempo
-        fig, ax = plt.subplots(figsize=(12, 8))
+        # 2. Trade-off Qualidade vs Tempo (simplificado - sem barras de erro)
+        fig, ax = plt.subplots(figsize=(10, 6))
 
         for pop_size in summary['population_size'].unique():
             subset = summary[summary['population_size'] == pop_size]
             ax.plot(subset['execution_time_mean'], subset['final_hypervolume_mean'],
                    'o-', markersize=8, linewidth=2, label=f'Pop {pop_size}')
-
-            # Adiciona barras de erro
-            ax.errorbar(subset['execution_time_mean'], subset['final_hypervolume_mean'],
-                       xerr=subset['execution_time_std'],
-                       yerr=subset['final_hypervolume_std'],
-                       fmt='none', alpha=0.3)
 
         ax.set_xlabel('Tempo de Execução Médio (s)')
         ax.set_ylabel('Hypervolume Médio')
