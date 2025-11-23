@@ -176,7 +176,7 @@ class YFinanceProcessor:
 
         except Exception as e:
             db.session.rollback()
-            print(f"  - ❌ Erro ao buscar dados para {asset.ticker}: {e}")
+            print(f"  - Erro ao buscar dados para {asset.ticker}: {e}")
 
     def process_daily(self, asset):
         """

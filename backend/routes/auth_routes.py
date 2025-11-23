@@ -12,8 +12,6 @@ logger = logging.getLogger(__name__)
 @auth_bp.route('/login', methods=['POST'])
 @limiter.limit("10 per minute")
 def login():
-    """Endpoint de login - Limitado a 10 requisições por minuto"""
-    logger.info(f"Tentativa de login de IP: {request.remote_addr}")
     data = request.get_json()
 
     email = data.get('email') if data else None
