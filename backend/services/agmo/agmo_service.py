@@ -423,37 +423,58 @@ class Nsga2OtimizacaoService:
             print(f"     Considere adicionar ativos de outros setores para diversificação.")
 
     def _choose_best_portfolio(self, objectives, solutions):
-        """Seleciona a melhor carteira da Fronteira de Pareto com base no perfil de risco."""
+        """
+        Seleciona a melhor carteira da Fronteira de Pareto usando Achievement Scalarizing Function (ASF).
+
+        Usa os mesmos reference points do R-NSGA2 para garantir consistência:
+        o algoritmo busca soluções próximas ao reference point, e a seleção final
+        escolhe a solução mais próxima a esse mesmo ponto.
+
+        ASF(x, ref) = max_i { (f_i(x) - z_i) / w_i }
+        Menor ASF = mais próximo do reference point = melhor solução
+        """
         print(f"Selecionando a melhor solução para o perfil '{self.risk_level}'...")
 
-        # Normaliza os objetivos para que fiquem na mesma escala (0 a 1). Obj 0 (Retorno) é negativo, então invertemos o sinal para normalizar
-        objectives = objectives.copy()
-        objectives[:, 0] = -objectives[:, 0]
+        # Reference points usados no R-NSGA2 (mesmos da configuração do algoritmo)
+        reference_points_config = {
+            'conservador': np.array([0.3, 0.0, 0.0]),  # aceita retorno pior, mas quer riscos ~0
+            'moderado': np.array([0.2, 0.3, 0.3]),     # balanceado
+            'arrojado': np.array([0.0, 0.3, 0.3])      # quer melhor retorno, aceita mais risco
+        }
+        ref_point = reference_points_config[self.risk_level]
 
-        normalized_objectives = np.zeros_like(objectives)
+        # Weights para ASF (mesmos usados no R-NSGA2)
+        weights = np.array([0.34, 0.33, 0.33])
+
+        # Normaliza os objetivos para [0, 1]
+        objectives_normalized = objectives.copy()
         for i in range(objectives.shape[1]):
             col = objectives[:, i]
             min_val, max_val = col.min(), col.max()
 
-            if max_val - min_val > 1e-10:  # Evita divisão por zero
-                normalized_objectives[:, i] = (col - min_val) / (max_val - min_val)
+            if max_val - min_val > 1e-10:
+                objectives_normalized[:, i] = (col - min_val) / (max_val - min_val)
             else:
-                normalized_objectives[:, i] = 0.5  # Valor neutro
+                objectives_normalized[:, i] = 0.0
 
-        # Pesos para cada objetivo [Retorno, Variância, CVaR]
-        profile_weights = {
-            'conservador': np.array([0.2, 0.5, 0.3]),  # Prioriza minimizar riscos
-            'moderado': np.array([0.4, 0.3, 0.3]),  # Equilibrado
-            'arrojado': np.array([0.6, 0.2, 0.2])  # Prioriza maximizar retorno
-        }
-        weights = profile_weights[self.risk_level]
+        # Calcula ASF para cada solução
+        asf_values = []
+        for obj in objectives_normalized:
+            # ASF = max_i { (obj[i] - ref[i]) / weight[i] }
+            # Menor ASF = mais próximo do reference point
+            asf_components = (obj - ref_point) / weights
+            asf = np.max(asf_components)
+            asf_values.append(asf)
 
-        # Calcula um "score" para cada carteira.
-        scores = ((normalized_objectives[:, 0] * weights[0]) - (normalized_objectives[:, 1] * weights[1])
-                  - (normalized_objectives[:, 2] * weights[2]))
+        asf_values = np.array(asf_values)
 
-        # O índice da carteira com o maior score é a nossa escolha.
-        best_idx = np.argmax(scores)
+        # Seleciona solução com MENOR ASF (mais próxima do reference point)
+        best_idx = np.argmin(asf_values)
+
+        print(f"✅ Solução selecionada: índice {best_idx} (ASF = {asf_values[best_idx]:.4f})")
+        print(f"   Objetivos normalizados: {objectives_normalized[best_idx]}")
+        print(f"   Reference point alvo: {ref_point}")
+
         return solutions[best_idx]
 
     def _print_matrix(self, matrix, formato=".3f"):
@@ -696,7 +717,7 @@ class Nsga2OtimizacaoService:
                 [0.2, 0.3, 0.3],  # Balanceado
             ]),
             'arrojado': np.array([
-                [0.0, 0.3, 0.3],  # Bom retorno com risco alto
+                [0.05, 0.25, 0.25],  # Bom retorno com risco alto
             ])
         }
 
@@ -711,7 +732,7 @@ class Nsga2OtimizacaoService:
             epsilon=0.01,  # Controla o tamanho da região de interesse em torno dos pontos de referência
             normalization='front',  # Normaliza baseado na fronteira atual
             extreme_points_as_reference_points=False,  # Usa apenas nossos pontos customizados
-            weights=np.array([0.34, 0.33, 0.33])  # Pesos para Achievement Scalarizing Function
+            weights=np.array([0.5, 0.25, 0.25])  # Pesos para Achievement Scalarizing Function
         )
 
         # return NSGA2(pop_size=population_size, crossover=crossover,
@@ -1045,7 +1066,7 @@ def save_backtest_chart(portfolio: List[Dict],
 
 
 def optimize_current_portfolio(app):
-    service = Nsga2OtimizacaoService(app, [], "conservador", 15, show_chart=True)
+    service = Nsga2OtimizacaoService(app, [], "arrojado", 10, show_chart=True)
     result = service.optimize(max_assets=10, use_optimal_config=False)
 
     # Informações adicionais
