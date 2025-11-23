@@ -26,6 +26,23 @@ DEFAULT_POPULATION_SIZE = 100
 
 MIN_ASSETS = 5
 
+# Reference Points: onde queremos chegar (aspirações no espaço normalizado [0,1])
+# - 0.0 = melhor valor possível (min risco / max retorno)
+# - 1.0 = pior valor possível (max risco / min retorno)
+REFERENCE_POINTS_CONFIG = {
+    'conservador': np.array([[0.3, 0.0, 0.0]]),  # Aceita retorno pior, mas quer riscos ~0
+    'moderado':    np.array([[0.2, 0.3, 0.3]]),  # Balanceado
+    'arrojado':    np.array([[0.0, 0.3, 0.3]])   # Quer melhor retorno, aceita mais risco
+}
+
+# Weights para Achievement Scalarizing Function (ASF)
+WEIGHTS_CONFIG = {
+    'conservador': np.array([0.20, 0.40, 0.40]),  # Desvios em risco são 2x mais graves
+    'moderado':    np.array([0.33, 0.34, 0.33]),  # Equilibrado
+    'arrojado':    np.array([0.50, 0.25, 0.25])   # Desvios em retorno são 2x mais graves
+}
+# ===============================================================
+
 class ConvergenceCallback(Callback):
     """
     Callback do pymoo para rastrear métricas de convergência durante a otimização.
@@ -435,21 +452,9 @@ class Nsga2OtimizacaoService:
         """
         print(f"Selecionando a melhor solução para o perfil '{self.risk_level}'...")
 
-        # Reference points usados no R-NSGA2 (mesmos da configuração do algoritmo)
-        reference_points_config = {
-            'conservador': np.array([0.3, 0.0, 0.0]),  # aceita retorno pior, mas quer riscos ~0
-            'moderado': np.array([0.2, 0.3, 0.3]),     # balanceado
-            'arrojado': np.array([0.0, 0.3, 0.3])      # quer melhor retorno, aceita mais risco
-        }
-        ref_point = reference_points_config[self.risk_level]
-
-        # Weights para ASF (mesmos usados no R-NSGA2, variam por perfil)
-        weights_config = {
-            'conservador': np.array([0.20, 0.40, 0.40]),  # Desvios em risco são 2x mais graves
-            'moderado':    np.array([0.33, 0.34, 0.33]),  # Equilibrado
-            'arrojado':    np.array([0.50, 0.25, 0.25])   # Desvios em retorno são 2x mais graves
-        }
-        weights = weights_config[self.risk_level]
+        # Usa configuração centralizada (constantes do módulo)
+        ref_point = REFERENCE_POINTS_CONFIG[self.risk_level][0]  # [0] extrai o array 1D da matriz
+        weights = WEIGHTS_CONFIG[self.risk_level]
 
         # Normaliza os objetivos para [0, 1]
         objectives_normalized = objectives.copy()
@@ -714,28 +719,9 @@ class Nsga2OtimizacaoService:
         crossover = SimplexCrossoverCardConstraint(max_assets=max_assets, eta=crossover_eta)
         mutation = SimplexMutationCardConstraint(max_assets=max_assets, eta=mutation_eta)
 
-        reference_points_config = {
-            'conservador': np.array([
-                [0.3, 0.0, 0.0],  # Prioridade máxima: minimizar variância e CVaR
-            ]),
-            'moderado': np.array([
-                [0.2, 0.3, 0.3],  # Balanceado
-            ]),
-            'arrojado': np.array([
-                [0.05, 0.25, 0.25],  # Bom retorno com risco alto
-            ])
-        }
-
-        # Weights por perfil para Achievement Scalarizing Function (ASF)
-        # Interpretação: quanto MENOR o weight, mais GRAVE é desviar desse objetivo
-        weights_config = {
-            'conservador': np.array([0.20, 0.40, 0.40]),  # Desvios em risco são 2x mais graves
-            'moderado':    np.array([0.33, 0.34, 0.33]),  # Equilibrado
-            'arrojado':    np.array([0.50, 0.25, 0.25])   # Desvios em retorno são 2x mais graves
-        }
-
-        ref_points = reference_points_config.get(self.risk_level)
-        weights = weights_config.get(self.risk_level)
+        # Usa configuração centralizada (constantes do módulo)
+        ref_points = REFERENCE_POINTS_CONFIG.get(self.risk_level)
+        weights = WEIGHTS_CONFIG.get(self.risk_level)
 
         return RNSGA2(
             ref_points=ref_points,

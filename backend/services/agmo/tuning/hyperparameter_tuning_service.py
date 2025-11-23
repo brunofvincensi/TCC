@@ -31,7 +31,11 @@ from dataclasses import dataclass, asdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .quality_metrics import QualityMetrics, ConvergenceTracker
-from services.agmo.agmo_service import Nsga2OtimizacaoService
+from services.agmo.agmo_service import (
+    Nsga2OtimizacaoService,
+    REFERENCE_POINTS_CONFIG,
+    WEIGHTS_CONFIG
+)
 
 logger = logging.getLogger(__name__)
 
@@ -102,19 +106,8 @@ class HyperparameterTuningService:
         # Prepara dados para otimização
         service = Nsga2OtimizacaoService(self.app, [], risk_level, 10, asset_ids=ids_assets)
 
-        # Obtém pontos de referência do R-NSGA2 para o perfil de risco
-        reference_points_config = {
-            'conservador': np.array([
-                [0.3, 0.0, 0.0],
-            ]),
-            'moderado': np.array([
-                [0.2, 0.3, 0.3],
-            ]),
-            'arrojado': np.array([
-                [0.0, 0.3, 0.3],
-            ])
-        }
-        ref_points = reference_points_config.get(risk_level)
+        # Obtém pontos de referência do R-NSGA2 para o perfil de risco (configuração centralizada)
+        ref_points = REFERENCE_POINTS_CONFIG.get(risk_level)
 
         # Múltiplas execuções para análise estatística
         all_runs = []
@@ -242,18 +235,7 @@ class HyperparameterTuningService:
         service = Nsga2OtimizacaoService(self.app, [], risk_level, asset_ids=ids_assets, years_period=3)
 
         # Obtém pontos de referência do R-NSGA2 para o perfil de risco
-        reference_points_config = {
-            'conservador': np.array([
-                [0.3, 0.0, 0.0],
-            ]),
-            'moderado': np.array([
-                [0.2, 0.3, 0.3],
-            ]),
-            'arrojado': np.array([
-                [0.0, 0.3, 0.3],
-            ])
-        }
-        ref_points = reference_points_config.get(risk_level)
+        ref_points = REFERENCE_POINTS_CONFIG.get(risk_level)
 
         convergence_tracker = ConvergenceTracker(
             reference_points_rnsga2=ref_points,
