@@ -443,8 +443,13 @@ class Nsga2OtimizacaoService:
         }
         ref_point = reference_points_config[self.risk_level]
 
-        # Weights para ASF (mesmos usados no R-NSGA2)
-        weights = np.array([0.34, 0.33, 0.33])
+        # Weights para ASF (mesmos usados no R-NSGA2, variam por perfil)
+        weights_config = {
+            'conservador': np.array([0.20, 0.40, 0.40]),  # Desvios em risco são 2x mais graves
+            'moderado':    np.array([0.33, 0.34, 0.33]),  # Equilibrado
+            'arrojado':    np.array([0.50, 0.25, 0.25])   # Desvios em retorno são 2x mais graves
+        }
+        weights = weights_config[self.risk_level]
 
         # Normaliza os objetivos para [0, 1]
         objectives_normalized = objectives.copy()
@@ -721,7 +726,16 @@ class Nsga2OtimizacaoService:
             ])
         }
 
+        # Weights por perfil para Achievement Scalarizing Function (ASF)
+        # Interpretação: quanto MENOR o weight, mais GRAVE é desviar desse objetivo
+        weights_config = {
+            'conservador': np.array([0.20, 0.40, 0.40]),  # Desvios em risco são 2x mais graves
+            'moderado':    np.array([0.33, 0.34, 0.33]),  # Equilibrado
+            'arrojado':    np.array([0.50, 0.25, 0.25])   # Desvios em retorno são 2x mais graves
+        }
+
         ref_points = reference_points_config.get(self.risk_level)
+        weights = weights_config.get(self.risk_level)
 
         return RNSGA2(
             ref_points=ref_points,
@@ -732,7 +746,7 @@ class Nsga2OtimizacaoService:
             epsilon=0.01,  # Controla o tamanho da região de interesse em torno dos pontos de referência
             normalization='front',  # Normaliza baseado na fronteira atual
             extreme_points_as_reference_points=False,  # Usa apenas nossos pontos customizados
-            weights=np.array([0.5, 0.25, 0.25])  # Pesos para Achievement Scalarizing Function
+            weights=weights  # Pesos variam por perfil de risco
         )
 
         # return NSGA2(pop_size=population_size, crossover=crossover,
@@ -1066,7 +1080,7 @@ def save_backtest_chart(portfolio: List[Dict],
 
 
 def optimize_current_portfolio(app):
-    service = Nsga2OtimizacaoService(app, [], "arrojado", 10, show_chart=True)
+    service = Nsga2OtimizacaoService(app, [], "moderado", 10, show_chart=True)
     result = service.optimize(max_assets=10, use_optimal_config=False)
 
     # Informações adicionais
@@ -1115,10 +1129,10 @@ def main():
     app = create_app()
 
     # Exemplo 1: Otimização normal (sem backtest)
-    optimize_current_portfolio(app)
+   # optimize_current_portfolio(app)
 
     # Exemplo 2: Otimização com backtest (usando dados até uma data específica)
-  #  backtest(app)
+    backtest(app)
 
 
 if __name__ == "__main__":
