@@ -106,8 +106,9 @@ class HyperparameterTuningService:
         # Prepara dados para otimização
         service = Nsga2OtimizacaoService(self.app, [], risk_level, 10, asset_ids=ids_assets)
 
-        # Obtém pontos de referência do R-NSGA2 para o perfil de risco (configuração centralizada)
+        # Obtém pontos de referência e weights do R-NSGA2 para o perfil de risco (configuração centralizada)
         ref_points = REFERENCE_POINTS_CONFIG.get(risk_level)
+        weights = WEIGHTS_CONFIG.get(risk_level)
 
         # Múltiplas execuções para análise estatística
         all_runs = []
@@ -117,7 +118,8 @@ class HyperparameterTuningService:
             # Executa otimização com tracking de convergência usando R-HV
             convergence_tracker = ConvergenceTracker(
                 reference_points_rnsga2=ref_points,
-                use_r_hv=True
+                use_r_hv=True,
+                weights=weights
             )
 
             result = service.optimize(

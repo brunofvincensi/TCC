@@ -121,7 +121,7 @@ def example_2_quick_test():
             ids_assets=ids_assets,
             population_sizes=[50, 100],
             generation_counts=[50, 100],
-            n_runs=2
+            n_runs=3
         )
 
         print("\n✅ Teste rápido concluído com sucesso!")
