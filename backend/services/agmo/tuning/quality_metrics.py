@@ -55,7 +55,7 @@ class QualityMetrics:
 
         IMPORTANTE: Quanto MENOR o R2, MELHOR a qualidade!
         Mas para consistência com outras métricas onde "maior é melhor",
-        retornamos o NEGATIVO do R2, assim MAIOR valor = MELHOR qualidade.
+        retornamos o INVERSO (1/R2), assim MAIOR valor = MELHOR qualidade.
 
         Args:
             pareto_front: Array (n_solutions, n_objectives) com objetivos
@@ -64,7 +64,7 @@ class QualityMetrics:
             nadir_point: Ponto nadir (valores máximos). Se None, usa max da fronteira.
 
         Returns:
-            Valor do R-HV negativo (maior = melhor qualidade)
+            Valor do R-HV = 1/R2 (maior = melhor qualidade, sempre positivo)
 
         Referências:
             - Hansen & Jaszkiewicz (1998). "Evaluating the quality of approximations to the non-dominated set"
@@ -125,11 +125,16 @@ class QualityMetrics:
         logger.debug(f"R2 indicator calculado: {r2:.6e}")
         logger.debug(f"Quanto menor R2, melhor a fronteira em relação aos ref points")
 
-        # Retorna o NEGATIVO para que "maior seja melhor" (consistente com HV)
-        # Assim, conforme R2 diminui (melhora), -R2 aumenta
-        r_hv = -r2
+        # Retorna o INVERSO (1/R2) para que "maior seja melhor" (consistente com HV)
+        # Assim, conforme R2 diminui (melhora), 1/R2 aumenta
+        # Proteção contra divisão por zero
+        if r2 < 1e-10:
+            logger.warning(f"R2 muito próximo de zero ({r2:.6e}). Usando R-HV máximo.")
+            r_hv = 1e10  # Valor muito alto indica qualidade perfeita
+        else:
+            r_hv = 1.0 / r2
 
-        logger.debug(f"R-HV (negativo de R2): {r_hv:.6e} (quanto maior, melhor)")
+        logger.debug(f"R-HV (1/R2): {r_hv:.6e} (quanto maior, melhor)")
 
         return r_hv
 
@@ -561,7 +566,7 @@ class ConvergenceTracker:
 
             if self.use_r_hv:
                 logger.info(f"   ✅ R-HV: Usando {len(self.reference_points_rnsga2)} pontos de referência do R-NSGA2")
-                logger.info(f"   ✅ R-HV vai CRESCER (tornar-se menos negativo) conforme soluções melhoram")
+                logger.info(f"   ✅ R-HV (1/R2) vai CRESCER conforme soluções melhoram em relação aos pontos de referência")
             else:
                 logger.info(f"   ✅ Box HV: entre ideal {self.ideal_point} e ref {self.reference_point}")
                 logger.info(f"   ✅ HV vai CRESCER conforme ideal_point melhora (diminui)")
