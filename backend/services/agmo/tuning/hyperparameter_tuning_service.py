@@ -102,13 +102,30 @@ class HyperparameterTuningService:
         # Prepara dados para otimização
         service = Nsga2OtimizacaoService(self.app, [], risk_level, 10, asset_ids=ids_assets)
 
+        # Obtém pontos de referência do R-NSGA2 para o perfil de risco
+        reference_points_config = {
+            'conservador': np.array([
+                [0.3, 0.0, 0.0],
+            ]),
+            'moderado': np.array([
+                [0.2, 0.3, 0.3],
+            ]),
+            'arrojado': np.array([
+                [0.0, 0.3, 0.3],
+            ])
+        }
+        ref_points = reference_points_config.get(risk_level)
+
         # Múltiplas execuções para análise estatística
         all_runs = []
         for run in range(n_runs):
             logger.info(f"Executando run {run + 1}/{n_runs}")
 
-            # Executa otimização com tracking de convergência
-            convergence_tracker = ConvergenceTracker()
+            # Executa otimização com tracking de convergência usando R-HV
+            convergence_tracker = ConvergenceTracker(
+                reference_points_rnsga2=ref_points,
+                use_r_hv=True
+            )
 
             result = service.optimize(
                 population_size=population_size,
@@ -136,7 +153,8 @@ class HyperparameterTuningService:
         population_sizes: List[int] = None,
         generation_counts: List[int] = None,
         n_runs: int = 3,
-        time_limit: Optional[float] = None
+        time_limit: Optional[float] = None,
+        risk_level: str = 'moderado'
     ) -> pd.DataFrame:
         """
         Realiza grid search para encontrar os melhores hiperparâmetros.
@@ -188,7 +206,8 @@ class HyperparameterTuningService:
                         config=config,
                         ids_assets=ids_assets,
                         run_number=run + 1,
-                        max_assets=10
+                        max_assets=10,
+                        risk_level=risk_level
                     )
                     results.append(result)
                     self.results.append(result)
@@ -213,14 +232,33 @@ class HyperparameterTuningService:
         config: HyperparameterConfig,
         ids_assets: List[int],
         run_number: int,
-        max_assets: int = None
+        max_assets: int = None,
+        risk_level: str = 'moderado'
     ) -> TuningResult:
 
         """
         Executa uma única otimização com uma configuração específica.
         """
-        service = Nsga2OtimizacaoService(self.app, [], "moderado", asset_ids=ids_assets, years_period=3)
-        convergence_tracker = ConvergenceTracker()
+        service = Nsga2OtimizacaoService(self.app, [], risk_level, asset_ids=ids_assets, years_period=3)
+
+        # Obtém pontos de referência do R-NSGA2 para o perfil de risco
+        reference_points_config = {
+            'conservador': np.array([
+                [0.3, 0.0, 0.0],
+            ]),
+            'moderado': np.array([
+                [0.2, 0.3, 0.3],
+            ]),
+            'arrojado': np.array([
+                [0.0, 0.3, 0.3],
+            ])
+        }
+        ref_points = reference_points_config.get(risk_level)
+
+        convergence_tracker = ConvergenceTracker(
+            reference_points_rnsga2=ref_points,
+            use_r_hv=True
+        )
 
         start_time = time.time()
 
@@ -237,11 +275,15 @@ class HyperparameterTuningService:
         # Extrai apenas as métricas essenciais
         history = convergence_tracker.get_history()
 
+        # Usa a chave correta (r_hypervolume ou hypervolume)
+        hv_key = convergence_tracker.hv_key
+        final_hv = history[hv_key][-1] if history[hv_key] else 0
+
         return TuningResult(
             config=config,
             run_number=run_number,
             execution_time=execution_time,
-            final_hypervolume=history['hypervolume'][-1] if history['hypervolume'] else 0,
+            final_hypervolume=final_hv,
             convergence_generation=convergence_tracker.get_convergence_generation()
         )
 
@@ -259,13 +301,17 @@ class HyperparameterTuningService:
         convergence_gens = [r['convergence_gen'] for r in all_runs
                            if r['convergence_gen'] is not None]
 
+        # Detecta qual chave de hypervolume está sendo usada
+        first_history = all_runs[0]['history']
+        hv_key = 'r_hypervolume' if 'r_hypervolume' in first_history else 'hypervolume'
+
         # Calcula métricas ao longo das gerações (média e desvio padrão)
         max_gen = max(len(r['history']['generation']) for r in all_runs)
 
         metrics_over_time = {
             'generation': list(range(max_gen)),
-            'hypervolume_mean': [],
-            'hypervolume_std': [],
+            f'{hv_key}_mean': [],
+            f'{hv_key}_std': [],
             'spread_mean': [],
             'spread_std': [],
             'spacing_mean': [],
@@ -283,13 +329,13 @@ class HyperparameterTuningService:
             for run in all_runs:
                 history = run['history']
                 if gen < len(history['generation']):
-                    hv_values.append(history['hypervolume'][gen])
+                    hv_values.append(history[hv_key][gen])
                     spread_values.append(history['spread'][gen])
                     spacing_values.append(history['spacing'][gen])
                     size_values.append(history['pareto_size'][gen])
 
-            metrics_over_time['hypervolume_mean'].append(np.mean(hv_values))
-            metrics_over_time['hypervolume_std'].append(np.std(hv_values))
+            metrics_over_time[f'{hv_key}_mean'].append(np.mean(hv_values))
+            metrics_over_time[f'{hv_key}_std'].append(np.std(hv_values))
             metrics_over_time['spread_mean'].append(np.mean(spread_values))
             metrics_over_time['spread_std'].append(np.std(spread_values))
             metrics_over_time['spacing_mean'].append(np.mean(spacing_values))
@@ -303,7 +349,8 @@ class HyperparameterTuningService:
             'convergence_mean': np.mean(convergence_gens) if convergence_gens else None,
             'convergence_std': np.std(convergence_gens) if convergence_gens else None,
             'metrics_over_time': metrics_over_time,
-            'raw_runs': all_runs
+            'raw_runs': all_runs,
+            'hv_key': hv_key  # Adiciona a chave usada para referência
         }
 
     def _create_summary_statistics(self, df_results: pd.DataFrame) -> pd.DataFrame:
@@ -348,23 +395,27 @@ class HyperparameterTuningService:
         """
         metrics = analysis['metrics_over_time']
         n_runs = analysis['n_runs']
+        hv_key = analysis.get('hv_key', 'hypervolume')
 
         fig, axes = plt.subplots(2, 2, figsize=(15, 12))
-        fig.suptitle(f'Análise de Convergência - População: {population_size}, '
+
+        # Define título apropriado baseado na métrica usada
+        hv_label = 'R-Hypervolume (R2)' if hv_key == 'r_hypervolume' else 'Hypervolume'
+        fig.suptitle(f'Análise de Convergência ({hv_label}) - População: {population_size}, '
                     f'{n_runs} execuções', fontsize=14, fontweight='bold')
 
         generations = metrics['generation']
 
-        # 1. Hypervolume
+        # 1. Hypervolume (ou R-Hypervolume)
         ax = axes[0, 0]
-        mean = metrics['hypervolume_mean']
-        std = metrics['hypervolume_std']
+        mean = metrics[f'{hv_key}_mean']
+        std = metrics[f'{hv_key}_std']
         ax.plot(generations, mean, 'b-', linewidth=2, label='Média')
         ax.fill_between(generations, np.array(mean) - np.array(std),
                        np.array(mean) + np.array(std), alpha=0.3)
         ax.set_xlabel('Geração')
-        ax.set_ylabel('Hypervolume')
-        ax.set_title('Evolução do Hypervolume')
+        ax.set_ylabel(hv_label)
+        ax.set_title(f'Evolução do {hv_label}')
         ax.legend()
         ax.grid(True, alpha=0.3)
 
@@ -610,7 +661,8 @@ class HyperparameterTuningService:
                 ids_assets=ids_assets,
                 population_sizes=population_sizes,
                 generation_counts=generation_counts,
-                n_runs=n_runs
+                n_runs=n_runs,
+                risk_level=risk_level
             )
 
             elapsed = time.time() - start_time
