@@ -60,8 +60,10 @@ class QualityMetrics:
         Args:
             pareto_front: Array (n_solutions, n_objectives) com objetivos
             reference_points: Array (n_ref_points, n_objectives) com pontos de referência
-            ideal_point: Ponto ideal (valores mínimos). Se None, usa min da fronteira.
-            nadir_point: Ponto nadir (valores máximos). Se None, usa max da fronteira.
+            ideal_point: Ponto ideal FIXO (valores mínimos). Para R-HV, deve ser fixo
+                        durante toda a execução. Se None, usa min da fronteira atual.
+            nadir_point: Ponto nadir FIXO (valores máximos). Para R-HV, deve ser fixo
+                        durante toda a execução. Se None, usa max da fronteira atual.
 
         Returns:
             Valor do R-HV = 1/R2 (maior = melhor qualidade, sempre positivo)
@@ -527,42 +529,38 @@ class ConvergenceTracker:
             logger.info(f"📍 Ponto de referência FIXO (nadir/pior caso): {self.reference_point}")
             logger.info(f"   Baseado em max da geração 0: {max_values}")
 
-        # Atualiza ponto ideal GLOBAL (MELHOR CASO acumulado de todas as gerações)
+        # Atualiza pontos de referência para normalização
         if len(pareto_front) > 0:
             min_values = np.min(pareto_front, axis=0)
             max_values = np.max(pareto_front, axis=0)
 
-            if not self.ideal_point_set:
-                # Primeira geração: inicializa ideal point
-                self.ideal_point = min_values.copy()
-                self.ideal_point_set = True
-                if self.use_r_hv:
+            if self.use_r_hv:
+                # Para R-HV: usa pontos FIXOS da primeira geração
+                # Isso garante que a métrica seja consistente e monotônica
+                if not self.ideal_point_set:
+                    self.ideal_point = min_values.copy()
+                    self.ideal_point_set = True
+                    logger.info(f"🎯 R-HV: Ponto ideal FIXO (gen 0): {self.ideal_point}")
+
+                if not self.nadir_point_set:
+                    # Nadir fixo com margem (como reference_point no HV tradicional)
+                    self.nadir_point = np.maximum(max_values * 1.5, max_values + 0.5)
+                    self.nadir_point_set = True
+                    logger.info(f"📍 R-HV: Ponto nadir FIXO (gen 0 + margem): {self.nadir_point}")
+            else:
+                # Para HV tradicional: ideal acumulado (global), nadir fixo
+                if not self.ideal_point_set:
+                    self.ideal_point = min_values.copy()
+                    self.ideal_point_set = True
                     logger.info(f"🎯 Ponto ideal INICIAL (melhor caso gen 0): {self.ideal_point}")
                 else:
-                    logger.info(f"🎯 Ponto ideal INICIAL (melhor caso gen 0): {self.ideal_point}")
-            else:
-                # Atualiza ideal point com os MELHORES valores já vistos
-                # Em minimização: min é melhor
-                old_ideal = self.ideal_point.copy()
-                self.ideal_point = np.minimum(self.ideal_point, min_values)
+                    # Atualiza ideal point com os MELHORES valores já vistos
+                    old_ideal = self.ideal_point.copy()
+                    self.ideal_point = np.minimum(self.ideal_point, min_values)
 
-                if not np.array_equal(old_ideal, self.ideal_point):
-                    logger.info(f"🎯 Ponto ideal ATUALIZADO: {self.ideal_point}")
-                    logger.info(f"   Melhoria: {old_ideal - self.ideal_point}")
-
-            # Atualiza ponto nadir GLOBAL (PIOR CASO acumulado) - usado para R-HV
-            if not self.nadir_point_set:
-                self.nadir_point = max_values.copy()
-                self.nadir_point_set = True
-                if self.use_r_hv:
-                    logger.info(f"📍 Ponto nadir INICIAL (pior caso gen 0): {self.nadir_point}")
-            else:
-                old_nadir = self.nadir_point.copy()
-                self.nadir_point = np.maximum(self.nadir_point, max_values)
-
-                if not np.array_equal(old_nadir, self.nadir_point):
-                    if self.use_r_hv:
-                        logger.info(f"📍 Ponto nadir ATUALIZADO: {self.nadir_point}")
+                    if not np.array_equal(old_ideal, self.ideal_point):
+                        logger.info(f"🎯 Ponto ideal ATUALIZADO: {self.ideal_point}")
+                        logger.info(f"   Melhoria: {old_ideal - self.ideal_point}")
 
             if self.use_r_hv:
                 logger.info(f"   ✅ R-HV: Usando {len(self.reference_points_rnsga2)} pontos de referência do R-NSGA2")
