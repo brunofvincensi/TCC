@@ -566,13 +566,18 @@ class HyperparameterTuningService:
 
     def get_best_configuration(self) -> Optional[HyperparameterConfig]:
         """
-        Retorna a melhor configuração baseada no trade-off qualidade × velocidade.
+        Retorna a melhor configuração priorizando fortemente o Hypervolume.
 
-        A eficiência é calculada como: hypervolume / tempo_execução
-        Isso favorece configurações que têm boa qualidade mas são rápidas.
+        Lógica de seleção:
+        1. Prioridade MÁXIMA: Hypervolume (qualidade das soluções)
+        2. Tempo só é considerado como desempate se HVs forem 90% similares
+           (diferença <= 10%)
+
+        Isso garante que a qualidade das soluções sempre venha em primeiro lugar,
+        e velocidade só importa quando não há perda significativa de qualidade.
 
         Returns:
-            Melhor configuração de hiperparâmetros (melhor custo-benefício)
+            Melhor configuração de hiperparâmetros (maior HV, tempo secundário)
         """
         if not self.results:
             return None
@@ -590,25 +595,53 @@ class HyperparameterTuningService:
             config_scores[config_str]['hypervolumes'].append(result.final_hypervolume)
             config_scores[config_str]['execution_times'].append(result.execution_time)
 
-        # Calcula eficiência (qualidade / tempo) para cada configuração
+        # Seleciona melhor configuração priorizando HV
+        # Tempo só é considerado se HVs forem 90% similares (diferença <= 10%)
         best_config = None
-        best_efficiency = -float('inf')
+        best_hv = -float('inf')
+        best_time = float('inf')
 
+        # Calcula médias para cada configuração
+        config_metrics = []
         for config_str, data in config_scores.items():
             mean_hv = np.mean(data['hypervolumes'])
             mean_time = np.mean(data['execution_times'])
+            config_metrics.append({
+                'config': data['config'],
+                'mean_hv': mean_hv,
+                'mean_time': mean_time,
+                'config_str': config_str
+            })
+            logger.debug(f"Config {config_str}: HV={mean_hv:.6e}, Time={mean_time:.2f}s")
 
-            # Eficiência = Hypervolume / Tempo (maior é melhor)
-            efficiency = mean_hv / mean_time if mean_time > 0 else 0
+        # Ordena por HV (decrescente)
+        config_metrics.sort(key=lambda x: x['mean_hv'], reverse=True)
 
-            logger.debug(f"Config {config_str}: HV={mean_hv:.6e}, Time={mean_time:.2f}s, Efficiency={efficiency:.6e}")
+        # Seleciona o melhor
+        for i, metrics in enumerate(config_metrics):
+            if i == 0:
+                # Primeiro (maior HV) é sempre candidato
+                best_config = metrics['config']
+                best_hv = metrics['mean_hv']
+                best_time = metrics['mean_time']
+            else:
+                # Verifica se HV é 90% similar ao melhor (diferença <= 10%)
+                hv_similarity = abs(metrics['mean_hv'] - best_hv) / best_hv if best_hv > 0 else 1.0
 
-            if efficiency > best_efficiency:
-                best_efficiency = efficiency
-                best_config = data['config']
+                if hv_similarity <= 0.10 and metrics['mean_time'] < best_time:
+                    # HVs são 90% similares E este é mais rápido
+                    logger.info(f"⚡ Trade-off tempo: HV similar ({hv_similarity*100:.1f}% diff), "
+                               f"mas {best_time/metrics['mean_time']:.2f}x mais rápido")
+                    best_config = metrics['config']
+                    best_hv = metrics['mean_hv']
+                    best_time = metrics['mean_time']
+                else:
+                    # HVs não são similares, prioriza qualidade
+                    break
 
-        logger.info(f"✅ Melhor configuração (trade-off): {best_config}")
-        logger.info(f"   Eficiência (HV/tempo): {best_efficiency:.6e}")
+        logger.info(f"✅ Melhor configuração (prioridade: HV >> tempo): {best_config}")
+        logger.info(f"   HV médio: {best_hv:.6e}")
+        logger.info(f"   Tempo médio: {best_time:.2f}s")
 
         return best_config
 

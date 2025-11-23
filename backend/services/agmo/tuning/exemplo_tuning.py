@@ -104,7 +104,7 @@ def example_2_quick_test():
 
     # Busca ativos
     with app.app_context():
-        assets = db.session.query(Asset).filter(Asset.type == AssetType.STOCK).all()
+        assets = db.session.query(Asset).filter(Asset.type == AssetType.STOCK).limit(20).all()
         ids_assets = [a.id for a in assets]
         print(f"Usando apenas {len(ids_assets)} ativos para teste rápido\n")
 
