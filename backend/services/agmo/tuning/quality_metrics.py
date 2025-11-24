@@ -37,8 +37,7 @@ class QualityMetrics:
     def calculate_r_hypervolume(self, pareto_front: np.ndarray,
                                 reference_points: np.ndarray,
                                 ideal_point: Optional[np.ndarray] = None,
-                                nadir_point: Optional[np.ndarray] = None,
-                                weights: Optional[np.ndarray] = None) -> float:
+                                nadir_point: Optional[np.ndarray] = None) -> float:
         """
         Calcula o R-Hypervolume (R2 indicator) da fronteira de Pareto.
 
@@ -47,12 +46,12 @@ class QualityMetrics:
         pontos de referência fornecidos pelo usuário.
 
         O R2 indicator usa a Achievement Scalarizing Function (ASF):
-        R2 = 1/|Z| * Σ_{z∈Z} min_{a∈A} ASF(a, z, w)
+        R2 = 1/|W| * Σ_{w∈W} min_{a∈A} ASF(a, w)
 
-        Onde ASF(a, z, w) = max_i {(a_i - z_i) / w_i}
-        - a: solução (normalizada)
-        - z: ponto de referência (aspiração)
-        - w: vetor de pesos
+        Onde ASF(a, w) = max_i {(a_i - z_i) / w_i}
+        - a: solução
+        - w: vetor de pesos (ponto de referência)
+        - z: ponto ideal
 
         IMPORTANTE: Quanto MENOR o R2, MELHOR a qualidade!
         Mas para consistência com outras métricas onde "maior é melhor",
@@ -60,10 +59,9 @@ class QualityMetrics:
 
         Args:
             pareto_front: Array (n_solutions, n_objectives) com objetivos
-            reference_points: Array (n_ref_points, n_objectives) com pontos de referência (aspirações)
+            reference_points: Array (n_ref_points, n_objectives) com pontos de referência
             ideal_point: Ponto ideal (valores mínimos). Se None, usa min da fronteira.
             nadir_point: Ponto nadir (valores máximos). Se None, usa max da fronteira.
-            weights: Array (n_objectives,) com pesos para ASF. Se None, usa pesos uniformes.
 
         Returns:
             Valor do R-HV = 1/R2 (maior = melhor qualidade, sempre positivo)
@@ -101,14 +99,6 @@ class QualityMetrics:
         # mas vamos garantir que estão no formato correto
         normalized_ref_points = reference_points.copy()
 
-        # Se weights não fornecido, usa pesos uniformes
-        if weights is None:
-            n_objectives = pareto_front.shape[1]
-            weights = np.ones(n_objectives) / n_objectives
-            logger.debug(f"Usando pesos uniformes para ASF: {weights}")
-        else:
-            logger.debug(f"Usando pesos fornecidos para ASF: {weights}")
-
         # Calcula R2 indicator
         r2_sum = 0.0
         n_ref_points = len(normalized_ref_points)
@@ -118,14 +108,10 @@ class QualityMetrics:
             min_asf = float('inf')
 
             for solution in normalized_front:
-                # CORREÇÃO: ASF(a, z, w) = max_i {(a_i - z_i) / w_i}
-                # - a_i: valor normalizado da solução no objetivo i
-                # - z_i: ponto de referência (aspiração) no objetivo i
-                # - w_i: peso do objetivo i
+                # ASF(a, w) = max_i {(a_i - 0) / w_i}
+                # Nota: usamos 0 como ideal pois já normalizamos
                 # Evita divisão por zero nos pesos
-                asf_values = np.where(weights > 1e-6,
-                                     (solution - ref_point) / weights,
-                                     (solution - ref_point) * 1e6)
+                asf_values = np.where(ref_point > 1e-6, solution / ref_point, solution * 1e6)
                 asf = np.max(asf_values)
 
                 if asf < min_asf:
@@ -423,7 +409,6 @@ class QualityMetrics:
                               ideal_point: Optional[np.ndarray] = None,
                               reference_points: Optional[np.ndarray] = None,
                               nadir_point: Optional[np.ndarray] = None,
-                              weights: Optional[np.ndarray] = None,
                               use_r_hv: bool = True) -> dict:
         """
         Calcula todas as métricas de qualidade.
@@ -433,7 +418,6 @@ class QualityMetrics:
             ideal_point: Ponto ideal para cálculo de hypervolume
             reference_points: Pontos de referência para R-HV (usado se use_r_hv=True)
             nadir_point: Ponto nadir para normalização do R-HV
-            weights: Pesos para ASF no cálculo de R-HV
             use_r_hv: Se True e reference_points fornecido, usa R-HV ao invés de HV
 
         Returns:
@@ -442,7 +426,7 @@ class QualityMetrics:
         # Decide qual métrica de hypervolume usar
         if use_r_hv and reference_points is not None:
             hv_value = self.calculate_r_hypervolume(
-                pareto_front, reference_points, ideal_point, nadir_point, weights
+                pareto_front, reference_points, ideal_point, nadir_point
             )
             hv_key = 'r_hypervolume'
         else:
@@ -490,7 +474,6 @@ class ConvergenceTracker:
 
     def __init__(self, reference_point: Optional[np.ndarray] = None,
                  reference_points_rnsga2: Optional[np.ndarray] = None,
-                 weights: Optional[np.ndarray] = None,
                  use_r_hv: bool = True):
         """
         Inicializa o rastreador.
@@ -500,7 +483,6 @@ class ConvergenceTracker:
                            Se None, será determinado na primeira geração.
             reference_points_rnsga2: Pontos de referência do R-NSGA2 para cálculo de R-HV.
                                      Array (n_ref_points, n_objectives).
-            weights: Pesos para ASF no cálculo de R-HV. Array (n_objectives,).
             use_r_hv: Se True e reference_points_rnsga2 fornecido, usa R-HV ao invés de HV.
         """
         # Decide qual chave usar no histórico
@@ -518,7 +500,6 @@ class ConvergenceTracker:
         self.reference_point = reference_point
         self.reference_point_set = reference_point is not None
         self.reference_points_rnsga2 = reference_points_rnsga2
-        self.weights = weights  # Pesos para ASF
         self.use_r_hv = use_r_hv and reference_points_rnsga2 is not None
         self.ideal_point = None  # Melhores valores já vistos (global)
         self.ideal_point_set = False
@@ -569,16 +550,19 @@ class ConvergenceTracker:
                     logger.info(f"🎯 Ponto ideal ATUALIZADO: {self.ideal_point}")
                     logger.info(f"   Melhoria: {old_ideal - self.ideal_point}")
 
-            # Define ponto nadir FIXO na primeira geração (PIOR CASO) - usado para R-HV
-            # CORREÇÃO: Nadir deve ser FIXO, não acumulativo, para evitar regressão do R-HV
+            # Atualiza ponto nadir GLOBAL (PIOR CASO acumulado) - usado para R-HV
             if not self.nadir_point_set:
-                # Adiciona margem de 50% para garantir que o nadir seja pior que qualquer solução
-                self.nadir_point = max_values * 1.5
+                self.nadir_point = max_values.copy()
                 self.nadir_point_set = True
                 if self.use_r_hv:
-                    logger.info(f"📍 Ponto nadir FIXO (pior caso gen 0 + 50%): {self.nadir_point}")
-                    logger.info(f"   Max da gen 0: {max_values}")
-                    logger.info(f"   ⚠️  NADIR SERÁ MANTIDO FIXO para evitar regressão do R-HV")
+                    logger.info(f"📍 Ponto nadir INICIAL (pior caso gen 0): {self.nadir_point}")
+            else:
+                old_nadir = self.nadir_point.copy()
+                self.nadir_point = np.maximum(self.nadir_point, max_values)
+
+                if not np.array_equal(old_nadir, self.nadir_point):
+                    if self.use_r_hv:
+                        logger.info(f"📍 Ponto nadir ATUALIZADO: {self.nadir_point}")
 
             if self.use_r_hv:
                 logger.info(f"   ✅ R-HV: Usando {len(self.reference_points_rnsga2)} pontos de referência do R-NSGA2")
@@ -606,7 +590,6 @@ class ConvergenceTracker:
             ideal_point=self.ideal_point,
             reference_points=self.reference_points_rnsga2,
             nadir_point=self.nadir_point,
-            weights=self.weights,
             use_r_hv=self.use_r_hv
         )
 

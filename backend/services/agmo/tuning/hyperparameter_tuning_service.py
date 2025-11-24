@@ -33,8 +33,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from .quality_metrics import QualityMetrics, ConvergenceTracker
 from services.agmo.agmo_service import (
     Nsga2OtimizacaoService,
-    REFERENCE_POINTS_CONFIG,
-    WEIGHTS_CONFIG
+    REFERENCE_POINTS_CONFIG
 )
 
 logger = logging.getLogger(__name__)
@@ -106,9 +105,8 @@ class HyperparameterTuningService:
         # Prepara dados para otimização
         service = Nsga2OtimizacaoService(self.app, [], risk_level, 10, asset_ids=ids_assets)
 
-        # Obtém pontos de referência e pesos do R-NSGA2 para o perfil de risco (configuração centralizada)
+        # Obtém pontos de referência do R-NSGA2 para o perfil de risco (configuração centralizada)
         ref_points = REFERENCE_POINTS_CONFIG.get(risk_level)
-        weights = WEIGHTS_CONFIG.get(risk_level)
 
         # Múltiplas execuções para análise estatística
         all_runs = []
@@ -118,7 +116,6 @@ class HyperparameterTuningService:
             # Executa otimização com tracking de convergência usando R-HV
             convergence_tracker = ConvergenceTracker(
                 reference_points_rnsga2=ref_points,
-                weights=weights,
                 use_r_hv=True
             )
 
@@ -236,13 +233,11 @@ class HyperparameterTuningService:
         """
         service = Nsga2OtimizacaoService(self.app, [], risk_level, asset_ids=ids_assets, years_period=3)
 
-        # Obtém pontos de referência e pesos do R-NSGA2 para o perfil de risco
+        # Obtém pontos de referência do R-NSGA2 para o perfil de risco
         ref_points = REFERENCE_POINTS_CONFIG.get(risk_level)
-        weights = WEIGHTS_CONFIG.get(risk_level)
 
         convergence_tracker = ConvergenceTracker(
             reference_points_rnsga2=ref_points,
-            weights=weights,
             use_r_hv=True
         )
 
