@@ -63,8 +63,8 @@ def example_1_convergence_analysis():
         resultados = tuning_service.convergence_analysis(
             ids_assets=ids_assets,
             risk_level='moderado',
-            max_generations=100,
-            population_size=100,
+            max_generations=200,
+            population_size=200,
             n_runs=1
         )
 
