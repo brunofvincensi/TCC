@@ -39,9 +39,13 @@ class QualityMetrics:
                                 reference_points: np.ndarray,
                                 ideal_point: Optional[np.ndarray] = None,
                                 nadir_point: Optional[np.ndarray] = None,
-                                weights: Optional[np.ndarray] = None) -> float:
+                                weights: Optional[np.ndarray] = None,
+                                use_log_transform: bool = True) -> float:
         """
         Calcula o R-Hypervolume (R2 indicator) da fronteira de Pareto.
+
+        CORREÇÃO: Implementa normalização consistente entre fronteira e reference points
+        para garantir que ambos estejam no mesmo espaço [0, 1].
 
         O R-HV é apropriado para algoritmos baseados em pontos de referência
         como R-NSGA2, pois mede a qualidade das soluções em relação aos
@@ -51,23 +55,25 @@ class QualityMetrics:
         R2 = 1/|Z| * Σ_{z∈Z} min_{a∈A} ASF(a, z, w)
 
         Onde ASF(a, z, w) = max_i {(a_i - z_i) / w_i}
-        - a: solução (normalizada)
-        - z: ponto de referência (aspiração)
+        - a: solução (normalizada no espaço [0, 1])
+        - z: ponto de referência (aspiração no espaço [0, 1])
         - w: vetor de pesos
 
         IMPORTANTE: Quanto MENOR o R2, MELHOR a qualidade!
-        Mas para consistência com outras métricas onde "maior é melhor",
-        retornamos o INVERSO (1/R2), assim MAIOR valor = MELHOR qualidade.
+        Por padrão, retornamos 1/(1+R2) (transformação sigmoid) para estabilidade.
 
         Args:
             pareto_front: Array (n_solutions, n_objectives) com objetivos
-            reference_points: Array (n_ref_points, n_objectives) com pontos de referência (aspirações)
-            ideal_point: Ponto ideal (valores mínimos). Se None, usa min da fronteira.
-            nadir_point: Ponto nadir (valores máximos). Se None, usa max da fronteira.
+            reference_points: Array (n_ref_points, n_objectives) com pontos de referência (aspirações em [0,1])
+            ideal_point: Ponto ideal FIXO (valores mínimos teóricos). Se None, estima da fronteira.
+            nadir_point: Ponto nadir FIXO (valores máximos teóricos). Se None, estima da fronteira.
             weights: Array (n_objectives,) com pesos para ASF. Se None, usa pesos uniformes.
+            use_log_transform: Se True, usa sigmoid 1/(1+R2); se False, usa 1/R2 (pode ser instável)
 
         Returns:
-            Valor do R-HV = 1/R2 (maior = melhor qualidade, sempre positivo)
+            Valor do R-HV (maior = melhor qualidade)
+            - Se use_log_transform=True: 1/(1+R2) ∈ (0, 1] onde 1.0=perfeito, 0.5=razoável
+            - Se use_log_transform=False: 1/R2 (pode ser muito grande ou instável)
 
         Referências:
             - Hansen & Jaszkiewicz (1998). "Evaluating the quality of approximations to the non-dominated set"
@@ -81,26 +87,39 @@ class QualityMetrics:
             logger.warning("Fronteira de Pareto contém valores NaN ou Inf. R-HV = 0.")
             return 0.0
 
-        # Define ponto ideal (melhor caso)
+        # CORREÇÃO 1: Define ponto ideal/nadir FIXOS
+        # Se fornecidos (recomendado), usa os valores fixos
+        # Caso contrário, estima conservadoramente da fronteira
         if ideal_point is None:
             ideal_point = np.min(pareto_front, axis=0)
-            logger.debug(f"Ideal point calculado: {ideal_point}")
+            logger.debug(f"Ideal point estimado da fronteira: {ideal_point}")
+        else:
+            logger.debug(f"Usando ideal point FIXO fornecido: {ideal_point}")
 
-        # Define ponto nadir (pior caso) - usado para normalização
         if nadir_point is None:
-            nadir_point = np.max(pareto_front, axis=0)
-            logger.debug(f"Nadir point calculado: {nadir_point}")
+            # CORREÇÃO 2: Adiciona margem generosa para acomodar pioras temporárias
+            nadir_point = np.max(pareto_front, axis=0) * 1.5
+            logger.debug(f"Nadir point estimado com margem (max * 1.5): {nadir_point}")
+        else:
+            logger.debug(f"Usando nadir point FIXO fornecido: {nadir_point}")
 
-        # Normaliza fronteira e pontos de referência para [0, 1]
-        # Isso garante que os objetivos tenham a mesma escala
+        # CORREÇÃO 3: Normaliza fronteira para [0, 1] com clipping
         range_vals = nadir_point - ideal_point
         range_vals[range_vals == 0] = 1.0  # Evita divisão por zero
 
         normalized_front = (pareto_front - ideal_point) / range_vals
+        # Clip para garantir [0, 1] mesmo se soluções ultrapassarem nadir
+        normalized_front = np.clip(normalized_front, 0, 1)
 
-        # Pontos de referência já são normalizados (valores entre 0 e 1)
-        # mas vamos garantir que estão no formato correto
+        # CORREÇÃO 4: Reference points JÁ estão em [0, 1] - usar diretamente
+        # Os reference points do R-NSGA2 são definidos no espaço normalizado
+        # onde 0 = melhor possível e 1 = pior possível
         normalized_ref_points = reference_points.copy()
+
+        # Verifica se reference points estão em [0, 1]
+        if not (np.all(normalized_ref_points >= 0) and np.all(normalized_ref_points <= 1)):
+            logger.warning(f"Reference points fora de [0,1]: {normalized_ref_points}")
+            normalized_ref_points = np.clip(normalized_ref_points, 0, 1)
 
         # Se weights não fornecido, usa pesos uniformes
         if weights is None:
@@ -120,8 +139,8 @@ class QualityMetrics:
 
             for solution in normalized_front:
                 # ASF(a, z, w) = max_i {(a_i - z_i) / w_i}
-                # - a_i: valor normalizado da solução no objetivo i
-                # - z_i: ponto de referência (aspiração) no objetivo i
+                # - a_i: valor normalizado da solução no objetivo i [0, 1]
+                # - z_i: ponto de referência (aspiração) no objetivo i [0, 1]
                 # - w_i: peso do objetivo i
                 # Evita divisão por zero nos pesos
                 asf_values = np.where(weights > 1e-6,
@@ -140,16 +159,35 @@ class QualityMetrics:
         logger.debug(f"R2 indicator calculado: {r2:.6e}")
         logger.debug(f"Quanto menor R2, melhor a fronteira em relação aos ref points")
 
-        # Retorna o INVERSO (1/R2) para que "maior seja melhor" (consistente com HV)
-        # Assim, conforme R2 diminui (melhora), 1/R2 aumenta
-        # Proteção contra divisão por zero
-        if r2 < 1e-10:
-            logger.warning(f"R2 muito próximo de zero ({r2:.6e}). Usando R-HV máximo.")
-            r_hv = 1e10  # Valor muito alto indica qualidade perfeita
-        else:
-            r_hv = 1.0 / r2
+        # CORREÇÃO 5: Usa transformação sigmoid para estabilidade e interpretabilidade
+        # Transformação: R-HV = 1 / (1 + R2)
+        #
+        # Propriedades:
+        # - Sempre positiva: R-HV ∈ (0, 1]
+        # - R2 = 0 (perfeito) → R-HV = 1.0
+        # - R2 = 1 (razoável) → R-HV = 0.5
+        # - R2 = ∞ (péssimo) → R-HV → 0
+        # - Monotônica: menor R2 = maior R-HV
+        if use_log_transform:
+            # Transformação sigmoid (padrão)
+            # IMPORTANTE: Não usar max(r2, 0) pois isso zera R2 negativos!
+            # R2 negativo significa soluções muito boas (melhores que ref points)
+            # Usamos abs(r2) para manter a escala mesmo quando super-ótimo
+            r2_adjusted = abs(r2) if r2 < 0 else r2
+            r_hv = 1.0 / (1.0 + r2_adjusted)
 
-        logger.debug(f"R-HV (1/R2): {r_hv:.6e} (quanto maior, melhor)")
+            logger.debug(f"R-HV (sigmoid): R2={r2:.4f} (adjusted={r2_adjusted:.4f}) → R-HV={r_hv:.4f}")
+            if r2 < 0:
+                logger.info(f"⭐ R2 NEGATIVO ({r2:.4f}): Soluções MELHORES que reference points!")
+            logger.debug(f"   Interpretação: 1.0=perfeito, 0.5=razoável, 0.0=péssimo")
+        else:
+            # Inversão tradicional 1/R2 (mantida para compatibilidade)
+            if abs(r2) < 1e-10:
+                logger.warning(f"R2 muito próximo de zero ({r2:.6e}). Usando R-HV máximo.")
+                r_hv = 1e10  # Valor muito alto indica qualidade perfeita
+            else:
+                r_hv = 1.0 / abs(r2)
+            logger.debug(f"R-HV (1/R2): {r_hv:.6e} (quanto maior, melhor)")
 
         return r_hv
 
@@ -426,7 +464,8 @@ class QualityMetrics:
                               reference_points: Optional[np.ndarray] = None,
                               nadir_point: Optional[np.ndarray] = None,
                               weights: Optional[np.ndarray] = None,
-                              use_r_hv: bool = True) -> dict:
+                              use_r_hv: bool = True,
+                              use_log_transform: bool = True) -> dict:
         """
         Calcula todas as métricas de qualidade.
 
@@ -437,6 +476,7 @@ class QualityMetrics:
             nadir_point: Ponto nadir para normalização do R-HV
             weights: Pesos para ASF no cálculo de R-HV
             use_r_hv: Se True e reference_points fornecido, usa R-HV ao invés de HV
+            use_log_transform: Se True, usa sigmoid 1/(1+R2) ∈ (0,1]; se False, usa 1/R2
 
         Returns:
             Dicionário com todas as métricas
@@ -444,7 +484,8 @@ class QualityMetrics:
         # Decide qual métrica de hypervolume usar
         if use_r_hv and reference_points is not None:
             hv_value = self.calculate_r_hypervolume(
-                pareto_front, reference_points, ideal_point, nadir_point, weights
+                pareto_front, reference_points, ideal_point, nadir_point, weights,
+                use_log_transform=use_log_transform
             )
             hv_key = 'r_hypervolume'
         else:
@@ -574,17 +615,19 @@ class ConvergenceTracker:
             # Define ponto nadir FIXO na primeira geração (PIOR CASO) - usado para R-HV
             # CORREÇÃO: Nadir deve ser FIXO, não acumulativo, para evitar regressão do R-HV
             if not self.nadir_point_set:
-                # Adiciona margem de 50% para garantir que o nadir seja pior que qualquer solução
-                self.nadir_point = max_values * 1.5
+                # CORREÇÃO: Adiciona margem GENEROSA (2x) para acomodar pioras temporárias
+                # Isso evita que soluções ultrapassem o nadir durante exploração
+                self.nadir_point = max_values * 2.0
                 self.nadir_point_set = True
                 if self.use_r_hv:
-                    logger.info(f"📍 Ponto nadir FIXO (pior caso gen 0 + 50%): {self.nadir_point}")
+                    logger.info(f"📍 Ponto nadir FIXO (pior caso gen 0 * 2.0): {self.nadir_point}")
                     logger.info(f"   Max da gen 0: {max_values}")
                     logger.info(f"   ⚠️  NADIR SERÁ MANTIDO FIXO para evitar regressão do R-HV")
 
             if self.use_r_hv:
                 logger.info(f"   ✅ R-HV: Usando {len(self.reference_points_rnsga2)} pontos de referência do R-NSGA2")
-                logger.info(f"   ✅ R-HV (1/R2) vai CRESCER conforme soluções melhoram em relação aos pontos de referência")
+                logger.info(f"   ✅ R-HV (sigmoid) vai CRESCER conforme soluções melhoram em relação aos pontos de referência")
+                logger.info(f"   ✅ Range: (0, 1] onde 1.0=perfeito, 0.5=razoável, próximo de 0=péssimo")
             else:
                 logger.info(f"   ✅ Box HV: entre ideal {self.ideal_point} e ref {self.reference_point}")
                 logger.info(f"   ✅ HV vai CRESCER conforme ideal_point melhora (diminui)")

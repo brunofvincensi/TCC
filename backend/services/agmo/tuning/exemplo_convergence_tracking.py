@@ -68,9 +68,9 @@ def exemplo_simples():
 
     result = service.optimize(
         population_size=100,
-        generations=150,
+        generations=200,
         convergence_tracker=tracker,  # Passa o tracker para o serviço
-        max_assets=max_assets,
+        max_assets=20,
         use_optimal_config=False
     )
 

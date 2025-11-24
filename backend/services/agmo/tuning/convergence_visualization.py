@@ -39,7 +39,7 @@ def plot_convergence_evolution(history: Dict,
 
     # Identifica qual tipo de hypervolume está sendo usado
     hv_key = 'r_hypervolume' if 'r_hypervolume' in history else 'hypervolume'
-    hv_label = 'R-Hypervolume (1/R2)' if hv_key == 'r_hypervolume' else 'Hypervolume'
+    hv_label = 'R-Hypervolume' if hv_key == 'r_hypervolume' else 'Hypervolume'
 
     # Cria figura com subplots
     fig, axes = plt.subplots(2, 2, figsize=figsize)
@@ -179,7 +179,7 @@ def plot_hypervolume_only(history: Dict,
 
     # Identifica qual tipo de hypervolume está sendo usado
     hv_key = 'r_hypervolume' if 'r_hypervolume' in history else 'hypervolume'
-    hv_label = 'R-Hypervolume (1/R2)' if hv_key == 'r_hypervolume' else 'Hypervolume'
+    hv_label = 'R-Hypervolume' if hv_key == 'r_hypervolume' else 'Hypervolume'
 
     hv_values = history[hv_key]
 
@@ -283,7 +283,7 @@ def plot_multiple_runs_comparison(histories: List[Dict],
 
     # Identifica qual tipo de hypervolume está sendo usado
     hv_key = 'r_hypervolume' if 'r_hypervolume' in histories[0] else 'hypervolume'
-    hv_label = 'R-Hypervolume (1/R2)' if hv_key == 'r_hypervolume' else 'Hypervolume'
+    hv_label = 'R-Hypervolume' if hv_key == 'r_hypervolume' else 'Hypervolume'
 
     # Cores para cada execução
     colors = ['#2E86AB', '#A23B72', '#F18F01', '#0EAD69', '#C73E1D', '#6A4C93']
@@ -349,7 +349,7 @@ def print_convergence_summary(history: Dict):
 
     # Identifica qual tipo de hypervolume está sendo usado
     hv_key = 'r_hypervolume' if 'r_hypervolume' in history else 'hypervolume'
-    hv_label = 'R-Hypervolume (1/R2)' if hv_key == 'r_hypervolume' else 'Hypervolume'
+    hv_label = 'R-Hypervolume' if hv_key == 'r_hypervolume' else 'Hypervolume'
 
     generations = history['generation']
     hv_values = history[hv_key]
