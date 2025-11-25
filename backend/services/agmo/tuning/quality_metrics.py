@@ -453,7 +453,7 @@ class ConvergenceTracker:
                     logger.info(f"🎯 Ponto ideal ATUALIZADO: {self.ideal_point}")
                     logger.info(f"   Melhoria: {old_ideal - self.ideal_point}")
 
-            # Define ponto nadir DINÂMICO (PIOR CASO acumulado) - usado para R-HV
+            # Define o ponto nadir da gen 0 e não muda mais
             if not self.nadir_point_set:
                 # Primeira geração: inicializa nadir point com margem generosa
                 self.nadir_point = max_values * 2.0
@@ -461,17 +461,7 @@ class ConvergenceTracker:
                 if self.use_r_hv:
                     logger.info(f"📍 Ponto nadir INICIAL (pior caso gen 0 * 2.0): {self.nadir_point}")
                     logger.info(f"   Max da gen 0: {max_values}")
-                    logger.info(f"   ⚠️  NADIR será ATUALIZADO dinamicamente para manter normalização correta")
-            else:
-                # Atualiza nadir point com os PIORES valores já vistos (max acumulativo)
-                # Adiciona margem de 10% para acomodar pequenas oscilações
-                old_nadir = self.nadir_point.copy()
-                new_nadir_candidate = max_values * 1.1
-                self.nadir_point = np.maximum(self.nadir_point, new_nadir_candidate)
 
-                if not np.array_equal(old_nadir, self.nadir_point):
-                    logger.info(f"📍 Ponto nadir ATUALIZADO: {self.nadir_point}")
-                    logger.info(f"   Expansão: {self.nadir_point - old_nadir}")
 
             logger.info(f"   ✅ R-HV: Usando {len(self.reference_points_rnsga2)} pontos de referência do R-NSGA2")
             logger.info(f"   ✅ R-HV (sigmoid) vai CRESCER conforme soluções melhoram em relação aos pontos de referência")

@@ -562,20 +562,6 @@ class Nsga2OtimizacaoService:
                            callback=callback, verbose=True)
         print("🏁 Otimização R-NSGA2 concluída.")
 
-        # --- calcular e imprimir R-HV da última geração (diretamente aqui, sem QualityMetrics)
-        try:
-            rhv_value = self.compute_rhv_last_generation(
-                result=result,
-                weight_vectors=WEIGHTS_CONFIG[self.risk_level],          # usa WEIGHTS_CONFIG[self.risk_level] por padrão
-                reference_points=REFERENCE_POINTS_CONFIG[self.risk_level]         # usa REFERENCE_POINTS_CONFIG[self.risk_level] por padrão
-            )
-            print(f"\n🔹 R-Hypervolume (R-HV) da última geração: {rhv_value:.6f}")
-            # também adiciona no optimization_result para consumo programático
-
-        except Exception as e:
-            print(f"⚠️ Erro ao calcular R-HV da última geração: {e}")
-
-
         if result.X is None:
             raise ValueError("O algoritmo não conseguiu encontrar nenhuma solução.")
 
