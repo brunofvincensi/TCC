@@ -41,6 +41,7 @@ class QualityMetrics:
                                 nadir_point: Optional[np.ndarray] = None,
                                 weights: Optional[np.ndarray] = None,
                                 use_log_transform: bool = True) -> float:
+
         """
         Calcula o R-Hypervolume (R2 indicator) da fronteira de Pareto.
 
@@ -65,8 +66,11 @@ class QualityMetrics:
         Args:
             pareto_front: Array (n_solutions, n_objectives) com objetivos
             reference_points: Array (n_ref_points, n_objectives) com pontos de referência (aspirações em [0,1])
-            ideal_point: Ponto ideal FIXO (valores mínimos teóricos). Se None, estima da fronteira.
-            nadir_point: Ponto nadir FIXO (valores máximos teóricos). Se None, estima da fronteira.
+            ideal_point: Ponto ideal DINÂMICO (melhores valores já vistos). Se None, estima da fronteira.
+                        IMPORTANTE: Deve ser atualizado com min acumulativo ao longo das gerações.
+            nadir_point: Ponto nadir DINÂMICO (piores valores já vistos). Se None, estima da fronteira.
+                        IMPORTANTE: Deve ser atualizado com max acumulativo ao longo das gerações.
+                        CRITICAL FIX: Se nadir for FIXO (geração 0), normalização fica incorreta!
             weights: Array (n_objectives,) com pesos para ASF. Se None, usa pesos uniformes.
             use_log_transform: Se True, usa sigmoid 1/(1+R2); se False, usa 1/R2 (pode ser instável)
 
@@ -87,9 +91,7 @@ class QualityMetrics:
             logger.warning("Fronteira de Pareto contém valores NaN ou Inf. R-HV = 0.")
             return 0.0
 
-        # CORREÇÃO 1: Define ponto ideal/nadir FIXOS
-        # Se fornecidos (recomendado), usa os valores fixos
-        # Caso contrário, estima conservadoramente da fronteira
+        # Se ideal/nadir não forem fornecidos, calcula
         if ideal_point is None:
             ideal_point = np.min(pareto_front, axis=0)
             logger.debug(f"Ideal point estimado da fronteira: {ideal_point}")
@@ -97,13 +99,13 @@ class QualityMetrics:
             logger.debug(f"Usando ideal point FIXO fornecido: {ideal_point}")
 
         if nadir_point is None:
-            # CORREÇÃO 2: Adiciona margem generosa para acomodar pioras temporárias
+            # Adicionando margem generosa para acomodar pioras temporárias
             nadir_point = np.max(pareto_front, axis=0) * 1.5
             logger.debug(f"Nadir point estimado com margem (max * 1.5): {nadir_point}")
         else:
             logger.debug(f"Usando nadir point FIXO fornecido: {nadir_point}")
 
-        # CORREÇÃO 3: Normaliza fronteira para [0, 1] com clipping
+        # Normaliza fronteira para [0, 1] com clipping
         range_vals = nadir_point - ideal_point
         range_vals[range_vals == 0] = 1.0  # Evita divisão por zero
 
@@ -111,9 +113,7 @@ class QualityMetrics:
         # Clip para garantir [0, 1] mesmo se soluções ultrapassarem nadir
         normalized_front = np.clip(normalized_front, 0, 1)
 
-        # CORREÇÃO 4: Reference points JÁ estão em [0, 1] - usar diretamente
-        # Os reference points do R-NSGA2 são definidos no espaço normalizado
-        # onde 0 = melhor possível e 1 = pior possível
+        # Reference points já estão em [0, 1] - usar diretamente
         normalized_ref_points = reference_points.copy()
 
         # Verifica se reference points estão em [0, 1]
@@ -159,7 +159,7 @@ class QualityMetrics:
         logger.debug(f"R2 indicator calculado: {r2:.6e}")
         logger.debug(f"Quanto menor R2, melhor a fronteira em relação aos ref points")
 
-        # CORREÇÃO 5: Usa transformação sigmoid para estabilidade e interpretabilidade
+        # Usa transformação sigmoid para estabilidade e interpretabilidade
         # Transformação: R-HV = 1 / (1 + R2)
         #
         # Propriedades:
@@ -191,116 +191,6 @@ class QualityMetrics:
 
         return r_hv
 
-    def calculate_hypervolume(self, pareto_front: np.ndarray,
-                              ideal_point: Optional[np.ndarray] = None) -> float:
-        """
-        Calcula o Hypervolume da fronteira de Pareto.
-
-        O Hypervolume mede o volume do espaço de objetivos dominado pela
-        fronteira de Pareto. Valores maiores indicam melhor qualidade.
-
-        COMPORTAMENTO CORRETO PARA MINIMIZAÇÃO:
-        - Quanto MENORES os valores das soluções, MAIOR o hypervolume
-        - HV deve CRESCER ao longo das gerações conforme o algoritmo melhora
-        - Ponto de referência fixo representa o pior caso possível
-
-        NOTA: Para R-NSGA2, considere usar calculate_r_hypervolume() ao invés
-              deste método, pois R-HV é mais apropriado para algoritmos baseados
-              em pontos de referência.
-
-        Args:
-            pareto_front: Array (n_solutions, n_objectives) com objetivos
-            ideal_point: Ponto ideal (valores mínimos). Se None, usa min da fronteira.
-
-        Returns:
-            Valor do hypervolume (maior = melhor qualidade)
-        """
-        if len(pareto_front) == 0:
-            return 0.0
-
-        # Verifica valores inválidos
-        if np.any(np.isnan(pareto_front)) or np.any(np.isinf(pareto_front)):
-            logger.warning("Fronteira de Pareto contém valores NaN ou Inf. Hypervolume = 0.")
-            return 0.0
-
-        # Se não há ponto de referência, usa o pior valor em cada objetivo + margem
-        if self.reference_point is None:
-            # Usa max + 10% de margem, mas garante um valor mínimo
-            max_values = np.max(pareto_front, axis=0)
-            ref_point = np.maximum(max_values * 1.1, max_values + 0.1)
-
-            logger.debug(f"Ponto de referência calculado: {ref_point}")
-        else:
-            ref_point = self.reference_point
-
-        # Para 3 objetivos, usa método de Monte Carlo simplificado
-        if pareto_front.shape[1] == 3:
-            return self._hypervolume_monte_carlo(pareto_front, ref_point, ideal_point)
-        else:
-            # Para outros casos, usa aproximação por dominância
-            return self._hypervolume_dominated_space(pareto_front, ref_point, ideal_point)
-
-    def _hypervolume_monte_carlo(self, pareto_front: np.ndarray,
-                                  ref_point: np.ndarray,
-                                  ideal_point: Optional[np.ndarray] = None,
-                                  n_samples: int = 10000) -> float:
-        """
-        Calcula Hypervolume usando Monte Carlo sampling.
-
-        Para minimização: HV mede o volume ENTRE as soluções e o ponto de referência (pior).
-        Quanto MENORES os valores das soluções, MAIOR o hypervolume.
-
-        Args:
-            pareto_front: Fronteira de Pareto
-            ref_point: Ponto de referência (pior caso - valores altos)
-            ideal_point: Ponto ideal (melhor caso - valores baixos). Se None, usa min da fronteira.
-            n_samples: Número de amostras para Monte Carlo
-
-        Returns:
-            Estimativa do hypervolume
-        """
-        # Usa ideal_point passado, ou min da fronteira atual como fallback
-        if ideal_point is None:
-            ideal_point = np.min(pareto_front, axis=0)
-            logger.debug(f"Ideal point não fornecido, usando min da fronteira: {ideal_point}")
-        else:
-            logger.debug(f"Usando ideal point GLOBAL fornecido: {ideal_point}")
-
-        # Verifica se o ponto de referência é válido
-        dimensions = ref_point - ideal_point
-        if np.any(dimensions <= 0):
-            logger.warning(f"Dimensões inválidas para hypervolume: {dimensions}")
-            logger.warning(f"Ideal point: {ideal_point}, Ref point: {ref_point}")
-            return 0.0
-
-        # Volume total da caixa de referência (FIXA - não muda com as soluções)
-        box_volume = np.prod(dimensions)
-        logger.debug(f"Box volume (FIXO): {box_volume:.6e}, Dimensions: {dimensions}")
-
-        # Gera pontos aleatórios na caixa FIXA
-        random_points = np.random.uniform(
-            low=ideal_point,    # Ponto ideal (0,0,0) - FIXO
-            high=ref_point,     # Ponto de referência (pior caso) - FIXO
-            size=(n_samples, pareto_front.shape[1])
-        )
-
-        # Conta quantos pontos são dominados por alguma solução da fronteira
-        # Quanto MELHORES as soluções (valores menores), MAIS pontos elas dominam
-        dominated_count = 0
-        for point in random_points:
-            # Um ponto é dominado se existe alguma solução que é melhor em todos os objetivos
-            if self._is_dominated_by_front(point, pareto_front):
-                dominated_count += 1
-
-        # Hypervolume é a fração de pontos dominados vezes o volume total
-        # Soluções melhores (menores) → dominam mais pontos → HV maior ✅
-        hypervolume = (dominated_count / n_samples) * box_volume
-
-        logger.debug(f"Dominated points: {dominated_count}/{n_samples} ({100*dominated_count/n_samples:.1f}%)")
-        logger.debug(f"HV = {hypervolume:.6e} (quanto maior, melhor a fronteira)")
-
-        return hypervolume
-
     def _is_dominated_by_front(self, point: np.ndarray, front: np.ndarray) -> bool:
         """
         Verifica se um ponto é dominado por alguma solução da fronteira.
@@ -318,44 +208,6 @@ class QualityMetrics:
             if np.all(solution <= point) and np.any(solution < point):
                 return True
         return False
-
-    def _hypervolume_dominated_space(self, pareto_front: np.ndarray,
-                                     ref_point: np.ndarray,
-                                     ideal_point: Optional[np.ndarray] = None) -> float:
-        """
-        Aproximação simplificada do hypervolume baseada em espaço dominado.
-
-        Para minimização: calcula o volume entre cada solução e o ponto de referência.
-        Quanto menores as soluções, maior o hypervolume.
-
-        Args:
-            pareto_front: Fronteira de Pareto
-            ref_point: Ponto de referência (pior caso)
-            ideal_point: Não usado neste método (mantido para consistência de API)
-
-        Returns:
-            Aproximação do hypervolume
-        """
-        # Soma dos volumes individuais (superestimativa devido a sobreposições)
-        # Cada solução contribui com o volume entre ela e o ponto de referência
-        total_volume = 0.0
-        for solution in pareto_front:
-            # Volume da caixa entre a solução e o ponto de referência
-            # Quanto menor a solução, maior o volume → HV maior ✅
-            dimensions = ref_point - solution
-            if np.all(dimensions > 0):
-                volume = np.prod(dimensions)
-                total_volume += volume
-            else:
-                # Solução está fora do espaço de referência (pior que ref_point)
-                logger.warning(f"Solução fora do espaço: {solution} (ref: {ref_point})")
-
-        # Normaliza pelo número de soluções para evitar viés
-        avg_volume = total_volume / len(pareto_front) if len(pareto_front) > 0 else 0.0
-
-        logger.debug(f"HV aproximado = {avg_volume:.6e} (média de {len(pareto_front)} soluções)")
-
-        return avg_volume
 
     def calculate_spread(self, pareto_front: np.ndarray) -> float:
         """
@@ -464,7 +316,6 @@ class QualityMetrics:
                               reference_points: Optional[np.ndarray] = None,
                               nadir_point: Optional[np.ndarray] = None,
                               weights: Optional[np.ndarray] = None,
-                              use_r_hv: bool = True,
                               use_log_transform: bool = True) -> dict:
         """
         Calcula todas as métricas de qualidade.
@@ -481,19 +332,12 @@ class QualityMetrics:
         Returns:
             Dicionário com todas as métricas
         """
-        # Decide qual métrica de hypervolume usar
-        if use_r_hv and reference_points is not None:
-            hv_value = self.calculate_r_hypervolume(
-                pareto_front, reference_points, ideal_point, nadir_point, weights,
-                use_log_transform=use_log_transform
-            )
-            hv_key = 'r_hypervolume'
-        else:
-            hv_value = self.calculate_hypervolume(pareto_front, ideal_point)
-            hv_key = 'hypervolume'
-
+        hv_value = self.calculate_r_hypervolume(
+            pareto_front, reference_points, ideal_point, nadir_point, weights,
+            use_log_transform=use_log_transform
+        )
         metrics = {
-            hv_key: hv_value,
+            'r_hypervolume': hv_value,
             'spread': self.calculate_spread(pareto_front),
             'spacing': self.calculate_spacing(pareto_front),
             'pareto_size': self.calculate_pareto_size(pareto_front),
@@ -598,10 +442,7 @@ class ConvergenceTracker:
                 # Primeira geração: inicializa ideal point
                 self.ideal_point = min_values.copy()
                 self.ideal_point_set = True
-                if self.use_r_hv:
-                    logger.info(f"🎯 Ponto ideal INICIAL (melhor caso gen 0): {self.ideal_point}")
-                else:
-                    logger.info(f"🎯 Ponto ideal INICIAL (melhor caso gen 0): {self.ideal_point}")
+                logger.info(f"🎯 Ponto ideal INICIAL (melhor caso gen 0): {self.ideal_point}")
             else:
                 # Atualiza ideal point com os MELHORES valores já vistos
                 # Em minimização: min é melhor
@@ -612,25 +453,29 @@ class ConvergenceTracker:
                     logger.info(f"🎯 Ponto ideal ATUALIZADO: {self.ideal_point}")
                     logger.info(f"   Melhoria: {old_ideal - self.ideal_point}")
 
-            # Define ponto nadir FIXO na primeira geração (PIOR CASO) - usado para R-HV
-            # CORREÇÃO: Nadir deve ser FIXO, não acumulativo, para evitar regressão do R-HV
+            # Define ponto nadir DINÂMICO (PIOR CASO acumulado) - usado para R-HV
             if not self.nadir_point_set:
-                # CORREÇÃO: Adiciona margem GENEROSA (2x) para acomodar pioras temporárias
-                # Isso evita que soluções ultrapassem o nadir durante exploração
+                # Primeira geração: inicializa nadir point com margem generosa
                 self.nadir_point = max_values * 2.0
                 self.nadir_point_set = True
                 if self.use_r_hv:
-                    logger.info(f"📍 Ponto nadir FIXO (pior caso gen 0 * 2.0): {self.nadir_point}")
+                    logger.info(f"📍 Ponto nadir INICIAL (pior caso gen 0 * 2.0): {self.nadir_point}")
                     logger.info(f"   Max da gen 0: {max_values}")
-                    logger.info(f"   ⚠️  NADIR SERÁ MANTIDO FIXO para evitar regressão do R-HV")
-
-            if self.use_r_hv:
-                logger.info(f"   ✅ R-HV: Usando {len(self.reference_points_rnsga2)} pontos de referência do R-NSGA2")
-                logger.info(f"   ✅ R-HV (sigmoid) vai CRESCER conforme soluções melhoram em relação aos pontos de referência")
-                logger.info(f"   ✅ Range: (0, 1] onde 1.0=perfeito, 0.5=razoável, próximo de 0=péssimo")
+                    logger.info(f"   ⚠️  NADIR será ATUALIZADO dinamicamente para manter normalização correta")
             else:
-                logger.info(f"   ✅ Box HV: entre ideal {self.ideal_point} e ref {self.reference_point}")
-                logger.info(f"   ✅ HV vai CRESCER conforme ideal_point melhora (diminui)")
+                # Atualiza nadir point com os PIORES valores já vistos (max acumulativo)
+                # Adiciona margem de 10% para acomodar pequenas oscilações
+                old_nadir = self.nadir_point.copy()
+                new_nadir_candidate = max_values * 1.1
+                self.nadir_point = np.maximum(self.nadir_point, new_nadir_candidate)
+
+                if not np.array_equal(old_nadir, self.nadir_point):
+                    logger.info(f"📍 Ponto nadir ATUALIZADO: {self.nadir_point}")
+                    logger.info(f"   Expansão: {self.nadir_point - old_nadir}")
+
+            logger.info(f"   ✅ R-HV: Usando {len(self.reference_points_rnsga2)} pontos de referência do R-NSGA2")
+            logger.info(f"   ✅ R-HV (sigmoid) vai CRESCER conforme soluções melhoram em relação aos pontos de referência")
+            logger.info(f"   ✅ Range: (0, 1] onde 1.0=perfeito, 0.5=razoável, próximo de 0=péssimo")
 
         # Debug: Log estatísticas da fronteira de Pareto
         if len(pareto_front) > 0:
@@ -651,8 +496,7 @@ class ConvergenceTracker:
             ideal_point=self.ideal_point,
             reference_points=self.reference_points_rnsga2,
             nadir_point=self.nadir_point,
-            weights=self.weights,
-            use_r_hv=self.use_r_hv
+            weights=self.weights
         )
 
         # Debug: Log métricas calculadas

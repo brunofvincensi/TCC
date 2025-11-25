@@ -30,9 +30,9 @@ MIN_ASSETS = 5
 # - 0.0 = melhor valor possível (min risco / max retorno)
 # - 1.0 = pior valor possível (max risco / min retorno)
 REFERENCE_POINTS_CONFIG = {
-    'conservador': np.array([[0.3, 0.0, 0.0]]),  # Aceita retorno pior, mas quer riscos ~0
-    'moderado':    np.array([[0.2, 0.3, 0.3]]),  # Balanceado
-    'arrojado':    np.array([[0.0, 0.3, 0.3]])   # Quer melhor retorno, aceita mais risco
+    'conservador': np.array([[0.3, 0.05, 0.05]]),  # Aceita retorno pior, mas quer riscos ~0
+    'moderado':    np.array([[0.3, 0.2, 0.2]]),  # Balanceado
+    'arrojado':    np.array([[0.05, 0.3, 0.3]])   # Quer melhor retorno, aceita mais risco
 }
 
 # Weights para Achievement Scalarizing Function (ASF)
@@ -110,7 +110,7 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         }
         super().__init__(n_var=num_assets,
                          n_obj=3,
-                         n_ieq_constr=n_ieq_constr,
+                         n_ieq_constr=0,
                          n_eq_constr=0, xl=xl, xu=xu)
         self.num_assets = num_assets
         self.portfolio_num_assets = portfolio_num_assets
@@ -192,10 +192,10 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
 
         out["F"] = [expected_return, variance, cvar]
 
-        if self.portfolio_num_assets >= 10:
-            hhi = np.sum(weights ** 2)
-            hhi_constraint = hhi - self.hhi_max
-            out["G"] = [hhi_constraint]
+        # if self.portfolio_num_assets >= 10:
+        #     hhi = np.sum(weights ** 2)
+        #     hhi_constraint = hhi - self.hhi_max
+        #     out["G"] = [hhi_constraint]
 
 class Nsga2OtimizacaoService:
     def __init__(self, app, restricted_asset_ids, risk_level, years_period=5, reference_date=None, start_date=None, asset_ids: List[int] = None, show_chart=False):
@@ -453,7 +453,7 @@ class Nsga2OtimizacaoService:
         print(f"Selecionando a melhor solução para o perfil '{self.risk_level}'...")
 
         # Usa configuração centralizada (constantes do módulo)
-        ref_point = REFERENCE_POINTS_CONFIG[self.risk_level][0]  # [0] extrai o array 1D da matriz
+        ref_point = REFERENCE_POINTS_CONFIG[self.risk_level][0]  # [0] extrai o primeiro array da matriz
         weights = WEIGHTS_CONFIG[self.risk_level]
 
         # Normaliza os objetivos para [0, 1]
@@ -561,6 +561,20 @@ class Nsga2OtimizacaoService:
         result = minimize(problem, algorithm, termination,
                            callback=callback, verbose=True)
         print("🏁 Otimização R-NSGA2 concluída.")
+
+        # --- calcular e imprimir R-HV da última geração (diretamente aqui, sem QualityMetrics)
+        try:
+            rhv_value = self.compute_rhv_last_generation(
+                result=result,
+                weight_vectors=WEIGHTS_CONFIG[self.risk_level],          # usa WEIGHTS_CONFIG[self.risk_level] por padrão
+                reference_points=REFERENCE_POINTS_CONFIG[self.risk_level]         # usa REFERENCE_POINTS_CONFIG[self.risk_level] por padrão
+            )
+            print(f"\n🔹 R-Hypervolume (R-HV) da última geração: {rhv_value:.6f}")
+            # também adiciona no optimization_result para consumo programático
+
+        except Exception as e:
+            print(f"⚠️ Erro ao calcular R-HV da última geração: {e}")
+
 
         if result.X is None:
             raise ValueError("O algoritmo não conseguiu encontrar nenhuma solução.")
@@ -699,19 +713,6 @@ class Nsga2OtimizacaoService:
 
         R-NSGA2 guia a busca durante a otimização usando pontos de referência,
         direcionando as soluções para regiões específicas da fronteira de Pareto.
-
-        Args:
-            crossover_eta: Parâmetro eta do crossover
-            mutation_eta: Parâmetro eta da mutação
-            population_size: Tamanho da população
-            max_assets: Número máximo de ativos (None = sem restrição)
-
-        Returns:
-            Instância do R-NSGA2 configurada
-
-        Referências:
-            - Deb & Sundar (2006). "Reference point based multi-objective optimization using evolutionary algorithms"
-            - Molina et al. (2009). "Preference incorporation to solve many-objective airfoil design problems"
         """
 
         # Operadores customizados com restrição de cardinalidade
@@ -1066,7 +1067,7 @@ def save_backtest_chart(portfolio: List[Dict],
 
 
 def optimize_current_portfolio(app):
-    service = Nsga2OtimizacaoService(app, [], "moderado", 10, show_chart=True)
+    service = Nsga2OtimizacaoService(app, [1, 10], "conservador", 10, show_chart=True)
     result = service.optimize(max_assets=10, use_optimal_config=False)
 
     # Informações adicionais
@@ -1079,7 +1080,7 @@ def optimize_current_portfolio(app):
 def backtest(app):
     from datetime import date
     backtest_date = date(2015, 1, 1)
-    backtest_service = Nsga2OtimizacaoService(app, [1, 10], "conservador", 10, reference_date=backtest_date, show_chart=True)
+    backtest_service = Nsga2OtimizacaoService(app, [1, 10], "moderado", 10, reference_date=backtest_date, show_chart=True)
     backtest_portfolio = backtest_service.optimize(max_assets=10)
 
     # Informações do backtest
@@ -1115,10 +1116,10 @@ def main():
     app = create_app()
 
     # Exemplo 1: Otimização normal (sem backtest)
-   # optimize_current_portfolio(app)
+    optimize_current_portfolio(app)
 
     # Exemplo 2: Otimização com backtest (usando dados até uma data específica)
-    backtest(app)
+   # backtest(app)
 
 
 if __name__ == "__main__":

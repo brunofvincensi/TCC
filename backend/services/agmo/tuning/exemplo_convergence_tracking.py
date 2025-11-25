@@ -70,7 +70,7 @@ def exemplo_simples():
         population_size=100,
         generations=200,
         convergence_tracker=tracker,  # Passa o tracker para o serviço
-        max_assets=20,
+        max_assets=60,
         use_optimal_config=False
     )
 
@@ -157,7 +157,7 @@ def exemplo_comparacao_multiplas_execucoes():
             population_size=config['pop'],
             generations=config['gen'],
             convergence_tracker=tracker,
-            max_assets=10,
+            max_assets=60,
             use_optimal_config=False
         )
 
