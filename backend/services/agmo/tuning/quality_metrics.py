@@ -409,7 +409,7 @@ class ConvergenceTracker:
         self.use_r_hv = use_r_hv and reference_points_rnsga2 is not None
         self.ideal_point = None  # Melhores valores já vistos (global)
         self.ideal_point_set = False
-        self.nadir_point = None  # Piores valores já vistos (global)
+        self.nadir_point = None  # Pior valor da gen 0
         self.nadir_point_set = False
         self.metrics_calculator = QualityMetrics(reference_point=reference_point)
 
