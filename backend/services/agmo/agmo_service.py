@@ -41,6 +41,22 @@ WEIGHTS_CONFIG = {
     'moderado':    np.array([0.33, 0.34, 0.33]),  # Equilibrado
     'arrojado':    np.array([0.50, 0.25, 0.25])   # Desvios em retorno são 2x mais graves
 }
+
+# Pontos Ideal e Nadir TEÓRICOS para normalização consistente do R-Hypervolume
+# Baseados em limites realistas para portfólios de ações brasileiras
+# Formato: [retorno_esperado_mensal, volatilidade_mensal, max_drawdown]
+#
+# IDEAL POINT (melhor caso teórico):
+# - Retorno esperado: -3% ao mês (negativo porque minimizamos -retorno)
+# - Volatilidade: 0.5% ao mês (muito estável)
+# - Max Drawdown: 2% (perda máxima pequena)
+IDEAL_POINT_PORTFOLIO = np.array([-0.03, 0.005, 0.02])
+
+# NADIR POINT (pior caso aceitável):
+# - Retorno esperado: +1.5% ao mês (ruim, positivo porque minimizamos -retorno)
+# - Volatilidade: 2.5% ao mês (muito volátil)
+# - Max Drawdown: 18% (perda máxima grande)
+NADIR_POINT_PORTFOLIO = np.array([0.015, 0.025, 0.18])
 # ===============================================================
 
 class ConvergenceCallback(Callback):

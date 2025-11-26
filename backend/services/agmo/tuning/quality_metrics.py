@@ -332,7 +332,9 @@ class ConvergenceTracker:
     """
 
     def __init__(self, reference_points_rnsga2: Optional[np.ndarray] = None,
-                 weights: Optional[np.ndarray] = None):
+                 weights: Optional[np.ndarray] = None,
+                 fixed_ideal_point: Optional[np.ndarray] = None,
+                 fixed_nadir_point: Optional[np.ndarray] = None):
         """
         Inicializa o rastreador.
 
@@ -340,6 +342,10 @@ class ConvergenceTracker:
             reference_points_rnsga2: Pontos de referência do R-NSGA2 para cálculo de R-HV.
                                      Array (n_ref_points, n_objectives).
             weights: Pesos para ASF no cálculo de R-HV. Array (n_objectives,).
+            fixed_ideal_point: Ponto ideal fixo para todas as gerações (opcional).
+                              Se fornecido, não será atualizado dinamicamente.
+            fixed_nadir_point: Ponto nadir fixo para todas as gerações (opcional).
+                              Se fornecido, não será atualizado dinamicamente.
         """
 
         self.history = {
@@ -353,11 +359,24 @@ class ConvergenceTracker:
 
         self.reference_points_rnsga2 = reference_points_rnsga2
         self.weights = weights  # Pesos para ASF
-        self.ideal_point = None  # Melhores valores já vistos (global)
-        self.ideal_point_set = False
-        self.nadir_point = None  # Pior valor da gen 0
-        self.nadir_point_set = False
+
+        # Pontos de referência fixos (para comparação justa entre execuções)
+        self.fixed_ideal_point = fixed_ideal_point
+        self.fixed_nadir_point = fixed_nadir_point
+        self.use_fixed_points = (fixed_ideal_point is not None and fixed_nadir_point is not None)
+
+        # Pontos dinâmicos (atualizados a cada geração)
+        self.ideal_point = fixed_ideal_point.copy() if fixed_ideal_point is not None else None
+        self.ideal_point_set = (fixed_ideal_point is not None)
+        self.nadir_point = fixed_nadir_point.copy() if fixed_nadir_point is not None else None
+        self.nadir_point_set = (fixed_nadir_point is not None)
+
         self.metrics_calculator = QualityMetrics()
+
+        if self.use_fixed_points:
+            logger.info(f"🔒 Usando pontos de referência FIXOS para comparação justa:")
+            logger.info(f"   Ideal point fixo: {self.fixed_ideal_point}")
+            logger.info(f"   Nadir point fixo: {self.fixed_nadir_point}")
 
     def update(self, generation: int, pareto_front: np.ndarray,
                population_fitness: np.ndarray):
@@ -370,8 +389,9 @@ class ConvergenceTracker:
             population_fitness: Fitness de toda a população
         """
 
-        # Atualiza ponto ideal GLOBAL (MELHOR CASO acumulado de todas as gerações)
-        if len(pareto_front) > 0:
+        # Atualiza pontos ideal e nadir GLOBAIS (acumulados de todas as gerações)
+        # APENAS se não estivermos usando pontos fixos
+        if len(pareto_front) > 0 and not self.use_fixed_points:
             min_values = np.min(pareto_front, axis=0)
             max_values = np.max(pareto_front, axis=0)
 
@@ -390,11 +410,20 @@ class ConvergenceTracker:
                     logger.info(f"🎯 Ponto ideal ATUALIZADO: {self.ideal_point}")
                     logger.info(f"   Melhoria: {old_ideal - self.ideal_point}")
 
-            # Define o ponto nadir da gen 0 e não muda mais
             if not self.nadir_point_set:
                 # Primeira geração: inicializa nadir point com margem generosa
-                self.nadir_point = max_values * 2.0
+                self.nadir_point = max_values * 1.5
                 self.nadir_point_set = True
+                logger.info(f"📊 Ponto nadir INICIAL (pior caso gen 0 com margem): {self.nadir_point}")
+            else:
+                # Atualiza nadir point com os PIORES valores já vistos
+                # Em minimização: max é pior
+                old_nadir = self.nadir_point.copy()
+                self.nadir_point = np.maximum(self.nadir_point, max_values * 1.1)
+
+                if not np.array_equal(old_nadir, self.nadir_point):
+                    logger.info(f"📊 Ponto nadir ATUALIZADO: {self.nadir_point}")
+                    logger.info(f"   Piora: {self.nadir_point - old_nadir}")
 
         # Debug: Log estatísticas da fronteira de Pareto
         if len(pareto_front) > 0:
