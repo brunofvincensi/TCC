@@ -255,11 +255,25 @@ def exemplo_comparacao_multiplas_execucoes():
                 'histories': run_histories
             })
 
+        # Mostra resumo de TODAS as configurações testadas
+        print(f"\n{'='*80}")
+        print(f"📊 RESUMO DE TODAS AS CONFIGURAÇÕES ({num_assets} ATIVOS):")
+        print(f"{'='*80}\n")
+
+        for i, result in enumerate(config_results, 1):
+            print(f"{i}. {result['label']}:")
+            print(f"   Hypervolume médio:  {result['hypervolume_mean']:.6e}")
+            print(f"   Tempo médio:        {result['execution_time_mean']:.2f}s")
+            print(f"   Convergência média: Gen {result['convergence_generation_mean']:.1f}")
+            print(f"   Trade-off Score:    {result['trade_off_score']:.6e}")
+            print()
+
         # Encontra a melhor configuração (maior trade-off)
         best_config = max(config_results, key=lambda x: x['trade_off_score'])
+        best_idx = config_results.index(best_config) + 1
 
-        print(f"\n{'='*80}")
-        print(f"🏆 MELHOR CONFIGURAÇÃO PARA {num_assets} ATIVOS:")
+        print(f"{'='*80}")
+        print(f"🏆 MELHOR CONFIGURAÇÃO: #{best_idx} - {best_config['label']}")
         print(f"   População: {best_config['population_size']}")
         print(f"   Gerações: {best_config['generations']}")
         print(f"   Hypervolume médio: {best_config['hypervolume_mean']:.6e}")
@@ -304,14 +318,52 @@ def exemplo_comparacao_multiplas_execucoes():
         # Gera gráfico de comparação para esta quantidade de ativos
         print(f"\n📊 Gerando gráfico de comparação para {num_assets} ativos...")
 
-        # Prepara dados para o gráfico (usa a primeira execução de cada config)
-        histories = [result['histories'][0] for result in config_results]
-        labels = [result['label'] for result in config_results]
+        # Calcula histórico médio das 3 execuções para cada configuração
+        averaged_histories = []
+        labels = []
+
+        for result in config_results:
+            # Pega os 3 históricos desta configuração
+            histories_for_config = result['histories']
+
+            # Calcula a média dos R-Hypervolumes nas mesmas gerações
+            # Assume que todos têm o mesmo número de gerações
+            avg_history = {
+                'generation': histories_for_config[0]['generation'].copy(),
+                'r_hypervolume': [],
+                'spread': [],
+                'spacing': [],
+                'pareto_size': [],
+                'best_fitness': []
+            }
+
+            # Para cada geração, calcula a média entre as 3 execuções
+            num_generations = len(histories_for_config[0]['generation'])
+            for gen_idx in range(num_generations):
+                # Média do R-Hypervolume
+                hvs = [h['r_hypervolume'][gen_idx] for h in histories_for_config]
+                avg_history['r_hypervolume'].append(np.mean(hvs))
+
+                # Média das outras métricas
+                spreads = [h['spread'][gen_idx] for h in histories_for_config]
+                avg_history['spread'].append(np.mean(spreads))
+
+                spacings = [h['spacing'][gen_idx] for h in histories_for_config]
+                avg_history['spacing'].append(np.mean(spacings))
+
+                sizes = [h['pareto_size'][gen_idx] for h in histories_for_config]
+                avg_history['pareto_size'].append(np.mean(sizes))
+
+                fitness = [h['best_fitness'][gen_idx] for h in histories_for_config]
+                avg_history['best_fitness'].append(np.mean(fitness))
+
+            averaged_histories.append(avg_history)
+            labels.append(f"{result['label']} (média de 3 runs)")
 
         plot_multiple_runs_comparison(
-            histories=histories,
+            histories=averaged_histories,
             labels=labels,
-            title=f"Comparação de Configurações - {num_assets} Ativos",
+            title=f"Comparação de Configurações - {num_assets} Ativos (Média de 3 Execuções)",
             save_path=f'comparison_{num_assets}_assets.png',
             show_plot=False
         )
