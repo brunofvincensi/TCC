@@ -147,13 +147,49 @@ def exemplo_comparacao_multiplas_execucoes():
     # ]
 
     # Array de quantidades de ativos para testar
-    asset_quantities = [30]
+    asset_quantities = [60]
 
     # Configurações de população e gerações para testar
     configs = [
         {'pop': 50, 'gen': 100},
         {'pop': 100, 'gen': 150},
     ]
+
+    print(f"\n📐 CALCULANDO PONTOS DE REFERÊNCIA FIXOS...")
+    print(f"   Executando configuração de referência para estabelecer baseline...")
+
+    # Executa uma configuração de referência para estimar ideal_point e nadir_point
+    # Usa a maior configuração para obter os melhores resultados possíveis
+    reference_service = Nsga2OtimizacaoService(
+        app=app,
+        restricted_asset_ids=[],
+        risk_level=risk_level,
+        years_period=10,
+        show_chart=False
+    )
+
+    reference_tracker = ConvergenceTracker(
+        reference_points_rnsga2=REFERENCE_POINTS_CONFIG[risk_level],
+        weights=WEIGHTS_CONFIG[risk_level]
+    )
+
+    # Executa com a maior quantidade de ativos e melhor configuração
+    reference_service.optimize(
+        population_size=150,
+        generations=200,  # Mais gerações para garantir boa convergência
+        convergence_tracker=reference_tracker,
+        max_assets=max(asset_quantities),
+        use_optimal_config=False
+    )
+
+    # Extrai os pontos de referência fixos do tracker de referência
+    fixed_ideal_point = reference_tracker.ideal_point.copy()
+    fixed_nadir_point = reference_tracker.nadir_point.copy()
+
+    print(f"\n   ✅ Pontos de referência calculados:")
+    print(f"      Ideal point (melhor caso): {fixed_ideal_point}")
+    print(f"      Nadir point (pior caso):   {fixed_nadir_point}")
+    print(f"   🔒 Estes valores serão FIXOS para todas as comparações!\n")
 
     # Para cada quantidade de ativos
     for num_assets in asset_quantities:
@@ -193,7 +229,9 @@ def exemplo_comparacao_multiplas_execucoes():
 
                 tracker = ConvergenceTracker(
                     reference_points_rnsga2=REFERENCE_POINTS_CONFIG[risk_level],
-                    weights=WEIGHTS_CONFIG[risk_level]
+                    weights=WEIGHTS_CONFIG[risk_level],
+                    fixed_ideal_point=fixed_ideal_point,
+                    fixed_nadir_point=fixed_nadir_point
                 )
 
                 # Mede tempo de execução
