@@ -15,7 +15,9 @@ from app import create_app
 from services.agmo.agmo_service import (
     Nsga2OtimizacaoService,
     REFERENCE_POINTS_CONFIG,
-    WEIGHTS_CONFIG
+    WEIGHTS_CONFIG,
+    IDEAL_POINT_PORTFOLIO,
+    NADIR_POINT_PORTFOLIO
 )
 from services.agmo.tuning import (
     ConvergenceTracker,
@@ -147,13 +149,31 @@ def exemplo_comparacao_multiplas_execucoes():
     # ]
 
     # Array de quantidades de ativos para testar
-    asset_quantities = [30]
+    asset_quantities = [60]
 
     # Configurações de população e gerações para testar
     configs = [
         {'pop': 50, 'gen': 100},
-        {'pop': 100, 'gen': 150},
+        {'pop': 150, 'gen': 150},
     ]
+
+    # Usa pontos de referência TEÓRICOS fixos para normalização consistente
+    # Isso evita que o R-Hypervolume caia quando o R-NSGA2 elimina diversidade
+    # (comportamento esperado do algoritmo ao convergir para o reference point)
+    fixed_ideal_point = IDEAL_POINT_PORTFOLIO.copy()
+    fixed_nadir_point = NADIR_POINT_PORTFOLIO.copy()
+
+    print(f"\n📐 USANDO PONTOS DE REFERÊNCIA TEÓRICOS FIXOS:")
+    print(f"   Ideal point (melhor caso teórico): {fixed_ideal_point}")
+    print(f"     Retorno: {-fixed_ideal_point[0]*100:.2f}%/mês")
+    print(f"     Volatilidade: {fixed_ideal_point[1]*100:.3f}%/mês")
+    print(f"     Max Drawdown: {fixed_ideal_point[2]*100:.1f}%")
+    print(f"\n   Nadir point (pior caso aceitável): {fixed_nadir_point}")
+    print(f"     Retorno: {-fixed_nadir_point[0]*100:.2f}%/mês")
+    print(f"     Volatilidade: {fixed_nadir_point[1]*100:.3f}%/mês")
+    print(f"     Max Drawdown: {fixed_nadir_point[2]*100:.1f}%")
+    print(f"\n   🔒 Estes valores serão FIXOS para todas as comparações!")
+    print(f"   ✅ R-Hypervolume não cairá artificialmente ao convergir\n")
 
     # Para cada quantidade de ativos
     for num_assets in asset_quantities:
@@ -180,7 +200,7 @@ def exemplo_comparacao_multiplas_execucoes():
             run_histories = []
 
             # Executa 3 vezes a mesma configuração
-            for run_num in range(1, 6):
+            for run_num in range(1, 21):
                 print(f"\n   🔄 Execução {run_num}/3...")
 
                 service = Nsga2OtimizacaoService(
@@ -193,7 +213,9 @@ def exemplo_comparacao_multiplas_execucoes():
 
                 tracker = ConvergenceTracker(
                     reference_points_rnsga2=REFERENCE_POINTS_CONFIG[risk_level],
-                    weights=WEIGHTS_CONFIG[risk_level]
+                    weights=WEIGHTS_CONFIG[risk_level],
+                    fixed_ideal_point=fixed_ideal_point,
+                    fixed_nadir_point=fixed_nadir_point
                 )
 
                 # Mede tempo de execução
