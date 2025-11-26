@@ -57,8 +57,7 @@ def exemplo_simples():
 
     tracker = ConvergenceTracker(
         reference_points_rnsga2=REFERENCE_POINTS_CONFIG[risk_level],
-        weights=WEIGHTS_CONFIG[risk_level],
-        use_r_hv=True  # Usa R-HV ao invés de HV tradicional
+        weights=WEIGHTS_CONFIG[risk_level]
     )
 
     print(f"   ✅ Tracker criado com sucesso!\n")
@@ -149,8 +148,7 @@ def exemplo_comparacao_multiplas_execucoes():
 
         tracker = ConvergenceTracker(
             reference_points_rnsga2=REFERENCE_POINTS_CONFIG[risk_level],
-            weights=WEIGHTS_CONFIG[risk_level],
-            use_r_hv=True
+            weights=WEIGHTS_CONFIG[risk_level]
         )
 
         result = service.optimize(
@@ -180,69 +178,6 @@ def exemplo_comparacao_multiplas_execucoes():
     print(f"   Verifique o arquivo 'comparison_configs.png'")
 
 
-def exemplo_analise_perfis_risco():
-    """
-    Exemplo: compara a convergência entre diferentes perfis de risco.
-    """
-    from services.agmo.tuning import plot_multiple_runs_comparison
-
-    print(f"\n{'='*80}")
-    print(f"📊 EXEMPLO: Análise de Perfis de Risco")
-    print(f"{'='*80}\n")
-
-    app = create_app()
-
-    histories = []
-    labels = []
-
-    # Testa cada perfil de risco
-    risk_levels = ['conservador', 'moderado', 'arrojado']
-
-    for risk_level in risk_levels:
-        print(f"\n🚀 Executando perfil: {risk_level.upper()}...")
-
-        service = Nsga2OtimizacaoService(
-            app=app,
-            restricted_asset_ids=[],
-            risk_level=risk_level,
-            years_period=10,
-            show_chart=False
-        )
-
-        tracker = ConvergenceTracker(
-            reference_points_rnsga2=REFERENCE_POINTS_CONFIG[risk_level],
-            weights=WEIGHTS_CONFIG[risk_level],
-            use_r_hv=True
-        )
-
-        result = service.optimize(
-            population_size=100,
-            generations=100,
-            convergence_tracker=tracker,
-            max_assets=10,
-            use_optimal_config=False
-        )
-
-        histories.append(tracker.get_history())
-        labels.append(risk_level.capitalize())
-
-        # Imprime resumo
-        print_convergence_summary(tracker.get_history())
-
-    # Gera gráfico de comparação
-    print(f"\n📊 Gerando gráfico de comparação entre perfis...")
-    plot_multiple_runs_comparison(
-        histories=histories,
-        labels=labels,
-        title="Comparação de Perfis de Risco - R-Hypervolume",
-        save_path='comparison_risk_profiles.png',
-        show_plot=False
-    )
-
-    print(f"\n✅ Análise concluída!")
-    print(f"   Verifique o arquivo 'comparison_risk_profiles.png'")
-
-
 if __name__ == "__main__":
     import argparse
 
@@ -257,8 +192,6 @@ if __name__ == "__main__":
         exemplo_simples()
     elif args.exemplo == 'comparacao':
         exemplo_comparacao_multiplas_execucoes()
-    elif args.exemplo == 'perfis':
-        exemplo_analise_perfis_risco()
     else:
         print(f"❌ Exemplo '{args.exemplo}' não encontrado")
         print(f"   Use: simples, comparacao, ou perfis")

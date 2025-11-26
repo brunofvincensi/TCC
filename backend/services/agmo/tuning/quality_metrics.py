@@ -7,7 +7,6 @@ convergência e comparar diferentes configurações de hiperparâmetros.
 
 Métricas Implementadas:
 - R-Hypervolume (R-HV): Apropriado para algoritmos baseados em pontos de referência (R-NSGA2)
-- Hypervolume (HV): Volume coberto pela fronteira de Pareto
 - Spread: Distribuição/diversidade das soluções
 - Spacing: Uniformidade da distribuição
 - Number of Pareto Solutions: Quantidade de soluções não-dominadas
@@ -25,15 +24,10 @@ class QualityMetrics:
     Classe para cálculo de métricas de qualidade de fronteiras de Pareto.
     """
 
-    def __init__(self, reference_point: Optional[np.ndarray] = None):
+    def __init__(self):
         """
         Inicializa o calculador de métricas.
-
-        Args:
-            reference_point: Ponto de referência para cálculo de Hypervolume.
-                           Se None, será calculado automaticamente.
         """
-        self.reference_point = reference_point
 
     def calculate_r_hypervolume(self, pareto_front: np.ndarray,
                                 reference_points: np.ndarray,
@@ -45,7 +39,7 @@ class QualityMetrics:
         """
         Calcula o R-Hypervolume (R2 indicator) da fronteira de Pareto.
 
-        CORREÇÃO: Implementa normalização consistente entre fronteira e reference points
+        Implementa normalização consistente entre fronteira e reference points
         para garantir que ambos estejam no mesmo espaço [0, 1].
 
         O R-HV é apropriado para algoritmos baseados em pontos de referência
@@ -60,19 +54,8 @@ class QualityMetrics:
         - z: ponto de referência (aspiração no espaço [0, 1])
         - w: vetor de pesos
 
-        IMPORTANTE: Quanto MENOR o R2, MELHOR a qualidade!
+        Quanto MENOR o R2, MELHOR a qualidade
         Por padrão, retornamos 1/(1+R2) (transformação sigmoid) para estabilidade.
-
-        Args:
-            pareto_front: Array (n_solutions, n_objectives) com objetivos
-            reference_points: Array (n_ref_points, n_objectives) com pontos de referência (aspirações em [0,1])
-            ideal_point: Ponto ideal DINÂMICO (melhores valores já vistos). Se None, estima da fronteira.
-                        IMPORTANTE: Deve ser atualizado com min acumulativo ao longo das gerações.
-            nadir_point: Ponto nadir DINÂMICO (piores valores já vistos). Se None, estima da fronteira.
-                        IMPORTANTE: Deve ser atualizado com max acumulativo ao longo das gerações.
-                        CRITICAL FIX: Se nadir for FIXO (geração 0), normalização fica incorreta!
-            weights: Array (n_objectives,) com pesos para ASF. Se None, usa pesos uniformes.
-            use_log_transform: Se True, usa sigmoid 1/(1+R2); se False, usa 1/R2 (pode ser instável)
 
         Returns:
             Valor do R-HV (maior = melhor qualidade)
@@ -170,7 +153,6 @@ class QualityMetrics:
         # - Monotônica: menor R2 = maior R-HV
         if use_log_transform:
             # Transformação sigmoid (padrão)
-            # IMPORTANTE: Não usar max(r2, 0) pois isso zera R2 negativos!
             # R2 negativo significa soluções muito boas (melhores que ref points)
             # Usamos abs(r2) para manter a escala mesmo quando super-ótimo
             r2_adjusted = abs(r2) if r2 < 0 else r2
@@ -302,12 +284,6 @@ class QualityMetrics:
     def calculate_pareto_size(self, pareto_front: np.ndarray) -> int:
         """
         Retorna o número de soluções na fronteira de Pareto.
-
-        Args:
-            pareto_front: Array (n_solutions, n_objectives)
-
-        Returns:
-            Número de soluções
         """
         return len(pareto_front)
 
@@ -317,21 +293,7 @@ class QualityMetrics:
                               nadir_point: Optional[np.ndarray] = None,
                               weights: Optional[np.ndarray] = None,
                               use_log_transform: bool = True) -> dict:
-        """
-        Calcula todas as métricas de qualidade.
 
-        Args:
-            pareto_front: Array (n_solutions, n_objectives)
-            ideal_point: Ponto ideal para cálculo de hypervolume
-            reference_points: Pontos de referência para R-HV (usado se use_r_hv=True)
-            nadir_point: Ponto nadir para normalização do R-HV
-            weights: Pesos para ASF no cálculo de R-HV
-            use_r_hv: Se True e reference_points fornecido, usa R-HV ao invés de HV
-            use_log_transform: Se True, usa sigmoid 1/(1+R2) ∈ (0,1]; se False, usa 1/R2
-
-        Returns:
-            Dicionário com todas as métricas
-        """
         hv_value = self.calculate_r_hypervolume(
             pareto_front, reference_points, ideal_point, nadir_point, weights,
             use_log_transform=use_log_transform
@@ -348,12 +310,6 @@ class QualityMetrics:
     def _normalize_front(self, pareto_front: np.ndarray) -> np.ndarray:
         """
         Normaliza a fronteira de Pareto para [0, 1] em cada objetivo.
-
-        Args:
-            pareto_front: Fronteira original
-
-        Returns:
-            Fronteira normalizada
         """
         min_vals = np.min(pareto_front, axis=0)
         max_vals = np.max(pareto_front, axis=0)
@@ -375,43 +331,33 @@ class ConvergenceTracker:
     para algoritmos baseados em pontos de referência como R-NSGA2.
     """
 
-    def __init__(self, reference_point: Optional[np.ndarray] = None,
-                 reference_points_rnsga2: Optional[np.ndarray] = None,
-                 weights: Optional[np.ndarray] = None,
-                 use_r_hv: bool = True):
+    def __init__(self, reference_points_rnsga2: Optional[np.ndarray] = None,
+                 weights: Optional[np.ndarray] = None):
         """
         Inicializa o rastreador.
 
         Args:
-            reference_point: Ponto de referência fixo (nadir) para cálculo de HV tradicional.
-                           Se None, será determinado na primeira geração.
             reference_points_rnsga2: Pontos de referência do R-NSGA2 para cálculo de R-HV.
                                      Array (n_ref_points, n_objectives).
             weights: Pesos para ASF no cálculo de R-HV. Array (n_objectives,).
-            use_r_hv: Se True e reference_points_rnsga2 fornecido, usa R-HV ao invés de HV.
         """
-        # Decide qual chave usar no histórico
-        hv_key = 'r_hypervolume' if (use_r_hv and reference_points_rnsga2 is not None) else 'hypervolume'
 
         self.history = {
             'generation': [],
-            hv_key: [],
+            'r_hypervolume': [],
             'spread': [],
             'spacing': [],
             'pareto_size': [],
             'best_fitness': [],
         }
-        self.hv_key = hv_key  # Armazena qual chave está sendo usada
-        self.reference_point = reference_point
-        self.reference_point_set = reference_point is not None
+
         self.reference_points_rnsga2 = reference_points_rnsga2
         self.weights = weights  # Pesos para ASF
-        self.use_r_hv = use_r_hv and reference_points_rnsga2 is not None
         self.ideal_point = None  # Melhores valores já vistos (global)
         self.ideal_point_set = False
         self.nadir_point = None  # Pior valor da gen 0
         self.nadir_point_set = False
-        self.metrics_calculator = QualityMetrics(reference_point=reference_point)
+        self.metrics_calculator = QualityMetrics()
 
     def update(self, generation: int, pareto_front: np.ndarray,
                population_fitness: np.ndarray):
@@ -423,15 +369,6 @@ class ConvergenceTracker:
             pareto_front: Fronteira de Pareto atual
             population_fitness: Fitness de toda a população
         """
-        # Define ponto de referência fixo na primeira geração (PIOR CASO) - para HV tradicional
-        if not self.reference_point_set and len(pareto_front) > 0 and not self.use_r_hv:
-            max_values = np.max(pareto_front, axis=0)
-            self.reference_point = np.maximum(max_values * 1.5, max_values + 1.0)
-            self.metrics_calculator.reference_point = self.reference_point
-            self.reference_point_set = True
-
-            logger.info(f"📍 Ponto de referência FIXO (nadir/pior caso): {self.reference_point}")
-            logger.info(f"   Baseado em max da geração 0: {max_values}")
 
         # Atualiza ponto ideal GLOBAL (MELHOR CASO acumulado de todas as gerações)
         if len(pareto_front) > 0:
@@ -458,14 +395,6 @@ class ConvergenceTracker:
                 # Primeira geração: inicializa nadir point com margem generosa
                 self.nadir_point = max_values * 2.0
                 self.nadir_point_set = True
-                if self.use_r_hv:
-                    logger.info(f"📍 Ponto nadir INICIAL (pior caso gen 0 * 2.0): {self.nadir_point}")
-                    logger.info(f"   Max da gen 0: {max_values}")
-
-
-            logger.info(f"   ✅ R-HV: Usando {len(self.reference_points_rnsga2)} pontos de referência do R-NSGA2")
-            logger.info(f"   ✅ R-HV (sigmoid) vai CRESCER conforme soluções melhoram em relação aos pontos de referência")
-            logger.info(f"   ✅ Range: (0, 1] onde 1.0=perfeito, 0.5=razoável, próximo de 0=péssimo")
 
         # Debug: Log estatísticas da fronteira de Pareto
         if len(pareto_front) > 0:
@@ -490,8 +419,8 @@ class ConvergenceTracker:
         )
 
         # Debug: Log métricas calculadas
-        hv_value = metrics.get(self.hv_key, 0)
-        logger.debug(f"{self.hv_key}: {hv_value:.6e}")
+        hv_value = metrics.get('r_hypervolume', 0)
+        logger.debug(f"Hypervolume: {hv_value:.6e}")
         logger.debug(f"Spread: {metrics['spread']:.4f}")
         logger.debug(f"Spacing: {metrics['spacing']:.6e}")
 
@@ -499,7 +428,7 @@ class ConvergenceTracker:
         best_fitness = np.min(population_fitness[:, 0]) if len(population_fitness) > 0 else 0
 
         self.history['generation'].append(generation)
-        self.history[self.hv_key].append(hv_value)
+        self.history['r_hypervolume'].append(hv_value)
         self.history['spread'].append(metrics['spread'])
         self.history['spacing'].append(metrics['spacing'])
         self.history['pareto_size'].append(metrics['pareto_size'])
@@ -516,7 +445,7 @@ class ConvergenceTracker:
 
     def has_converged(self, window: int = 10, threshold: float = 0.01) -> bool:
         """
-        Verifica se o algoritmo convergiu baseado no hypervolume (HV ou R-HV).
+        Verifica se o algoritmo convergiu baseado no hypervolume.
 
         Args:
             window: Janela de gerações para análise
@@ -525,10 +454,10 @@ class ConvergenceTracker:
         Returns:
             True se convergiu
         """
-        if len(self.history[self.hv_key]) < window + 1:
+        if len(self.history['r_hypervolume']) < window + 1:
             return False
 
-        recent_hv = self.history[self.hv_key][-window:]
+        recent_hv = self.history['r_hypervolume'][-window:]
         improvement = (max(recent_hv) - min(recent_hv)) / (abs(min(recent_hv)) + 1e-10)
 
         return improvement < threshold
@@ -545,8 +474,8 @@ class ConvergenceTracker:
         Returns:
             Número da geração de convergência ou None se não convergiu
         """
-        for i in range(window, len(self.history[self.hv_key])):
-            window_hv = self.history[self.hv_key][i-window:i]
+        for i in range(window, len(self.history['r_hypervolume'])):
+            window_hv = self.history['r_hypervolume'][i-window:i]
             improvement = (max(window_hv) - min(window_hv)) / (abs(min(window_hv)) + 1e-10)
 
             if improvement < threshold:
