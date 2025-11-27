@@ -149,12 +149,12 @@ def exemplo_comparacao_multiplas_execucoes():
     # ]
 
     # Array de quantidades de ativos para testar
-    asset_quantities = [60]
+    asset_quantities = [10]
 
     # Configurações de população e gerações para testar
     configs = [
+        {'pop': 50, 'gen': 50},
         {'pop': 100, 'gen': 100},
-        {'pop': 100, 'gen': 200},
     ]
 
     # Usa pontos de referência TEÓRICOS fixos para normalização consistente
@@ -177,6 +177,47 @@ def exemplo_comparacao_multiplas_execucoes():
 
     # Para cada quantidade de ativos
     for num_assets in asset_quantities:
+
+        print(f"\n📐 CALCULANDO PONTOS DE REFERÊNCIA FIXOS...")
+        print(f"   Executando configuração de referência para estabelecer baseline...")
+
+        # Executa uma configuração de referência para estimar ideal_point e nadir_point
+        # Usa a maior configuração para obter os melhores resultados possíveis
+        reference_service = Nsga2OtimizacaoService(
+            app=app,
+            restricted_asset_ids=[],
+            risk_level=risk_level,
+            years_period=10,
+            show_chart=False
+        )
+
+        reference_tracker = ConvergenceTracker(
+            reference_points_rnsga2=REFERENCE_POINTS_CONFIG[risk_level],
+            weights=WEIGHTS_CONFIG
+        )
+
+        # Executa com a maior quantidade de ativos e melhor configuração
+        reference_service.optimize(
+            population_size=150,
+            generations=200,  # Mais gerações para garantir boa convergência
+            convergence_tracker=reference_tracker,
+            max_assets=max(asset_quantities),
+            use_optimal_config=False
+        )
+
+        # Extrai os pontos de referência fixos do tracker de referência
+        # Ambos são acumulados ao longo de TODAS as gerações:
+        # - ideal_point: mínimo acumulado (melhor caso)
+        # - nadir_point: máximo acumulado (pior caso)
+        fixed_ideal_point = reference_tracker.ideal_point.copy()
+        fixed_nadir_point = reference_tracker.nadir_point.copy()
+
+        print(f"\n   ✅ Pontos de referência calculados (acumulados de 200 gerações):")
+        print(f"      Ideal point: {fixed_ideal_point}")
+        print(f"      Nadir point: {fixed_nadir_point}")
+        print(f"   🔒 Estes valores serão FIXOS para todas as comparações!\n")
+
+
         print(f"\n{'='*80}")
         print(f"🎯 TESTANDO COM {num_assets} ATIVOS")
         print(f"{'='*80}\n")
@@ -199,16 +240,18 @@ def exemplo_comparacao_multiplas_execucoes():
             run_convergence_gens = []
             run_histories = []
 
-            # Executa 3 vezes a mesma configuração
-            for run_num in range(1, 11):
-                print(f"\n   🔄 Execução {run_num}/3...")
+            # Executa 10 vezes a mesma configuração
+            for run_num in range(1, 4):
+                print(f"\n   🔄 Execução {run_num}/10...")
 
                 service = Nsga2OtimizacaoService(
                     app=app,
                     restricted_asset_ids=[],
                     risk_level=risk_level,
                     years_period=10,
-                    show_chart=False
+                    show_chart=False,
+                    fixed_ideal_point=fixed_ideal_point,
+                    fixed_nadir_point=fixed_nadir_point,
                 )
 
                 tracker = ConvergenceTracker(
@@ -389,12 +432,12 @@ def exemplo_comparacao_multiplas_execucoes():
                 avg_history['best_fitness'].append(np.mean(fitness))
 
             averaged_histories.append(avg_history)
-            labels.append(f"{result['label']} (média de 3 runs)")
+            labels.append(f"{result['label']} (média de 10 runs)")
 
         plot_multiple_runs_comparison(
             histories=averaged_histories,
             labels=labels,
-            title=f"Comparação de Configurações - {num_assets} Ativos (Média de 3 Execuções)",
+            title=f"Comparação de Configurações - {num_assets} Ativos (Média de 10 Execuções)",
             save_path=f'comparison_{num_assets}_assets.png',
             show_plot=False
         )

@@ -236,7 +236,8 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         #     out["G"] = [hhi_constraint]
 
 class Nsga2OtimizacaoService:
-    def __init__(self, app, restricted_asset_ids, risk_level, years_period=5, reference_date=None, start_date=None, asset_ids: List[int] = None, show_chart=False):
+    def __init__(self, app, restricted_asset_ids, risk_level, years_period=5, reference_date=None, start_date=None, asset_ids: List[int] = None, show_chart=False,
+                 fixed_nadir_point=False, fixed_ideal_point=False):
         """
         Serviço de otimização de carteira usando R-NSGA2 (Reference Point Based NSGA-II).
 
@@ -272,6 +273,8 @@ class Nsga2OtimizacaoService:
         self.covariance_matrix = None
         self.returns_history = None
         self.tickers = None
+        self.fixed_nadir_point = fixed_nadir_point
+        self.fixed_ideal_point = fixed_ideal_point
 
     def _prepare_data(self):
 
@@ -734,21 +737,32 @@ class Nsga2OtimizacaoService:
 
         # Usa configuração centralizada (constantes do módulo)
         ref_points = REFERENCE_POINTS_CONFIG.get(self.risk_level)
-        weights = WEIGHTS_CONFIG
 
-        return RNSGA2(
+        # Parâmetros comuns a todas as execuções
+        common_args = dict(
             ref_points=ref_points,
             pop_size=population_size,
             crossover=crossover,
             mutation=mutation,
             sampling=sampling,
-            epsilon=0.01,  # Controla o tamanho da região de interesse em torno dos pontos de referência
-            normalization='front',
-            # normalization='bounded',  # usa bounds FIXOS
-            # ideal_point=IDEAL_POINT_PORTFOLIO,  # MESMO DO TUNING
-            # nadir_point=NADIR_POINT_PORTFOLIO,  # MESMO DO TUNING
-            extreme_points_as_reference_points=False,  # Usa apenas nossos pontos customizados
-            weights=weights  # Pesos variam por perfil de risco
+            epsilon=0.01,
+            extreme_points_as_reference_points=False,
+            weights=WEIGHTS_CONFIG,
+        )
+
+        # Se bounds fixos foram fornecidos → usar bounded normalization
+        if self.fixed_ideal_point is not None and self.fixed_nadir_point is not None:
+            return RNSGA2(
+                **common_args,
+                normalization="bounded",
+                ideal_point=self.fixed_ideal_point,
+                nadir_point=self.fixed_nadir_point,
+            )
+
+        # Caso contrário → normalização dinâmica por geração
+        return RNSGA2(
+            **common_args,
+            normalization="front",
         )
 
         # return NSGA2(pop_size=population_size, crossover=crossover,
