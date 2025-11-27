@@ -149,7 +149,7 @@ def exemplo_comparacao_multiplas_execucoes():
     # ]
 
     # Array de quantidades de ativos para testar
-    asset_quantities = [10]
+    asset_quantities = [60]
 
     # Configurações de população e gerações para testar
     configs = [
@@ -342,11 +342,63 @@ def exemplo_comparacao_multiplas_execucoes():
             print(f"   Trade-off Score:    {result['trade_off_score']:.6e}")
             print()
 
-        # Encontra a melhor configuração (maior trade-off)
-        best_config = max(config_results, key=lambda x: x['trade_off_score'])
+        # Função para comparar configurações priorizando hipervolume
+        # Tempo só é considerado se hipervolumes forem 90% iguais (diferença <= 10%)
+        def compare_configs(config1, config2):
+            """
+            Compara duas configurações priorizando hipervolume.
+            Retorna config1 se for melhor, config2 caso contrário.
+
+            Regra:
+            - Se hipervolumes forem 90% iguais (diferença relativa <= 0.10), escolhe pelo menor tempo
+            - Caso contrário, escolhe pelo maior hipervolume
+            """
+            hv1 = config1['hypervolume_mean']
+            hv2 = config2['hypervolume_mean']
+            time1 = config1['execution_time_mean']
+            time2 = config2['execution_time_mean']
+
+            # Calcula diferença relativa entre hipervolumes
+            # Usa o maior hipervolume como base para a comparação percentual
+            max_hv = max(hv1, hv2)
+            if max_hv > 0:
+                relative_diff = abs(hv1 - hv2) / max_hv
+            else:
+                relative_diff = 0
+
+            # Se hipervolumes são 90% iguais (diferença <= 10%), considera o tempo
+            if relative_diff <= 0.10:
+                # Hipervolumes muito próximos, escolhe pelo menor tempo
+                return config1 if time1 <= time2 else config2
+            else:
+                # Hipervolumes diferentes, escolhe pelo maior hipervolume
+                return config1 if hv1 > hv2 else config2
+
+        # Encontra a melhor configuração usando comparação customizada
+        from functools import reduce
+        best_config = reduce(compare_configs, config_results)
         best_idx = config_results.index(best_config) + 1
 
+        # Explica o critério de seleção
+        print(f"\n{'='*80}")
+        print(f"📊 CRITÉRIO DE SELEÇÃO:")
+        print(f"   ✓ Prioridade: HIPERVOLUME (qualidade da solução)")
+        print(f"   ✓ Tempo só é considerado se hipervolumes forem 90% iguais")
+        print(f"   ✓ Diferença tolerada: ≤ 10% entre hipervolumes")
+
+        # Verifica se houve empate de hipervolume na escolha final
+        if len(config_results) > 1:
+            # Compara a melhor com a segunda melhor para ver se foi por tempo ou hipervolume
+            other_configs = [c for c in config_results if c != best_config]
+            for other in other_configs:
+                max_hv = max(best_config['hypervolume_mean'], other['hypervolume_mean'])
+                if max_hv > 0:
+                    rel_diff = abs(best_config['hypervolume_mean'] - other['hypervolume_mean']) / max_hv
+                    if rel_diff <= 0.10:
+                        print(f"   ⚖️  Hipervolume similar detectado (±{rel_diff*100:.1f}%), tempo foi considerado")
+                        break
         print(f"{'='*80}")
+
         print(f"🏆 MELHOR CONFIGURAÇÃO: #{best_idx} - {best_config['label']}")
         print(f"   População: {best_config['population_size']}")
         print(f"   Gerações: {best_config['generations']}")
