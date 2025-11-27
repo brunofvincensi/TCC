@@ -139,6 +139,27 @@ class QualityMetrics:
         # R2 = média dos mínimos ASF
         r2 = r2_sum / n_ref_points
 
+        # DEBUG: Log detalhado a cada 10 gerações ou se for gen 0
+
+        if not hasattr(self, '_debug_counter'):
+            self._debug_counter = 0
+
+        self._debug_counter += 1
+
+        # Log detalhado a cada 10 chamadas ou nas primeiras 3
+
+        if self._debug_counter <= 3 or self._debug_counter % 10 == 0:
+            logger.info(f"\n{'=' * 60}")
+            logger.info(f" DEBUG R-Hypervolume (call #{self._debug_counter}):")
+            logger.info(f"   Fronteira: {len(pareto_front)} soluções")
+            logger.info(f"   Exemplo: {pareto_front[0]}")
+            logger.info(f"   Exemplo normalizado: {normalized_front[0] if len(normalized_front) > 0 else 'N/A'}")
+            logger.info(f"   Reference points: {normalized_ref_points}")
+            logger.info(f"   R2 calculado: {r2:.6f} (menor = melhor)")
+            logger.info(f"   Ideal usado: {ideal_point}")
+            logger.info(f"   Nadir usado: {nadir_point}")
+            logger.info(f"{'=' * 60}\n")
+
         logger.debug(f"R2 indicator calculado: {r2:.6e}")
         logger.debug(f"Quanto menor R2, melhor a fronteira em relação aos ref points")
 
@@ -157,6 +178,16 @@ class QualityMetrics:
             # Usamos abs(r2) para manter a escala mesmo quando super-ótimo
             r2_adjusted = abs(r2) if r2 < 0 else r2
             r_hv = 1.0 / (1.0 + r2_adjusted)
+
+            # Log simplificado nas primeiras gerações
+
+            if self._debug_counter <= 3 or self._debug_counter % 10 == 0:
+
+                logger.info(f"   → R-HV final: {r_hv:.4f} (maior = melhor)")
+
+                if r2 < 0:
+
+                    logger.info(f"   ⭐ R2 NEGATIVO: Soluções melhores que reference points!")
 
             logger.debug(f"R-HV (sigmoid): R2={r2:.4f} (adjusted={r2_adjusted:.4f}) → R-HV={r_hv:.4f}")
             if r2 < 0:
@@ -373,6 +404,9 @@ class ConvergenceTracker:
 
         self.metrics_calculator = QualityMetrics()
 
+        # Armazena fronteiras para análise posterior
+        self._all_pareto_fronts = []
+
         if self.use_fixed_points:
             logger.info(f"🔒 Usando pontos de referência FIXOS para comparação justa:")
             logger.info(f"   Ideal point fixo: {self.fixed_ideal_point}")
@@ -424,6 +458,10 @@ class ConvergenceTracker:
                 if not np.array_equal(old_nadir, self.nadir_point):
                     logger.info(f"📊 Ponto nadir ATUALIZADO: {self.nadir_point}")
                     logger.info(f"   Piora: {self.nadir_point - old_nadir}")
+
+        # Armazena fronteira para análise posterior
+        if len(pareto_front) > 0:
+            self._all_pareto_fronts.append(pareto_front.copy())
 
         # Debug: Log estatísticas da fronteira de Pareto
         if len(pareto_front) > 0:

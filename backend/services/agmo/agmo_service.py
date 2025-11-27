@@ -30,33 +30,55 @@ MIN_ASSETS = 5
 # - 0.0 = melhor valor possível (min risco / max retorno)
 # - 1.0 = pior valor possível (max risco / min retorno)
 REFERENCE_POINTS_CONFIG = {
-    'conservador': np.array([[0.3, 0.05, 0.05]]),  # Aceita retorno pior, mas quer riscos ~0
+    'conservador': np.array([[0.3, 0.05, 0.05]]),  # Aceita retorno pior, mas quer menos riscos
     'moderado':    np.array([[0.3, 0.2, 0.2]]),  # Balanceado
-    'arrojado':    np.array([[0.05, 0.3, 0.3]])   # Quer melhor retorno, aceita mais risco
+    'arrojado':    np.array([[0.05, 0.25, 0.25]])   # Quer melhor retorno, aceita mais risco
 }
 
-# Weights para Achievement Scalarizing Function (ASF)
-WEIGHTS_CONFIG = {
-    'conservador': np.array([0.20, 0.40, 0.40]),  # Desvios em risco são 2x mais graves
-    'moderado':    np.array([0.33, 0.34, 0.33]),  # Equilibrado
-    'arrojado':    np.array([0.50, 0.25, 0.25])   # Desvios em retorno são 2x mais graves
-}
+#'moderado': [[0.3, 0.25, 0.35]]  # Drawdown mais realista
+#'moderado':    np.array([[0.18, 0.41, 0.43]]),  # Balanceado
+
+# # Weights para Achievement Scalarizing Function (ASF)
+# WEIGHTS_CONFIG = {
+#     'conservador': np.array([0.20, 0.40, 0.40]),  # Desvios em risco são 2x mais graves
+#     'moderado':    np.array([0.33, 0.34, 0.33]),  # Equilibrado
+#     'arrojado':    np.array([0.50, 0.25, 0.25])   # Desvios em retorno são 2x mais graves
+# }
+
+WEIGHTS_CONFIG = np.array([0.33, 0.34, 0.33])
+
 
 # Pontos Ideal e Nadir TEÓRICOS para normalização consistente do R-Hypervolume
 # Baseados em limites realistas para portfólios de ações brasileiras
 # Formato: [retorno_esperado_mensal, volatilidade_mensal, max_drawdown]
 #
-# IDEAL POINT (melhor caso teórico):
-# - Retorno esperado: -3% ao mês (negativo porque minimizamos -retorno)
-# - Volatilidade: 0.5% ao mês (muito estável)
-# - Max Drawdown: 2% (perda máxima pequena)
-IDEAL_POINT_PORTFOLIO = np.array([-0.03, 0.005, 0.02])
+# Pontos Ideal e Nadir CALIBRADOS para normalização consistente do R-Hypervolume
+
+# Baseados em dados REAIS observados de portfólios otimizados
+
+# Formato: [retorno_esperado_mensal, volatilidade_mensal, max_drawdown]
+
+#
+
+# IDEAL POINT (melhor caso realista):
+
+# - Retorno esperado: -2.5% ao mês (melhor observado: ~-2.2%)
+
+# - Volatilidade: 0.3% ao mês (melhor observado: ~0.34%)
+
+# - Max Drawdown: 8% (melhor observado: ~9.9%)
+
+IDEAL_POINT_PORTFOLIO = np.array([-0.025, 0.005, 0.09])
 
 # NADIR POINT (pior caso aceitável):
-# - Retorno esperado: +1.5% ao mês (ruim, positivo porque minimizamos -retorno)
-# - Volatilidade: 2.5% ao mês (muito volátil)
-# - Max Drawdown: 18% (perda máxima grande)
-NADIR_POINT_PORTFOLIO = np.array([0.015, 0.025, 0.18])
+
+# - Retorno esperado: +1% ao mês (pior observado: ~-1.6%)
+
+# - Volatilidade: 1% ao mês (pior observado: ~0.69%)
+
+# - Max Drawdown: 16% (pior observado: ~13.5%)
+
+NADIR_POINT_PORTFOLIO = np.array([-0.010, 0.01, 0.15])
 # ===============================================================
 
 class ConvergenceCallback(Callback):
@@ -470,7 +492,7 @@ class Nsga2OtimizacaoService:
 
         # Usa configuração centralizada (constantes do módulo)
         ref_point = REFERENCE_POINTS_CONFIG[self.risk_level][0]  # [0] extrai o primeiro array da matriz
-        weights = WEIGHTS_CONFIG[self.risk_level]
+        weights = WEIGHTS_CONFIG
 
         # Normaliza os objetivos para [0, 1]
         objectives_normalized = objectives.copy()
@@ -629,18 +651,6 @@ class Nsga2OtimizacaoService:
         # Mas self.assets_to_optimize pode estar em ordem diferente
         weights_by_ticker = {ticker: float(weight) for ticker, weight in zip(self.tickers, optimal_weights)}
 
-        print(f"\n{'='*70}")
-        print(f"🔗 MAPEAMENTO PESOS → ATIVOS")
-        print(f"{'='*70}")
-        print(f"  Ordem self.tickers (usado na otimização):")
-        for i, ticker in enumerate(self.tickers):
-            print(f"    [{i}] {ticker:8s} → peso: {optimal_weights[i]:.6f}")
-        print(f"\n  Ordem self.assets_to_optimize (usado no resultado):")
-        for i, asset in enumerate(self.assets_to_optimize):
-            weight = weights_by_ticker.get(asset.ticker, 0)
-            print(f"    [{i}] {asset.ticker:8s} → peso: {weight:.6f}")
-        print(f"{'='*70}\n")
-
         final_composition = []
         for asset in self.assets_to_optimize:
             weight = weights_by_ticker.get(asset.ticker, 0)
@@ -724,7 +734,7 @@ class Nsga2OtimizacaoService:
 
         # Usa configuração centralizada (constantes do módulo)
         ref_points = REFERENCE_POINTS_CONFIG.get(self.risk_level)
-        weights = WEIGHTS_CONFIG.get(self.risk_level)
+        weights = WEIGHTS_CONFIG
 
         return RNSGA2(
             ref_points=ref_points,
@@ -733,7 +743,10 @@ class Nsga2OtimizacaoService:
             mutation=mutation,
             sampling=sampling,
             epsilon=0.01,  # Controla o tamanho da região de interesse em torno dos pontos de referência
-            normalization='front',  # Normaliza baseado na fronteira atual
+            normalization='front',
+            # normalization='bounded',  # usa bounds FIXOS
+            # ideal_point=IDEAL_POINT_PORTFOLIO,  # MESMO DO TUNING
+            # nadir_point=NADIR_POINT_PORTFOLIO,  # MESMO DO TUNING
             extreme_points_as_reference_points=False,  # Usa apenas nossos pontos customizados
             weights=weights  # Pesos variam por perfil de risco
         )
@@ -1069,8 +1082,8 @@ def save_backtest_chart(portfolio: List[Dict],
 
 
 def optimize_current_portfolio(app):
-    service = Nsga2OtimizacaoService(app, [1, 10], "conservador", 10, show_chart=True)
-    result = service.optimize(max_assets=10, use_optimal_config=False)
+    service = Nsga2OtimizacaoService(app, [1, 10], "moderado", 10, show_chart=True)
+    result = service.optimize(max_assets=25, use_optimal_config=False)
 
     # Informações adicionais
     print(f"\n📅 INFORMAÇÕES DO PERÍODO:")

@@ -63,7 +63,7 @@ def exemplo_simples():
 
     tracker = ConvergenceTracker(
         reference_points_rnsga2=REFERENCE_POINTS_CONFIG[risk_level],
-        weights=WEIGHTS_CONFIG[risk_level]
+        weights=WEIGHTS_CONFIG
     )
 
     print(f"   ✅ Tracker criado com sucesso!\n")
@@ -153,8 +153,8 @@ def exemplo_comparacao_multiplas_execucoes():
 
     # Configurações de população e gerações para testar
     configs = [
-        {'pop': 50, 'gen': 100},
-        {'pop': 150, 'gen': 150},
+        {'pop': 100, 'gen': 100},
+        {'pop': 100, 'gen': 200},
     ]
 
     # Usa pontos de referência TEÓRICOS fixos para normalização consistente
@@ -200,7 +200,7 @@ def exemplo_comparacao_multiplas_execucoes():
             run_histories = []
 
             # Executa 3 vezes a mesma configuração
-            for run_num in range(1, 21):
+            for run_num in range(1, 11):
                 print(f"\n   🔄 Execução {run_num}/3...")
 
                 service = Nsga2OtimizacaoService(
@@ -213,7 +213,7 @@ def exemplo_comparacao_multiplas_execucoes():
 
                 tracker = ConvergenceTracker(
                     reference_points_rnsga2=REFERENCE_POINTS_CONFIG[risk_level],
-                    weights=WEIGHTS_CONFIG[risk_level],
+                    weights=WEIGHTS_CONFIG,
                     fixed_ideal_point=fixed_ideal_point,
                     fixed_nadir_point=fixed_nadir_point
                 )
@@ -234,6 +234,15 @@ def exemplo_comparacao_multiplas_execucoes():
                 # Obtém métricas
                 history = tracker.get_history()
                 run_histories.append(history)
+
+                # DEBUG: Imprime valores reais dos objetivos (sem normalização)
+                if hasattr(tracker, '_all_pareto_fronts') and len(tracker._all_pareto_fronts) > 0:
+                    all_fronts = np.vstack(tracker._all_pareto_fronts)
+                    print(f"\n      📊 DEBUG - Valores REAIS dos objetivos:")
+                    print(f"         Min observado: {np.min(all_fronts, axis=0)}")
+                    print(f"         Max observado: {np.max(all_fronts, axis=0)}")
+                    print(f"         Ideal fixo: {fixed_ideal_point}")
+                    print(f"         Nadir fixo: {fixed_nadir_point}")
 
                 # Hypervolume final
                 final_hypervolume = history['r_hypervolume'][-1] if history['r_hypervolume'] else 0
