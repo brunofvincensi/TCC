@@ -1,6 +1,8 @@
 from matplotlib import pyplot as plt
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.config import Config
+
+from services.agmo.asf_calculator import compute_asf
 from services.agmo.custom_operators import (
     SimplexSamplingCardConstraint,
     SimplexCrossoverCardConstraint,
@@ -35,51 +37,8 @@ REFERENCE_POINTS_CONFIG = {
     'arrojado':    np.array([[0.05, 0.25, 0.25]])   # Quer melhor retorno, aceita mais risco
 }
 
-#'moderado': [[0.3, 0.25, 0.35]]  # Drawdown mais realista
-#'moderado':    np.array([[0.18, 0.41, 0.43]]),  # Balanceado
-
-# # Weights para Achievement Scalarizing Function (ASF)
-# WEIGHTS_CONFIG = {
-#     'conservador': np.array([0.20, 0.40, 0.40]),  # Desvios em risco são 2x mais graves
-#     'moderado':    np.array([0.33, 0.34, 0.33]),  # Equilibrado
-#     'arrojado':    np.array([0.50, 0.25, 0.25])   # Desvios em retorno são 2x mais graves
-# }
-
 WEIGHTS_CONFIG = np.array([0.33, 0.34, 0.33])
 
-
-# Pontos Ideal e Nadir TEÓRICOS para normalização consistente do R-Hypervolume
-# Baseados em limites realistas para portfólios de ações brasileiras
-# Formato: [retorno_esperado_mensal, volatilidade_mensal, max_drawdown]
-#
-# Pontos Ideal e Nadir CALIBRADOS para normalização consistente do R-Hypervolume
-
-# Baseados em dados REAIS observados de portfólios otimizados
-
-# Formato: [retorno_esperado_mensal, volatilidade_mensal, max_drawdown]
-
-#
-
-# IDEAL POINT (melhor caso realista):
-
-# - Retorno esperado: -2.5% ao mês (melhor observado: ~-2.2%)
-
-# - Volatilidade: 0.3% ao mês (melhor observado: ~0.34%)
-
-# - Max Drawdown: 8% (melhor observado: ~9.9%)
-
-IDEAL_POINT_PORTFOLIO = np.array([-0.025, 0.005, 0.09])
-
-# NADIR POINT (pior caso aceitável):
-
-# - Retorno esperado: +1% ao mês (pior observado: ~-1.6%)
-
-# - Volatilidade: 1% ao mês (pior observado: ~0.69%)
-
-# - Max Drawdown: 16% (pior observado: ~13.5%)
-
-NADIR_POINT_PORTFOLIO = np.array([-0.010, 0.01, 0.15])
-# ===============================================================
 
 class ConvergenceCallback(Callback):
     """
@@ -236,28 +195,10 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         #     out["G"] = [hhi_constraint]
 
 class Nsga2OtimizacaoService:
-    def __init__(self, app, restricted_asset_ids, risk_level, years_period=5, reference_date=None, start_date=None, asset_ids: List[int] = None, show_chart=False,
+    def __init__(self, app, restricted_asset_ids, risk_level, years_period=3, reference_date=None, start_date=None, asset_ids: List[int] = None, show_chart=False,
                  fixed_nadir_point=False, fixed_ideal_point=False):
         """
         Serviço de otimização de carteira usando R-NSGA2 (Reference Point Based NSGA-II).
-
-        R-NSGA2 permite guiar a busca durante a otimização usando pontos de referência
-        customizados por perfil de risco, ao contrário do NSGA2 tradicional que só
-        permite seleção após gerar todas as soluções não-dominadas.
-
-        Args:
-            app: Instância da aplicação Flask
-            restricted_asset_ids: Lista de IDs de ativos a serem excluídos da otimização
-            risk_level: Perfil de risco ('conservador', 'moderado', 'arrojado')
-                        - conservador: Prioriza minimizar riscos (variância e CVaR)
-                        - moderado: Busca equilíbrio entre retorno e risco
-                        - arrojado: Prioriza maximizar retorno
-            years_period: Prazo do investimento em anos
-            reference_date: Data de referência para backtest (opcional). Se fornecida,
-                           usa apenas dados históricos até essa data. Formato: datetime.date
-
-        Referências:
-            - Deb & Sundar (2006). "Reference point based multi-objective optimization using evolutionary algorithms"
         """
         self.app = app
         self.restricted_asset_ids = restricted_asset_ids
@@ -358,7 +299,7 @@ class Nsga2OtimizacaoService:
             if len(valid_assets) < MIN_ASSETS:
                 raise ValueError(f" Reduza o prazo de investimento (atual: {self.years_period} anos)\n")
 
-            print(f"\n  ✅ Resultado do filtro:")
+            print(f"\n  Resultado do filtro:")
             print(f"     Ativos incluídos: {len(valid_assets)}")
             print(f"     Ativos excluídos: {len(excluded_assets)}")
 
@@ -488,7 +429,6 @@ class Nsga2OtimizacaoService:
         o algoritmo busca soluções próximas ao reference point, e a seleção final
         escolhe a solução mais próxima a esse mesmo ponto.
 
-        ASF(x, ref) = max_i { (f_i(x) - z_i) / w_i }
         Menor ASF = mais próximo do reference point = melhor solução
         """
         print(f"Selecionando a melhor solução para o perfil '{self.risk_level}'...")
@@ -509,24 +449,13 @@ class Nsga2OtimizacaoService:
                 objectives_normalized[:, i] = 0.0
 
         # Calcula ASF para cada solução
-        asf_values = []
-        for obj in objectives_normalized:
-            # ASF = max_i { (obj[i] - ref[i]) / weight[i] }
-            # Menor ASF = mais próximo do reference point
-            asf_components = (obj - ref_point) / weights
-            asf = np.max(asf_components)
-            asf_values.append(asf)
-
-        asf_values = np.array(asf_values)
+        asf_values = [compute_asf(obj, ref_point, weights)
+                      for obj in objectives_normalized]
 
         # Seleciona solução com MENOR ASF (mais próxima do reference point)
         best_idx = np.argmin(asf_values)
-
-        print(f"✅ Solução selecionada: índice {best_idx} (ASF = {asf_values[best_idx]:.4f})")
-        print(f"   Objetivos normalizados: {objectives_normalized[best_idx]}")
-        print(f"   Reference point alvo: {ref_point}")
-
         return solutions[best_idx]
+
 
     def _print_matrix(self, matrix, formato=".3f"):
         """
@@ -566,8 +495,7 @@ class Nsga2OtimizacaoService:
 
     def optimize(self, population_size: int = None, generations: int = None,
                  crossover_eta: float = 10.0, mutation_eta: float = 10.0,
-                 convergence_tracker=None, use_optimal_config: bool = True,
-                 enable_early_stopping=False, max_assets: int = 20):
+                 convergence_tracker=None, use_optimal_config: bool = True, max_assets: int = 20):
 
         if max_assets is not None and max_assets < MIN_ASSETS:
             raise ValueError(f"São necessários pelo menos {MIN_ASSETS} ativos para a otimização.")
@@ -584,7 +512,7 @@ class Nsga2OtimizacaoService:
 
         callback = self.get_callback(convergence_tracker)
 
-        termination = self.get_termination(generations, enable_early_stopping)
+        termination = self.get_termination(generations)
 
         print(f"\n{'='*70}")
         print(f"🚀 EXECUTANDO OTIMIZAÇÃO R-NSGA2")
@@ -803,22 +731,18 @@ class Nsga2OtimizacaoService:
                         population_size = optimal_config.population_size
                     if generations is None:
                         generations = optimal_config.generations
-
-                    print(f"  ✅ Configuração ótima encontrada no banco!")
-                    print(f"  📊 População: {population_size}")
-                    print(f"  📊 Gerações: {generations}")
-                    print(f"  📅 Tuning realizado em: {optimal_config.tuning_date.strftime('%Y-%m-%d')}")
-                    print(f"  🎯 Hypervolume médio: {optimal_config.hypervolume_mean:.6f}")
-                    print(f"  ⏱️  Tempo médio esperado: {optimal_config.execution_time_mean:.2f}s")
+                    print(f"  Configuração ótima encontrada no banco!")
+                    print(f"  População: {population_size}")
+                    print(f"  Gerações: {generations}")
                 else:
-                    print(f"  ⚠️  Configuração não encontrada. Usando valores padrão.")
+                    print(f"  Configuração não encontrada. Usando valores padrão.")
                     if population_size is None:
                         population_size = DEFAULT_POPULATION_SIZE
                     if generations is None:
                         generations = DEFAULT_GEN_SIZE
 
         except Exception as e:
-            print(f"  ⚠️  Erro ao buscar configuração: {e}")
+            print(f"  Erro ao buscar configuração: {e}")
             if population_size is None:
                 population_size = DEFAULT_POPULATION_SIZE
             if generations is None:
@@ -826,23 +750,9 @@ class Nsga2OtimizacaoService:
 
         return population_size, generations
 
-    def get_termination(self, generations, enable_early_stopping):
-        if enable_early_stopping:
-            from pymoo.termination import DefaultMultiObjectiveTermination
+    def get_termination(self, generations):
+        return ('n_gen', generations)
 
-            termination = DefaultMultiObjectiveTermination(
-                ftol=0.005, # Tolerância na mudança dos objetivos
-                period=40,  # Janela de análise (gerações)
-                n_max_gen=generations
-            )
-
-            print(f"  ⚡ Parada adaptativa:")
-            print(f"     Máximo: {generations} gerações (do banco)")
-            print(f"     Critério: ftol=0.005 (pode parar antes)")
-            return termination
-        else:
-            print(f"  🎯 Gerações fixas: {generations} (do banco)")
-            return ('n_gen', generations)
 
     def get_callback(self, convergence_tracker) -> ConvergenceCallback:
         if convergence_tracker is not None:

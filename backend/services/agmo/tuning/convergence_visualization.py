@@ -19,16 +19,6 @@ def plot_convergence_evolution(history: Dict,
                                figsize: tuple = (16, 10)) -> str:
     """
     Cria um gráfico completo mostrando a evolução de todas as métricas de convergência.
-
-    Args:
-        history: Dicionário com histórico de métricas do ConvergenceTracker
-        title: Título principal do gráfico
-        save_path: Caminho para salvar o gráfico (opcional)
-        show_plot: Se True, mostra o gráfico
-        figsize: Tamanho da figura (largura, altura)
-
-    Returns:
-        Caminho do arquivo salvo (ou None se não salvou)
     """
     # Verifica se há dados
     if not history or 'generation' not in history or len(history['generation']) == 0:
@@ -159,16 +149,6 @@ def plot_hypervolume_only(history: Dict,
                          figsize: tuple = (12, 7)) -> str:
     """
     Cria um gráfico focado apenas na evolução do R-Hypervolume/Hypervolume.
-
-    Args:
-        history: Dicionário com histórico de métricas do ConvergenceTracker
-        title: Título do gráfico
-        save_path: Caminho para salvar o gráfico (opcional)
-        show_plot: Se True, mostra o gráfico
-        figsize: Tamanho da figura (largura, altura)
-
-    Returns:
-        Caminho do arquivo salvo
     """
     # Verifica se há dados
     if not history or 'generation' not in history or len(history['generation']) == 0:
@@ -265,17 +245,6 @@ def plot_multiple_runs_comparison(histories: List[Dict],
                                   figsize: tuple = (14, 8)) -> str:
     """
     Compara a evolução do R-Hypervolume de múltiplas execuções em um único gráfico.
-
-    Args:
-        histories: Lista de dicionários com histórico de métricas
-        labels: Lista de rótulos para cada execução
-        title: Título do gráfico
-        save_path: Caminho para salvar o gráfico (opcional)
-        show_plot: Se True, mostra o gráfico
-        figsize: Tamanho da figura (largura, altura)
-
-    Returns:
-        Caminho do arquivo salvo
     """
     if not histories or len(histories) == 0:
         print("⚠️  Sem dados para visualizar")
@@ -339,9 +308,6 @@ def plot_multiple_runs_comparison(histories: List[Dict],
 def print_convergence_summary(history: Dict):
     """
     Imprime um resumo estatístico da convergência.
-
-    Args:
-        history: Dicionário com histórico de métricas do ConvergenceTracker
     """
     if not history or 'generation' not in history or len(history['generation']) == 0:
         print("⚠️  Sem dados para resumir")

@@ -16,6 +16,8 @@ import numpy as np
 from typing import Optional
 import logging
 
+from services.agmo.asf_calculator import compute_asf
+
 logger = logging.getLogger(__name__)
 
 
@@ -118,22 +120,10 @@ class QualityMetrics:
 
         for ref_point in normalized_ref_points:
             # Para cada ponto de referência, encontra a solução com menor ASF
-            min_asf = float('inf')
-
-            for solution in normalized_front:
-                # ASF(a, z, w) = max_i {(a_i - z_i) / w_i}
-                # - a_i: valor normalizado da solução no objetivo i [0, 1]
-                # - z_i: ponto de referência (aspiração) no objetivo i [0, 1]
-                # - w_i: peso do objetivo i
-                # Evita divisão por zero nos pesos
-                asf_values = np.where(weights > 1e-6,
-                                     (solution - ref_point) / weights,
-                                     (solution - ref_point) * 1e6)
-                asf = np.max(asf_values)
-
-                if asf < min_asf:
-                    min_asf = asf
-
+            min_asf = min(
+                compute_asf(solution, ref_point, weights)
+                for solution in normalized_front
+            )
             r2_sum += min_asf
 
         # R2 = média dos mínimos ASF
@@ -446,14 +436,14 @@ class ConvergenceTracker:
 
             if not self.nadir_point_set:
                 # Primeira geração: inicializa nadir point com margem generosa
-                self.nadir_point = max_values * 1.5
+                self.nadir_point = max_values
                 self.nadir_point_set = True
                 logger.info(f"📊 Ponto nadir INICIAL (pior caso gen 0 com margem): {self.nadir_point}")
             else:
                 # Atualiza nadir point com os PIORES valores já vistos
                 # Em minimização: max é pior
                 old_nadir = self.nadir_point.copy()
-                self.nadir_point = np.maximum(self.nadir_point, max_values * 1.1)
+                self.nadir_point = np.maximum(self.nadir_point, max_values)
 
                 if not np.array_equal(old_nadir, self.nadir_point):
                     logger.info(f"📊 Ponto nadir ATUALIZADO: {self.nadir_point}")

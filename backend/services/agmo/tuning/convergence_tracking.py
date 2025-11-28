@@ -15,9 +15,7 @@ from app import create_app
 from services.agmo.agmo_service import (
     Nsga2OtimizacaoService,
     REFERENCE_POINTS_CONFIG,
-    WEIGHTS_CONFIG,
-    IDEAL_POINT_PORTFOLIO,
-    NADIR_POINT_PORTFOLIO
+    WEIGHTS_CONFIG
 )
 from services.agmo.tuning import (
     ConvergenceTracker,
@@ -30,6 +28,25 @@ from models import db
 import time
 import numpy as np
 
+# IDEAL POINT (melhor caso realista):
+
+# - Retorno esperado: -2.5% ao mês (melhor observado: ~-2.2%)
+
+# - Volatilidade: 0.3% ao mês (melhor observado: ~0.34%)
+
+# - Max Drawdown: 8% (melhor observado: ~9.9%)
+
+IDEAL_POINT_PORTFOLIO = np.array([-0.025, 0.005, 0.09])
+
+# NADIR POINT (pior caso aceitável):
+
+# - Retorno esperado: +1% ao mês (pior observado: ~-1.6%)
+
+# - Volatilidade: 1% ao mês (pior observado: ~0.69%)
+
+# - Max Drawdown: 16% (pior observado: ~13.5%)
+
+NADIR_POINT_PORTFOLIO = np.array([-0.010, 0.01, 0.15])
 
 def exemplo_simples():
     """
@@ -149,11 +166,11 @@ def exemplo_comparacao_multiplas_execucoes():
     # ]
 
     # Array de quantidades de ativos para testar
-    asset_quantities = [60]
+    asset_quantities = [20]
 
     # Configurações de população e gerações para testar
     configs = [
-        {'pop': 50, 'gen': 50},
+        {'pop': 150, 'gen': 150},
         {'pop': 100, 'gen': 100},
     ]
 
