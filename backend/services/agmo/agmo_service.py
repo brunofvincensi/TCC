@@ -87,30 +87,17 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
     pelo perfil de risco do usuário.
     """
 
-    def __init__(self, mean_returns, covariance_matrix, returns_history, tickers, risk_level, max_assets, alpha=0.05, min_weight=0.01, max_weight=0.30):
+    def __init__(self, mean_returns, covariance_matrix, returns_history, tickers, risk_level, alpha=0.05, min_weight=0.01, max_weight=0.30):
         num_assets = len(mean_returns)
         # Limites por ativo
         xl = np.full(num_assets, min_weight)
         xu = np.full(num_assets, max_weight)
 
-        portfolio_num_assets = min(num_assets, max_assets)
-
-        n_ieq_constr = 1 if portfolio_num_assets >= 10 else 0
-
-        # HHI (Herfindahl-Hirschman Index) Thresholds por Perfil de Risco
-        # HHI = Σ(wi²), onde N_eff = 1/HHI (número efetivo de ativos)
-        # Valores baseados em literatura de concentração de mercado e diversificação
-        self.hhi_thresholds = {
-            'conservador': 0.12,  # N_eff ≈ 8.3 ativos (baixa concentração)
-            'moderado': 0.15,     # N_eff ≈ 6.7 ativos (concentração moderada)
-            'arrojado': 0.20      # N_eff ≈ 5.0 ativos (concentração aceitável)
-        }
         super().__init__(n_var=num_assets,
                          n_obj=3,
                          n_ieq_constr=0,
                          n_eq_constr=0, xl=xl, xu=xu)
         self.num_assets = num_assets
-        self.portfolio_num_assets = portfolio_num_assets
         self.mu = mean_returns
         self.cov = covariance_matrix
         self.hist = returns_history
@@ -119,18 +106,11 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         self.alpha = alpha
         self.min_weight = min_weight
         self.max_weight = max_weight
-        self.hhi_max = self.hhi_thresholds.get(risk_level, 0.15)
-        self.max_assets = max_assets
 
     def _calculate_cvar(self, weights):
         """
         Calcula o Conditional Value-at-Risk (CVaR) usando método empírico.
-
         CVaR_α = E[Perda | Perda ≥ VaR_α] ≈ média dos ⌈α·n⌉ piores retornos
-
-        Referências:
-            - Rockafellar & Uryasev (2000). "Optimization of conditional value-at-risk"
-            - Acerbi & Tasche (2002). "On the coherence of expected shortfall"
         """
         # 1. Calcular retornos e perdas do portfolio
         portfolio_returns = self.hist @ weights
@@ -156,7 +136,7 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         return cvar
 
     def _evaluate(self, x, out, *args, **kwargs):
-        """Avalia uma única carteira"""
+        """Avalia uma única carteira (x = vetor de pesos)."""
 
         # ========== DEBUG ==========
         # print(f"\n{'=' * 70}")
@@ -174,7 +154,7 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         # for i, (ticker, peso_raw) in enumerate(zip(self.tickers, x)):
         #     print(f"   x[{i}] = {peso_raw:.6f} → {ticker}")
 
-        """Avalia uma única carteira (x = vetor de pesos)."""
+
         weights = x
 
         # --- Objetivos ---
@@ -189,10 +169,6 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
 
         out["F"] = [expected_return, variance, cvar]
 
-        # if self.portfolio_num_assets >= 10:
-        #     hhi = np.sum(weights ** 2)
-        #     hhi_constraint = hhi - self.hhi_max
-        #     out["G"] = [hhi_constraint]
 
 class Nsga2OtimizacaoService:
     def __init__(self, app, restricted_asset_ids, risk_level, years_period=3, reference_date=None, start_date=None, asset_ids: List[int] = None, show_chart=False,
@@ -218,7 +194,6 @@ class Nsga2OtimizacaoService:
         self.fixed_ideal_point = fixed_ideal_point
 
     def _prepare_data(self):
-
         """Busca dados e aplica o ajuste de risco pelo prazo."""
         with self.app.app_context():
             assets_query = db.session.query(Asset).filter(
@@ -257,15 +232,6 @@ class Nsga2OtimizacaoService:
             if df_history.empty:
                 raise ValueError("Sem histórico para os ativos selecionados.")
 
-            # Filtrar ações antes do pivot baseado no horizonte de investimento
-            minimum_history_months = int(self.years_period * 12)
-
-            print(f"\n{'=' * 70}")
-            print(f"🔍 FILTRANDO ATIVOS POR HISTÓRICO MÍNIMO")
-            print(f"{'=' * 70}")
-            print(f"  Prazo de investimento: {self.years_period} anos")
-            print(f"  Histórico mínimo requerido: {minimum_history_months} meses ({minimum_history_months/12:.1f} anos)")
-
             # Pivot sem dropna para analisar cada ativo
             df_returns_complete = df_history.pivot(
                 index='date',
@@ -283,6 +249,15 @@ class Nsga2OtimizacaoService:
 
             valid_assets = []
             excluded_assets = []
+
+            # Filtrar ações antes do pivot baseado no horizonte de investimento
+            minimum_history_months = int(self.years_period * 12)
+
+            print(f"\n{'=' * 70}")
+            print(f"🔍 FILTRANDO ATIVOS POR HISTÓRICO MÍNIMO")
+            print(f"{'=' * 70}")
+            print(f"  Prazo de investimento: {self.years_period} anos")
+            print(f"  Histórico mínimo requerido: {minimum_history_months} meses ({minimum_history_months/12:.1f} anos)")
 
             for ticker in available_assets:
                 available_months = data_count[ticker]
@@ -506,7 +481,7 @@ class Nsga2OtimizacaoService:
 
         generations, population_size = self.get_hyperparameters(generations, num_assets, population_size, use_optimal_config)
 
-        problem = self.get_problem(max_assets)
+        problem = self.get_problem()
 
         algorithm = self.get_algorithm(crossover_eta, mutation_eta, population_size, max_assets)
 
@@ -638,14 +613,13 @@ class Nsga2OtimizacaoService:
 
         return optimization_result
 
-    def get_problem(self, max_assets) -> PersonalizedPortfolioProblem:
+    def get_problem(self) -> PersonalizedPortfolioProblem:
         return PersonalizedPortfolioProblem(
             mean_returns=self.mean_returns.values,
             covariance_matrix=self.covariance_matrix.values,
             returns_history=self.returns_history.values,
             tickers=self.tickers,
-            risk_level=self.risk_level,
-            max_assets=max_assets
+            risk_level=self.risk_level
         )
 
     def get_algorithm(self, crossover_eta: float, mutation_eta: float,
@@ -1006,6 +980,7 @@ def save_backtest_chart(portfolio: List[Dict],
 
 
 def optimize_current_portfolio(app):
+    # asset_ids = [14, 92, 67, 51, 96]
     service = Nsga2OtimizacaoService(app, [1, 10], "moderado", 10, show_chart=True)
     result = service.optimize(max_assets=25, use_optimal_config=False)
 
