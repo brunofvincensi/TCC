@@ -167,7 +167,7 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
 
 class Nsga2OtimizacaoService:
     def __init__(self, app, restricted_asset_ids, risk_level, years_period=3, reference_date=None, start_date=None, asset_ids: List[int] = None, show_chart=False,
-                 fixed_nadir_point=False, fixed_ideal_point=False):
+                 fixed_nadir_point=None, fixed_ideal_point=None):
         """
         Serviço de otimização de carteira usando R-NSGA2 (Reference Point Based NSGA-II).
         """
@@ -975,9 +975,9 @@ def save_backtest_chart(portfolio: List[Dict],
 
 
 def optimize_current_portfolio(app):
-    asset_ids = [14, 92, 67, 51, 96]
-    service = Nsga2OtimizacaoService(app, [1, 10], "moderado", 10, show_chart=True, asset_ids=asset_ids)
-    result = service.optimize(max_assets=4, use_optimal_config=False)
+   # asset_ids = [14, 92, 67, 51, 96]
+    service = Nsga2OtimizacaoService(app, [1, 10], "conservador", 10, show_chart=True)
+    result = service.optimize(max_assets=10, use_optimal_config=False)
 
     # Informações adicionais
     print(f"\n📅 INFORMAÇÕES DO PERÍODO:")
@@ -989,7 +989,7 @@ def optimize_current_portfolio(app):
 def backtest(app):
     from datetime import date
     backtest_date = date(2015, 1, 1)
-    backtest_service = Nsga2OtimizacaoService(app, [1, 10], "moderado", 10, reference_date=backtest_date, show_chart=True)
+    backtest_service = Nsga2OtimizacaoService(app, [1, 10], "conservador", 10, reference_date=backtest_date, show_chart=True)
     backtest_portfolio = backtest_service.optimize(max_assets=10)
 
     # Informações do backtest
