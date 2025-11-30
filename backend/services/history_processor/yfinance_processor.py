@@ -62,7 +62,7 @@ class YFinanceProcessor:
         _, last_day = monthrange(date.year, date.month)
         return date.replace(day=last_day)
 
-    def _calculate_monthly_variation(self, ticker, target_date):
+    def _calculate_Variation(self, ticker, target_date):
         """
         Calcula a variação percentual mensal até uma data específica.
 
@@ -101,7 +101,7 @@ class YFinanceProcessor:
             if update_if_exists:
                 existing.closing_price = price
                 if variation is not None:
-                    existing.monthly_variation = variation
+                    existing.Variation = variation
                 db.session.commit()
                 return 'updated'
             return 'skipped'
@@ -111,7 +111,7 @@ class YFinanceProcessor:
             asset_id=asset.id,
             date=date,
             closing_price=price,
-            monthly_variation=variation
+            Variation=variation
         )
         db.session.add(new_price)
         return 'inserted'
@@ -135,7 +135,7 @@ class YFinanceProcessor:
                 return
 
             # Calcular variação mensal
-            data['variacao_mensal'] = data['Close'].pct_change()
+            data['Variation'] = data['Close'].pct_change()
 
             # Resetar índice para transformar datas em coluna
             data = data.reset_index()
@@ -151,7 +151,7 @@ class YFinanceProcessor:
 
                     # Extrair valores
                     closing_price = self._extract_value(row, 'Close')
-                    variation = self._extract_value(row, 'variacao_mensal')
+                    variation = self._extract_value(row, 'Variation')
 
                     # Inserir apenas novos registros (não atualiza existentes)
                     result = self._upsert_price_record(
@@ -218,7 +218,7 @@ class YFinanceProcessor:
                 return
 
             # Calcular variação mensal
-            variation = self._calculate_monthly_variation(asset.ticker, last_date)
+            variation = self._calculate_Variation(asset.ticker, last_date)
 
             # Normalizar para último dia do mês
             month_end_date = self._get_month_end_date(last_date)

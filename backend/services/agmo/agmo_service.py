@@ -26,7 +26,7 @@ from models.ativo import AssetType
 DEFAULT_GEN_SIZE = 100
 DEFAULT_POPULATION_SIZE = 100
 
-MIN_ASSETS = 5
+MIN_ASSETS = 3
 
 # Reference Points: onde queremos chegar (aspirações no espaço normalizado [0,1])
 # - 0.0 = melhor valor possível (min risco / max retorno)
@@ -93,10 +93,7 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         xl = np.full(num_assets, min_weight)
         xu = np.full(num_assets, max_weight)
 
-        super().__init__(n_var=num_assets,
-                         n_obj=3,
-                         n_ieq_constr=0,
-                         n_eq_constr=0, xl=xl, xu=xu)
+        super().__init__(n_var=num_assets, n_obj=3, xl=xl, xu=xu)
         self.num_assets = num_assets
         self.mu = mean_returns
         self.cov = covariance_matrix
@@ -131,9 +128,7 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         sorted_losses = np.sort(valid_losses)
         tail = sorted_losses[-k:]  # Sempre exatamente k observações
 
-        cvar = float(np.mean(tail))
-
-        return cvar
+        return float(np.mean(tail))
 
     def _evaluate(self, x, out, *args, **kwargs):
         """Avalia uma única carteira (x = vetor de pesos)."""
@@ -469,7 +464,7 @@ class Nsga2OtimizacaoService:
         print()
 
     def optimize(self, population_size: int = None, generations: int = None,
-                 crossover_eta: float = 10.0, mutation_eta: float = 10.0,
+                 crossover_eta: float = 15.0, mutation_eta: float = 15.0,
                  convergence_tracker=None, use_optimal_config: bool = True, max_assets: int = 20):
 
         if max_assets is not None and max_assets < MIN_ASSETS:
@@ -980,9 +975,9 @@ def save_backtest_chart(portfolio: List[Dict],
 
 
 def optimize_current_portfolio(app):
-    # asset_ids = [14, 92, 67, 51, 96]
-    service = Nsga2OtimizacaoService(app, [1, 10], "moderado", 10, show_chart=True)
-    result = service.optimize(max_assets=25, use_optimal_config=False)
+    asset_ids = [14, 92, 67, 51, 96]
+    service = Nsga2OtimizacaoService(app, [1, 10], "moderado", 10, show_chart=True, asset_ids=asset_ids)
+    result = service.optimize(max_assets=4, use_optimal_config=False)
 
     # Informações adicionais
     print(f"\n📅 INFORMAÇÕES DO PERÍODO:")

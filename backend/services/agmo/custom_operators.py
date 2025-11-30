@@ -1,5 +1,5 @@
 """
-Operadores Genéticos com Restrição de Cardinalidade para NSGA-II
+Operadores Genéticos com Restrição de Cardinalidade para R-NSGA-II
 
 Este módulo implementa operadores customizados (Sampling, Crossover, Mutation) que
 garantem que TODAS as soluções geradas tenham no máximo K ativos com peso > 0.
@@ -311,7 +311,6 @@ class SimplexMutationCardConstraint(Mutation):
                     # Transfere todo o peso
                     individual[add_idx] = individual[remove_idx]
                     individual[remove_idx] = 0.0
-
             else:
                 # Mutação por transferência: move peso entre ativos
                 if n_active >= 2:
