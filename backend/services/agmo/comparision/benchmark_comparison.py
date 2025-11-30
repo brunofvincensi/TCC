@@ -656,7 +656,7 @@ class BenchmarkComparison:
 
         # Configurar figura com 3 subplots verticais
         fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(14, 16))
-        fig.suptitle('Comparação: portfolio vs Benchmark', fontsize=16, fontweight='bold')
+        fig.suptitle('Comparação: Carteira vs Benchmark', fontsize=16, fontweight='bold')
 
         datas = self.portfolio_data.index
 
@@ -712,7 +712,7 @@ class BenchmarkComparison:
         ax2.plot(datas, vol_bench_rolling,
                 linewidth=2.5, color='#F18F01', marker='s', markersize=3,
                 label=f'Benchmark ({benchmark_ticker or "Índice"})')
-        ax2.set_title(f'Volatilidade Rolante ({janela} meses, anualizada)', fontsize=12, fontweight='bold')
+        ax2.set_title('Volatilidade', fontsize=12, fontweight='bold')
         ax2.set_xlabel('Data', fontsize=10)
         ax2.set_ylabel('Volatilidade (%)', fontsize=10)
         ax2.grid(True, alpha=0.3, linestyle='--')
@@ -721,16 +721,16 @@ class BenchmarkComparison:
 
         # Adicionar anotações com volatilidade média
         ax2.annotate(f'Média portfolio: {vol_media_cart:.2f}%',
-                    xy=(0.02, 0.95), xycoords='axes fraction',
+                    xy=(0.98, 0.95), xycoords='axes fraction',
                     bbox=dict(boxstyle='round,pad=0.5', facecolor='#2E86AB', alpha=0.7),
                     fontsize=8, fontweight='bold', color='white',
-                    va='top')
+                    va='top', ha='right')
 
         ax2.annotate(f'Média Benchmark: {vol_media_bench:.2f}%',
-                    xy=(0.02, 0.85), xycoords='axes fraction',
+                    xy=(0.98, 0.85), xycoords='axes fraction',
                     bbox=dict(boxstyle='round,pad=0.5', facecolor='#F18F01', alpha=0.7),
                     fontsize=8, fontweight='bold', color='white',
-                    va='top')
+                    va='top', ha='right')
 
         # ====================================================================
         # Gráfico 3: Retornos Mensais Comparados

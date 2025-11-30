@@ -23,10 +23,10 @@ from app import create_app
 from models import db, Asset, PriceHistory
 from models.ativo import AssetType
 
-DEFAULT_GEN_SIZE = 100
+DEFAULT_GEN_SIZE = 50
 DEFAULT_POPULATION_SIZE = 100
 
-MIN_ASSETS = 3
+MIN_ASSETS = 5
 
 # Reference Points: onde queremos chegar (aspirações no espaço normalizado [0,1])
 # - 0.0 = melhor valor possível (min risco / max retorno)
@@ -45,13 +45,21 @@ class ConvergenceCallback(Callback):
     Callback do pymoo para rastrear métricas de convergência durante a otimização.
     """
 
-    def __init__(self, convergence_tracker=None):
+    def __init__(self, convergence_tracker=None, visualize_cvar_first_gen=False,
+                 problem=None, output_dir='cvar_visualizations'):
         """
         Args:
             convergence_tracker: Instância de ConvergenceTracker para registrar métricas
+            visualize_cvar_first_gen: Se True, cria visualizações do CVaR na primeira geração
+            problem: Instância do problema (necessário para visualização)
+            output_dir: Diretório onde salvar as visualizações
         """
         super().__init__()
         self.convergence_tracker = convergence_tracker
+        self.visualize_cvar_first_gen = visualize_cvar_first_gen
+        self.problem = problem
+        self.output_dir = output_dir
+        self.first_gen_visualized = False
 
     def notify(self, algorithm):
         """
@@ -60,6 +68,11 @@ class ConvergenceCallback(Callback):
         Args:
             algorithm: Instância do algoritmo com população atual
         """
+        # Visualizar CVaR na primeira geração
+        if self.visualize_cvar_first_gen and not self.first_gen_visualized and algorithm.n_gen == 1:
+            self._visualize_first_generation(algorithm)
+            self.first_gen_visualized = True
+
         if self.convergence_tracker is None:
             return
 
@@ -79,6 +92,94 @@ class ConvergenceCallback(Callback):
             pareto_front=pareto_front,
             population_fitness=population_fitness
         )
+
+    def _visualize_first_generation(self, algorithm):
+        """
+        Cria visualizações do CVaR para algumas soluções da primeira geração.
+        """
+        import os
+
+        if self.problem is None:
+            print("  ⚠️  Problema não fornecido, não é possível visualizar CVaR")
+            return
+
+        # Criar diretório se não existir
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
+
+        print(f"\n{'='*70}")
+        print(f"📊 GERANDO VISUALIZAÇÕES DE CVaR DA PRIMEIRA GERAÇÃO")
+        print(f"{'='*70}")
+
+        # Pegar população da primeira geração
+        population = algorithm.pop
+        X = population.get("X")  # Soluções (pesos)
+        F = population.get("F")  # Objetivos
+
+        # Selecionar algumas soluções interessantes:
+        # 1. Melhor retorno (menor F[0], pois é negativo)
+        # 2. Menor risco (menor F[1])
+        # 3. Menor CVaR (menor F[2])
+        # 4. Uma solução aleatória
+        # 5. Solução balanceada (próxima ao centro)
+
+        indices_to_visualize = []
+        labels = []
+
+        # Melhor retorno
+        idx_best_return = np.argmin(F[:, 0])
+        indices_to_visualize.append(idx_best_return)
+        labels.append("Melhor_Retorno")
+
+        # Menor variância
+        idx_min_variance = np.argmin(F[:, 1])
+        indices_to_visualize.append(idx_min_variance)
+        labels.append("Menor_Variancia")
+
+        # Menor CVaR
+        idx_min_cvar = np.argmin(F[:, 2])
+        indices_to_visualize.append(idx_min_cvar)
+        labels.append("Menor_CVaR")
+
+        # Solução aleatória
+        np.random.seed(42)
+        idx_random = np.random.randint(0, len(X))
+        indices_to_visualize.append(idx_random)
+        labels.append("Aleatoria")
+
+        # Solução balanceada (mais próxima da mediana em todas as dimensões)
+        F_normalized = (F - F.min(axis=0)) / (F.max(axis=0) - F.min(axis=0) + 1e-10)
+        distances_to_center = np.linalg.norm(F_normalized - 0.5, axis=1)
+        idx_balanced = np.argmin(distances_to_center)
+        indices_to_visualize.append(idx_balanced)
+        labels.append("Balanceada")
+
+        # Remover duplicatas mantendo a ordem e os labels correspondentes
+        seen = set()
+        unique_indices = []
+        unique_labels = []
+        for idx, label in zip(indices_to_visualize, labels):
+            if idx not in seen:
+                seen.add(idx)
+                unique_indices.append(idx)
+                unique_labels.append(label)
+
+        print(f"  Visualizando {len(unique_indices)} soluções distintas...")
+
+        # Criar visualizações
+        for i, (idx, label) in enumerate(zip(unique_indices, unique_labels), 1):
+            weights = X[idx]
+            save_path = os.path.join(self.output_dir, f'cvar_gen1_sol{i}_{label}.png')
+
+            print(f"\n  [{i}/{len(unique_indices)}] Solução #{idx} ({label}):")
+            print(f"     Retorno: {-F[idx, 0]*100:.2f}%")
+            print(f"     Variância: {F[idx, 1]:.6f}")
+            print(f"     CVaR: {F[idx, 2]:.4f}")
+
+            self.problem.visualize_cvar(weights, f"{idx}_{label}", save_path)
+
+        print(f"\n  ✅ {len(unique_indices)} visualizações salvas em: {self.output_dir}/")
+        print(f"{'='*70}\n")
 
 class PersonalizedPortfolioProblem(ElementwiseProblem):
 
@@ -117,9 +218,6 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         valid_losses = losses[np.isfinite(losses)]
         n = len(valid_losses)
 
-        # 3. Proteção para amostras pequenas
-        if n < 20:
-            return float(np.std(valid_losses))
 
         # 4. Calcular número de observações na cauda
         k = max(1, int(np.ceil(self.alpha * n)))
@@ -129,6 +227,87 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         tail = sorted_losses[-k:]  # Sempre exatamente k observações
 
         return float(np.mean(tail))
+
+    def visualize_cvar(self, weights, solution_id, save_path=None):
+        """
+        Visualiza a distribuição de perdas e o cálculo do CVaR para uma solução específica.
+
+        Args:
+            weights: Vetor de pesos da solução
+            solution_id: Identificador da solução (para título)
+            save_path: Caminho para salvar a imagem (opcional)
+        """
+        # Calcular retornos e perdas
+        portfolio_returns = self.hist @ weights
+        losses = -portfolio_returns
+        valid_losses = losses[np.isfinite(losses)]
+        n = len(valid_losses)
+
+        # Calcular CVaR
+        k = max(1, int(np.ceil(self.alpha * n)))
+        sorted_losses = np.sort(valid_losses)
+        var = sorted_losses[-k]  # VaR é o k-ésimo pior retorno
+        cvar = np.mean(sorted_losses[-k:])
+
+        # Criar figura
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+
+        # Subplot 1: Histograma de perdas
+        ax1.hist(valid_losses, bins=50, alpha=0.7, color='steelblue', edgecolor='black')
+        ax1.axvline(var, color='orange', linestyle='--', linewidth=2, label=f'VaR ({self.alpha*100:.0f}%) = {var:.4f}')
+        ax1.axvline(cvar, color='red', linestyle='-', linewidth=2, label=f'CVaR = {cvar:.4f}')
+
+        # Marcar a região da cauda
+        ax1.axvspan(var, valid_losses.max(), alpha=0.3, color='red', label='Cauda (piores retornos)')
+
+        ax1.set_xlabel('Perdas (retornos negativos)', fontsize=11)
+        ax1.set_ylabel('Frequência', fontsize=11)
+        ax1.set_title(f'Distribuição de Perdas', fontsize=12, fontweight='bold')
+        ax1.legend(fontsize=10)
+        ax1.grid(True, alpha=0.3)
+
+        # Subplot 2: Pesos da carteira
+        # Filtrar apenas ativos com peso significativo
+        significant_weights = [(ticker, w) for ticker, w in zip(self.tickers, weights) if w > 0.001]
+        significant_weights.sort(key=lambda x: x[1], reverse=True)
+
+        if significant_weights:
+            tickers_sig = [t for t, w in significant_weights]
+            weights_sig = [w for t, w in significant_weights]
+
+            colors = plt.cm.viridis(np.linspace(0, 1, len(tickers_sig)))
+            bars = ax2.barh(tickers_sig, weights_sig, color=colors, edgecolor='black')
+
+            # Adicionar valores nas barras
+            for i, (ticker, weight) in enumerate(significant_weights):
+                ax2.text(weight, i, f' {weight*100:.1f}%', va='center', fontsize=9)
+
+            ax2.set_xlabel('Peso na Carteira', fontsize=11)
+            ax2.set_title(f'Composição da Carteira', fontsize=12, fontweight='bold')
+            ax2.set_xlim(0, max(weights_sig) * 1.15)
+            ax2.grid(True, alpha=0.3, axis='x')
+
+        # Adicionar informações da solução
+        expected_return = -np.dot(weights, self.mu)
+        variance = np.dot(weights, self.cov @ weights)
+
+        info_text = (
+            f'CVaR: {cvar:.4f}\n'
+            f'Nº ativos: {len(significant_weights)}'
+        )
+
+        fig.text(0.5, 0.02, info_text, ha='center', fontsize=10,
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+        plt.tight_layout(rect=[0, 0.08, 1, 1])
+
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            print(f"  💾 Visualização salva em: {save_path}")
+
+        plt.close()
+
+        return cvar
 
     def _evaluate(self, x, out, *args, **kwargs):
         """Avalia uma única carteira (x = vetor de pesos)."""
@@ -465,7 +644,8 @@ class Nsga2OtimizacaoService:
 
     def optimize(self, population_size: int = None, generations: int = None,
                  crossover_eta: float = 15.0, mutation_eta: float = 15.0,
-                 convergence_tracker=None, use_optimal_config: bool = True, max_assets: int = 20):
+                 convergence_tracker=None, use_optimal_config: bool = True, max_assets: int = 20,
+                 visualize_cvar: bool = False, cvar_output_dir: str = 'cvar_visualizations'):
 
         if max_assets is not None and max_assets < MIN_ASSETS:
             raise ValueError(f"São necessários pelo menos {MIN_ASSETS} ativos para a otimização.")
@@ -480,7 +660,7 @@ class Nsga2OtimizacaoService:
 
         algorithm = self.get_algorithm(crossover_eta, mutation_eta, population_size, max_assets)
 
-        callback = self.get_callback(convergence_tracker)
+        callback = self.get_callback(convergence_tracker, visualize_cvar, problem, cvar_output_dir)
 
         termination = self.get_termination(generations)
 
@@ -541,7 +721,7 @@ class Nsga2OtimizacaoService:
 
             ax.set_xlabel("Risco (variância)", fontsize=11)
             ax.set_ylabel("Retorno esperado", fontsize=11)
-            ax.set_title(f"Fronteira de Pareto - R-NSGA2 (Perfil: {self.risk_level})", fontsize=12)
+            ax.set_title(f"Fronteira de Pareto - R-NSGA-II (Perfil: {self.risk_level})", fontsize=12)
             ax.grid(True, alpha=0.3)
 
             plt.colorbar(scatter, ax=ax, label="CVaR")
@@ -723,12 +903,14 @@ class Nsga2OtimizacaoService:
         return ('n_gen', generations)
 
 
-    def get_callback(self, convergence_tracker) -> ConvergenceCallback:
-        if convergence_tracker is not None:
-            callback = ConvergenceCallback(convergence_tracker)
-        else:
-            callback = ConvergenceCallback(None)
-        return callback
+    def get_callback(self, convergence_tracker, visualize_cvar=False,
+                    problem=None, cvar_output_dir='cvar_visualizations') -> ConvergenceCallback:
+        return ConvergenceCallback(
+            convergence_tracker=convergence_tracker,
+            visualize_cvar_first_gen=visualize_cvar,
+            problem=problem,
+            output_dir=cvar_output_dir
+        )
 
     def _print_optimization_result(self, composition: List[Dict], metrics: Dict):
         """
@@ -1025,10 +1207,10 @@ def main():
     app = create_app()
 
     # Exemplo 1: Otimização normal (sem backtest)
-    optimize_current_portfolio(app)
+   # optimize_current_portfolio(app)
 
     # Exemplo 2: Otimização com backtest (usando dados até uma data específica)
-   # backtest(app)
+    backtest(app)
 
 
 if __name__ == "__main__":

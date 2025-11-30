@@ -32,7 +32,7 @@ def complete_example():
 
     # Parâmetros da otimização
     restricted_asset_ids = []  # Sem restrições de ativos
-    risk_level = 'arrojado'  # Perfil de risco
+    risk_level = 'conservador'  # Perfil de risco
     years_period = 10  # Prazo de investimento
     max_assets = 10  # Máximo de ativos no portfolio
 
