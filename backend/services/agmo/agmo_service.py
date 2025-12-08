@@ -580,22 +580,50 @@ class Nsga2OtimizacaoService:
 
         Menor ASF = mais próximo do reference point = melhor solução
         """
-        print(f"Selecionando a melhor solução para o perfil '{self.risk_level}'...")
+        print(f"\n{'='*80}")
+        print(f"🎯 SELEÇÃO DA MELHOR CARTEIRA - PERFIL '{self.risk_level.upper()}'")
+        print(f"{'='*80}")
 
         # Usa configuração centralizada (constantes do módulo)
         ref_point = REFERENCE_POINTS_CONFIG[self.risk_level][0]  # [0] extrai o primeiro array da matriz
         weights = WEIGHTS_CONFIG
 
+        # Informações sobre o reference point
+        print(f"\n📍 REFERENCE POINT (Ponto de Aspiração):")
+        print(f"   Perfil: {self.risk_level}")
+        print(f"   Retorno: {ref_point[0]:.3f} (0.0 = melhor possível, 1.0 = pior possível)")
+        print(f"   Variância: {ref_point[1]:.3f}")
+        print(f"   CVaR: {ref_point[2]:.3f}")
+        print(f"\n   Pesos dos objetivos: Retorno={weights[0]:.2f}, Variância={weights[1]:.2f}, CVaR={weights[2]:.2f}")
+
+        # Análise dos objetivos NÃO normalizados
+        print(f"\n{'─'*80}")
+        print(f"📊 ANÁLISE DOS OBJETIVOS (VALORES ORIGINAIS):")
+        print(f"{'─'*80}")
+        print(f"   {'Objetivo':<20} {'Mínimo':>15} {'Máximo':>15} {'Amplitude':>15}")
+        print(f"   {'-'*70}")
+
+        obj_names = ['Retorno (negativo)', 'Variância', 'CVaR']
+        for i in range(objectives.shape[1]):
+            col = objectives[:, i]
+            min_val, max_val = col.min(), col.max()
+            amplitude = max_val - min_val
+            print(f"   {obj_names[i]:<20} {min_val:>15.6f} {max_val:>15.6f} {amplitude:>15.6f}")
+
         # Normaliza os objetivos para [0, 1]
         objectives_normalized = objectives.copy()
+        normalization_info = []
+
         for i in range(objectives.shape[1]):
             col = objectives[:, i]
             min_val, max_val = col.min(), col.max()
 
             if max_val - min_val > 1e-10:
                 objectives_normalized[:, i] = (col - min_val) / (max_val - min_val)
+                normalization_info.append((min_val, max_val))
             else:
                 objectives_normalized[:, i] = 0.0
+                normalization_info.append((min_val, max_val))
 
         # Calcula ASF para cada solução
         asf_values = [compute_asf(obj, ref_point, weights)
@@ -603,8 +631,283 @@ class Nsga2OtimizacaoService:
 
         # Seleciona solução com MENOR ASF (mais próxima do reference point)
         best_idx = np.argmin(asf_values)
+
+        # Informações sobre as soluções e ASF
+        print(f"\n{'─'*80}")
+        print(f"🔍 CÁLCULO DA ASF (Achievement Scalarizing Function):")
+        print(f"{'─'*80}")
+        print(f"   Total de soluções na Fronteira de Pareto: {len(objectives)}")
+        print(f"   ASF = max{{w_i * |obj_i - ref_i|}} para i ∈ {{retorno, variância, CVaR}}")
+        print(f"   Quanto MENOR a ASF, mais próxima a solução está do reference point")
+
+        # Mostra estatísticas dos valores de ASF
+        asf_array = np.array(asf_values)
+        print(f"\n   Estatísticas dos valores de ASF:")
+        print(f"   {'Métrica':<20} {'Valor':>15}")
+        print(f"   {'-'*40}")
+        print(f"   {'Mínimo (MELHOR)':<20} {asf_array.min():>15.6f}")
+        print(f"   {'Máximo (PIOR)':<20} {asf_array.max():>15.6f}")
+        print(f"   {'Média':<20} {asf_array.mean():>15.6f}")
+        print(f"   {'Mediana':<20} {np.median(asf_array):>15.6f}")
+        print(f"   {'Desvio Padrão':<20} {asf_array.std():>15.6f}")
+
+        # Mostra as top 5 soluções
+        top_5_indices = np.argsort(asf_values)[:5]
+
+        print(f"\n{'─'*80}")
+        print(f"🏆 TOP 5 SOLUÇÕES (menor ASF = melhor):")
+        print(f"{'─'*80}")
+        print(f"   {'Rank':<6} {'ASF':<12} {'Retorno':<12} {'Variância':<12} {'CVaR':<12} {'Ativos':>8}")
+        print(f"   {'-'*75}")
+
+        for rank, idx in enumerate(top_5_indices, 1):
+            asf_val = asf_values[idx]
+            ret = -objectives[idx, 0]  # Negativo porque está negado
+            var = objectives[idx, 1]
+            cvar = objectives[idx, 2]
+            n_assets = np.sum(solutions[idx] > 0.001)
+
+            marker = "👑" if rank == 1 else f"{rank}."
+            print(f"   {marker:<6} {asf_val:<12.6f} {ret:<12.6f} {var:<12.6f} {cvar:<12.6f} {n_assets:>8}")
+
+        # Informações detalhadas da solução escolhida
+        print(f"\n{'='*80}")
+        print(f"✅ SOLUÇÃO ESCOLHIDA (Índice {best_idx}):")
+        print(f"{'='*80}")
+
+        best_obj = objectives[best_idx]
+        best_obj_norm = objectives_normalized[best_idx]
+        best_asf = asf_values[best_idx]
+
+        print(f"\n   Valores Originais:")
+        print(f"   {'Objetivo':<20} {'Valor':>15}")
+        print(f"   {'-'*40}")
+        print(f"   {'Retorno Esperado':<20} {-best_obj[0]:>15.6f}")
+        print(f"   {'Variância':<20} {best_obj[1]:>15.6f}")
+        print(f"   {'CVaR':<20} {best_obj[2]:>15.6f}")
+
+        print(f"\n   Valores Normalizados [0,1]:")
+        print(f"   {'Objetivo':<20} {'Normalizado':>15} {'Reference':>15} {'Diferença':>15}")
+        print(f"   {'-'*70}")
+        for i, name in enumerate(obj_names):
+            diff = abs(best_obj_norm[i] - ref_point[i])
+            print(f"   {name:<20} {best_obj_norm[i]:>15.6f} {ref_point[i]:>15.6f} {diff:>15.6f}")
+
+        print(f"\n   ASF (distância ao reference point): {best_asf:.6f}")
+        print(f"   Número de ativos na carteira: {np.sum(solutions[best_idx] > 0.001)}")
+
+        # Gera visualização gráfica
+        self._visualize_portfolio_selection(
+            objectives, objectives_normalized, solutions,
+            ref_point, weights, asf_values, best_idx,
+            normalization_info
+        )
+
+        print(f"{'='*80}\n")
+
         return solutions[best_idx]
 
+    def _visualize_portfolio_selection(self, objectives, objectives_normalized, solutions,
+                                       ref_point, weights, asf_values, best_idx, normalization_info):
+        """
+        Cria visualização detalhada do processo de seleção da melhor carteira.
+
+        Args:
+            objectives: Objetivos originais (não normalizados)
+            objectives_normalized: Objetivos normalizados [0,1]
+            solutions: Pesos das soluções
+            ref_point: Ponto de referência usado
+            weights: Pesos dos objetivos na ASF
+            asf_values: Valores de ASF calculados
+            best_idx: Índice da melhor solução
+            normalization_info: Lista com (min, max) para cada objetivo
+        """
+        import os
+        from datetime import datetime
+
+        # Criar diretório se não existir
+        output_dir = 'portfolio_selection_visualizations'
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f'portfolio_selection_{self.risk_level}_{timestamp}.png'
+        filepath = os.path.join(output_dir, filename)
+
+        # Criar figura com 6 subplots
+        fig = plt.figure(figsize=(20, 14))
+        gs = fig.add_gridspec(3, 3, hspace=0.3, wspace=0.3)
+
+        # Título principal
+        fig.suptitle(f'Processo de Seleção da Melhor Carteira - Perfil: {self.risk_level.upper()}',
+                    fontsize=18, fontweight='bold', y=0.98)
+
+        # ===== SUBPLOT 1: Fronteira de Pareto 3D (Objetivos Originais) =====
+        ax1 = fig.add_subplot(gs[0, :2], projection='3d')
+
+        # Plotar todas as soluções
+        scatter = ax1.scatter(objectives[:, 1], -objectives[:, 0], objectives[:, 2],
+                            c=asf_values, cmap='viridis', s=50, alpha=0.6, edgecolors='black', linewidth=0.5)
+
+        # Destacar a melhor solução
+        ax1.scatter([objectives[best_idx, 1]], [-objectives[best_idx, 0]], [objectives[best_idx, 2]],
+                   c='red', s=300, marker='*', edgecolors='black', linewidth=2, label='Melhor Solução', zorder=10)
+
+        ax1.set_xlabel('Variância (Risco)', fontsize=10, labelpad=10)
+        ax1.set_ylabel('Retorno Esperado', fontsize=10, labelpad=10)
+        ax1.set_zlabel('CVaR (Risco de Cauda)', fontsize=10, labelpad=10)
+        ax1.set_title('Fronteira de Pareto (Valores Originais)', fontsize=12, fontweight='bold', pad=20)
+        ax1.legend(loc='upper left', fontsize=9)
+
+        cbar1 = plt.colorbar(scatter, ax=ax1, pad=0.1, shrink=0.6)
+        cbar1.set_label('Valor ASF', fontsize=9)
+
+        # ===== SUBPLOT 2: Distribuição dos valores de ASF =====
+        ax2 = fig.add_subplot(gs[0, 2])
+
+        asf_array = np.array(asf_values)
+        ax2.hist(asf_array, bins=30, color='steelblue', alpha=0.7, edgecolor='black')
+        ax2.axvline(asf_array[best_idx], color='red', linestyle='--', linewidth=2,
+                   label=f'Melhor ASF = {asf_array[best_idx]:.4f}')
+        ax2.axvline(asf_array.mean(), color='green', linestyle='--', linewidth=1.5,
+                   label=f'Média = {asf_array.mean():.4f}')
+
+        ax2.set_xlabel('Valor ASF', fontsize=10)
+        ax2.set_ylabel('Frequência', fontsize=10)
+        ax2.set_title('Distribuição dos Valores de ASF', fontsize=12, fontweight='bold')
+        ax2.legend(fontsize=8)
+        ax2.grid(True, alpha=0.3)
+
+        # ===== SUBPLOT 3: Espaço Normalizado 3D =====
+        ax3 = fig.add_subplot(gs[1, :2], projection='3d')
+
+        # Plotar soluções normalizadas
+        scatter3 = ax3.scatter(objectives_normalized[:, 1], objectives_normalized[:, 0],
+                              objectives_normalized[:, 2], c=asf_values, cmap='viridis',
+                              s=50, alpha=0.6, edgecolors='black', linewidth=0.5)
+
+        # Reference point
+        ax3.scatter([ref_point[1]], [ref_point[0]], [ref_point[2]],
+                   c='gold', s=100, marker='D', edgecolors='black', linewidth=2,
+                   label='Reference Point', zorder=10)
+
+        # Melhor solução
+        ax3.scatter([objectives_normalized[best_idx, 1]], [objectives_normalized[best_idx, 0]],
+                   [objectives_normalized[best_idx, 2]], c='red', s=150, marker='*',
+                   edgecolors='black', linewidth=2, label='Melhor Solução', zorder=10)
+
+        # Linha conectando reference point à melhor solução
+        ax3.plot([ref_point[1], objectives_normalized[best_idx, 1]],
+                [ref_point[0], objectives_normalized[best_idx, 0]],
+                [ref_point[2], objectives_normalized[best_idx, 2]],
+                'r--', linewidth=2, alpha=0.7, label='Distância ASF')
+
+        ax3.set_xlabel('Variância Norm.', fontsize=10, labelpad=10)
+        ax3.set_ylabel('Retorno Norm.', fontsize=10, labelpad=10)
+        ax3.set_zlabel('CVaR Norm.', fontsize=10, labelpad=10)
+        ax3.set_title('Espaço Normalizado [0,1] com Reference Point', fontsize=12, fontweight='bold', pad=20)
+        ax3.legend(loc='upper left', fontsize=8)
+
+        # ===== SUBPLOT 4: Comparação das Top 5 Soluções =====
+        ax4 = fig.add_subplot(gs[1, 2])
+
+        top_5_indices = np.argsort(asf_values)[:5]
+        top_5_asf = [asf_values[i] for i in top_5_indices]
+        labels = [f'#{i+1}\n(idx {top_5_indices[i]})' for i in range(5)]
+
+        colors_bar = ['red' if i == 0 else 'steelblue' for i in range(5)]
+        bars = ax4.barh(labels, top_5_asf, color=colors_bar, edgecolor='black', alpha=0.7)
+
+        # Adicionar valores nas barras
+        for i, (bar, val) in enumerate(zip(bars, top_5_asf)):
+            ax4.text(val, i, f' {val:.4f}', va='center', fontsize=9, fontweight='bold')
+
+        ax4.set_xlabel('Valor ASF', fontsize=10)
+        ax4.set_title('Top 5 Soluções (Menor ASF)', fontsize=12, fontweight='bold')
+        ax4.invert_yaxis()
+        ax4.grid(True, alpha=0.3, axis='x')
+
+        # ===== SUBPLOT 5: Análise por Objetivo (Normalizado) =====
+        ax5 = fig.add_subplot(gs[2, 0])
+
+        obj_names = ['Retorno', 'Variância', 'CVaR']
+        x_pos = np.arange(len(obj_names))
+
+        best_values = objectives_normalized[best_idx]
+        ref_values = ref_point
+
+        width = 0.35
+        bars1 = ax5.bar(x_pos - width/2, best_values, width, label='Melhor Solução',
+                       color='red', alpha=0.7, edgecolor='black')
+        bars2 = ax5.bar(x_pos + width/2, ref_values, width, label='Reference Point',
+                       color='gold', alpha=0.7, edgecolor='black')
+
+        # Adicionar valores
+        for bars in [bars1, bars2]:
+            for bar in bars:
+                height = bar.get_height()
+                ax5.text(bar.get_x() + bar.get_width()/2., height,
+                        f'{height:.3f}', ha='center', va='bottom', fontsize=8)
+
+        ax5.set_ylabel('Valor Normalizado', fontsize=10)
+        ax5.set_title('Comparação: Melhor Solução vs Reference Point', fontsize=11, fontweight='bold')
+        ax5.set_xticks(x_pos)
+        ax5.set_xticklabels(obj_names)
+        ax5.legend(fontsize=9)
+        ax5.set_ylim(0, 1.1)
+        ax5.grid(True, alpha=0.3, axis='y')
+
+        # ===== SUBPLOT 6: Informações Textuais =====
+        ax6 = fig.add_subplot(gs[2, 1:])
+        ax6.axis('off')
+
+        # Preparar texto informativo
+        info_text = f"""
+INFORMAÇÕES DO PROCESSO DE SELEÇÃO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PERFIL DE RISCO: {self.risk_level.upper()}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📍 REFERENCE POINT (Aspirações Normalizadas):
+   • Retorno: {ref_point[0]:.3f}  (0.0 = melhor possível, 1.0 = pior possível)
+   • Variância: {ref_point[1]:.3f}
+   • CVaR: {ref_point[2]:.3f}
+
+⚖️  PESOS DOS OBJETIVOS NA ASF:
+   • Retorno: {weights[0]:.2f}  |  Variância: {weights[1]:.2f}  |  CVaR: {weights[2]:.2f}
+
+📊 FAIXA DE VALORES (Objetivos Originais):
+   • Retorno:    [{-objectives[:, 0].max():.6f}, {-objectives[:, 0].min():.6f}]
+   • Variância:  [{objectives[:, 1].min():.6f}, {objectives[:, 1].max():.6f}]
+   • CVaR:       [{objectives[:, 2].min():.6f}, {objectives[:, 2].max():.6f}]
+
+🎯 ACHIEVEMENT SCALARIZING FUNCTION (ASF):
+   • Fórmula: ASF = max{{w_i × |objetivo_norm_i - reference_i|}}
+   • Interpretação: Quanto MENOR o valor, mais próxima a solução está do ponto de referência
+   • Total de soluções avaliadas: {len(objectives)}
+   • ASF mínima (melhor): {asf_array.min():.6f}
+   • ASF máxima (pior): {asf_array.max():.6f}
+
+✅ SOLUÇÃO ESCOLHIDA (Índice {best_idx}):
+   • ASF: {asf_values[best_idx]:.6f}
+   • Retorno Esperado: {-objectives[best_idx, 0]:.6f}  (normalizado: {objectives_normalized[best_idx, 0]:.3f})
+   • Variância: {objectives[best_idx, 1]:.6f}  (normalizado: {objectives_normalized[best_idx, 1]:.3f})
+   • CVaR: {objectives[best_idx, 2]:.6f}  (normalizado: {objectives_normalized[best_idx, 2]:.3f})
+   • Número de ativos: {np.sum(solutions[best_idx] > 0.001)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        """
+
+        ax6.text(0.05, 0.95, info_text, transform=ax6.transAxes,
+                fontsize=9, verticalalignment='top', fontfamily='monospace',
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.3))
+
+        # Salvar figura
+        plt.savefig(filepath, dpi=300, bbox_inches='tight', facecolor='white')
+        plt.close()
+
+        print(f"\n📊 Visualização salva em: {os.path.abspath(filepath)}")
 
     def _print_matrix(self, matrix, formato=".3f"):
         """
