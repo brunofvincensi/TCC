@@ -496,7 +496,7 @@ class Nsga2OtimizacaoService:
             if self.reference_date is not None:
                 print(f"Usando APENAS dados históricos até a data {self.reference_date}")
 
-            print(f"\n  ✅ Período histórico: {len(df_returns)} meses")
+            print(f"\n  Período histórico: {len(df_returns)} meses")
             print(f"  📅 De {df_returns.index.min()} até {df_returns.index.max()}")
 
             # Calcular estatísticas
@@ -505,7 +505,7 @@ class Nsga2OtimizacaoService:
             correlation_matrix = df_returns.corr()
 
             print(f"\n{'=' * 70}")
-            print(f"📊 MATRIZ DE CORRELAÇÃO")
+            print(f"MATRIZ DE CORRELAÇÃO")
             print(f"{'=' * 70}")
             self._print_matrix(correlation_matrix, formato=".3f")
 
@@ -513,7 +513,7 @@ class Nsga2OtimizacaoService:
             self._analyze_correlation(correlation_matrix)
 
             print(f"\n{'=' * 70}")
-            print(f"📊 MATRIZ DE COVARIÂNCIA (Mensal)")
+            print(f"MATRIZ DE COVARIÂNCIA (Mensal)")
             print(f"{'=' * 70}")
             self._print_matrix(self.covariance_matrix, formato=".6f")
 
@@ -521,7 +521,7 @@ class Nsga2OtimizacaoService:
 
             # Estatísticas gerais
             print(f"\n{'=' * 70}")
-            print(f"📊 ESTATÍSTICAS GERAIS")
+            print(f"ESTATÍSTICAS GERAIS")
             print(f"{'=' * 70}")
             print(f"  Retorno médio mensal: {self.mean_returns.mean() * 100:.2f}%")
             print(f"  Volatilidade média: {np.sqrt(np.diag(self.covariance_matrix)).mean() * 100:.2f}%")
@@ -534,13 +534,13 @@ class Nsga2OtimizacaoService:
                 sharpe = ret / vol if vol > 0 else 0
                 print(f"     {ticker:8s} | Ret: {ret:6.2f}% | Vol: {vol:6.2f}% | Sharpe: {sharpe:5.2f}")
 
-            print(f"\n  ✅ Dados preparados com sucesso!")
+            print(f"\n  Dados preparados com sucesso!")
 
     def _analyze_correlation(self, correlation_matrix):
         """
         Analisa e printa insights da matriz de correlação
         """
-        print(f"\n  🔍 Análise de Correlação:")
+        print(f"\n  Análise de Correlação:")
 
         # Extrair apenas metade superior (sem diagonal)
         mask = np.triu(np.ones_like(correlation_matrix, dtype=bool), k=1)
@@ -561,13 +561,13 @@ class Nsga2OtimizacaoService:
         # Pares com correlação negativa (< -0.3)
         negative_correlations = correlations[correlations < -0.3].sort_values()
         if len(negative_correlations) > 0:
-            print(f"\n  ✅ Pares com Correlação NEGATIVA (< -0.3) [Boa diversificação!]:")
+            print(f"\n  Pares com Correlação NEGATIVA (< -0.3) [Boa diversificação!]:")
             for pair, corr in negative_correlations.head(5).items():
                 print(f"     {pair[0]:8s} ↔ {pair[1]:8s}: {corr:.3f}")
 
         # Aviso se tudo muito correlacionado
         if correlations.mean() > 0.7:
-            print(f"\n  ⚠️  ATENÇÃO: Ativos muito correlacionados (média {correlations.mean():.2f})")
+            print(f"\n  ATENÇÃO: Ativos muito correlacionados (média {correlations.mean():.2f})")
             print(f"     Considere adicionar ativos de outros setores para diversificação.")
 
     def _choose_best_portfolio(self, objectives, solutions):
@@ -598,7 +598,7 @@ class Nsga2OtimizacaoService:
 
         # Análise dos objetivos NÃO normalizados
         print(f"\n{'─'*80}")
-        print(f"📊 ANÁLISE DOS OBJETIVOS (VALORES ORIGINAIS):")
+        print(f"ANÁLISE DOS OBJETIVOS (VALORES ORIGINAIS):")
         print(f"{'─'*80}")
         print(f"   {'Objetivo':<20} {'Mínimo':>15} {'Máximo':>15} {'Amplitude':>15}")
         print(f"   {'-'*70}")
@@ -634,7 +634,7 @@ class Nsga2OtimizacaoService:
 
         # Informações sobre as soluções e ASF
         print(f"\n{'─'*80}")
-        print(f"🔍 CÁLCULO DA ASF (Achievement Scalarizing Function):")
+        print(f"CÁLCULO DA ASF (Achievement Scalarizing Function):")
         print(f"{'─'*80}")
         print(f"   Total de soluções na Fronteira de Pareto: {len(objectives)}")
         print(f"   ASF = max{{w_i * |obj_i - ref_i|}} para i ∈ {{retorno, variância, CVaR}}")
@@ -672,7 +672,7 @@ class Nsga2OtimizacaoService:
 
         # Informações detalhadas da solução escolhida
         print(f"\n{'='*80}")
-        print(f"✅ SOLUÇÃO ESCOLHIDA (Índice {best_idx}):")
+        print(f"SOLUÇÃO ESCOLHIDA (Índice {best_idx}):")
         print(f"{'='*80}")
 
         best_obj = objectives[best_idx]
@@ -711,16 +711,6 @@ class Nsga2OtimizacaoService:
                                        ref_point, weights, asf_values, best_idx, normalization_info):
         """
         Cria visualização detalhada do processo de seleção da melhor carteira.
-
-        Args:
-            objectives: Objetivos originais (não normalizados)
-            objectives_normalized: Objetivos normalizados [0,1]
-            solutions: Pesos das soluções
-            ref_point: Ponto de referência usado
-            weights: Pesos dos objetivos na ASF
-            asf_values: Valores de ASF calculados
-            best_idx: Índice da melhor solução
-            normalization_info: Lista com (min, max) para cada objetivo
         """
         import os
         from datetime import datetime
@@ -762,23 +752,7 @@ class Nsga2OtimizacaoService:
         cbar1 = plt.colorbar(scatter, ax=ax1, pad=0.1, shrink=0.6)
         cbar1.set_label('Valor ASF', fontsize=9)
 
-        # ===== SUBPLOT 2: Distribuição dos valores de ASF =====
-        ax2 = fig.add_subplot(gs[0, 2])
-
-        asf_array = np.array(asf_values)
-        ax2.hist(asf_array, bins=30, color='steelblue', alpha=0.7, edgecolor='black')
-        ax2.axvline(asf_array[best_idx], color='red', linestyle='--', linewidth=2,
-                   label=f'Melhor ASF = {asf_array[best_idx]:.4f}')
-        ax2.axvline(asf_array.mean(), color='green', linestyle='--', linewidth=1.5,
-                   label=f'Média = {asf_array.mean():.4f}')
-
-        ax2.set_xlabel('Valor ASF', fontsize=10)
-        ax2.set_ylabel('Frequência', fontsize=10)
-        ax2.set_title('Distribuição dos Valores de ASF', fontsize=12, fontweight='bold')
-        ax2.legend(fontsize=8)
-        ax2.grid(True, alpha=0.3)
-
-        # ===== SUBPLOT 3: Espaço Normalizado 3D =====
+        # ===== SUBPLOT 2: Espaço Normalizado 3D =====
         ax3 = fig.add_subplot(gs[1, :2], projection='3d')
 
         # Plotar soluções normalizadas
@@ -807,101 +781,6 @@ class Nsga2OtimizacaoService:
         ax3.set_zlabel('CVaR Norm.', fontsize=10, labelpad=10)
         ax3.set_title('Espaço Normalizado [0,1] com Reference Point', fontsize=12, fontweight='bold', pad=20)
         ax3.legend(loc='upper left', fontsize=8)
-
-        # ===== SUBPLOT 4: Comparação das Top 5 Soluções =====
-        ax4 = fig.add_subplot(gs[1, 2])
-
-        top_5_indices = np.argsort(asf_values)[:5]
-        top_5_asf = [asf_values[i] for i in top_5_indices]
-        labels = [f'#{i+1}\n(idx {top_5_indices[i]})' for i in range(5)]
-
-        colors_bar = ['red' if i == 0 else 'steelblue' for i in range(5)]
-        bars = ax4.barh(labels, top_5_asf, color=colors_bar, edgecolor='black', alpha=0.7)
-
-        # Adicionar valores nas barras
-        for i, (bar, val) in enumerate(zip(bars, top_5_asf)):
-            ax4.text(val, i, f' {val:.4f}', va='center', fontsize=9, fontweight='bold')
-
-        ax4.set_xlabel('Valor ASF', fontsize=10)
-        ax4.set_title('Top 5 Soluções (Menor ASF)', fontsize=12, fontweight='bold')
-        ax4.invert_yaxis()
-        ax4.grid(True, alpha=0.3, axis='x')
-
-        # ===== SUBPLOT 5: Análise por Objetivo (Normalizado) =====
-        ax5 = fig.add_subplot(gs[2, 0])
-
-        obj_names = ['Retorno', 'Variância', 'CVaR']
-        x_pos = np.arange(len(obj_names))
-
-        best_values = objectives_normalized[best_idx]
-        ref_values = ref_point
-
-        width = 0.35
-        bars1 = ax5.bar(x_pos - width/2, best_values, width, label='Melhor Solução',
-                       color='red', alpha=0.7, edgecolor='black')
-        bars2 = ax5.bar(x_pos + width/2, ref_values, width, label='Reference Point',
-                       color='gold', alpha=0.7, edgecolor='black')
-
-        # Adicionar valores
-        for bars in [bars1, bars2]:
-            for bar in bars:
-                height = bar.get_height()
-                ax5.text(bar.get_x() + bar.get_width()/2., height,
-                        f'{height:.3f}', ha='center', va='bottom', fontsize=8)
-
-        ax5.set_ylabel('Valor Normalizado', fontsize=10)
-        ax5.set_title('Comparação: Melhor Solução vs Reference Point', fontsize=11, fontweight='bold')
-        ax5.set_xticks(x_pos)
-        ax5.set_xticklabels(obj_names)
-        ax5.legend(fontsize=9)
-        ax5.set_ylim(0, 1.1)
-        ax5.grid(True, alpha=0.3, axis='y')
-
-        # ===== SUBPLOT 6: Informações Textuais =====
-        ax6 = fig.add_subplot(gs[2, 1:])
-        ax6.axis('off')
-
-        # Preparar texto informativo
-        info_text = f"""
-INFORMAÇÕES DO PROCESSO DE SELEÇÃO
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-PERFIL DE RISCO: {self.risk_level.upper()}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📍 REFERENCE POINT (Aspirações Normalizadas):
-   • Retorno: {ref_point[0]:.3f}  (0.0 = melhor possível, 1.0 = pior possível)
-   • Variância: {ref_point[1]:.3f}
-   • CVaR: {ref_point[2]:.3f}
-
-⚖️  PESOS DOS OBJETIVOS NA ASF:
-   • Retorno: {weights[0]:.2f}  |  Variância: {weights[1]:.2f}  |  CVaR: {weights[2]:.2f}
-
-📊 FAIXA DE VALORES (Objetivos Originais):
-   • Retorno:    [{-objectives[:, 0].max():.6f}, {-objectives[:, 0].min():.6f}]
-   • Variância:  [{objectives[:, 1].min():.6f}, {objectives[:, 1].max():.6f}]
-   • CVaR:       [{objectives[:, 2].min():.6f}, {objectives[:, 2].max():.6f}]
-
-🎯 ACHIEVEMENT SCALARIZING FUNCTION (ASF):
-   • Fórmula: ASF = max{{w_i × |objetivo_norm_i - reference_i|}}
-   • Interpretação: Quanto MENOR o valor, mais próxima a solução está do ponto de referência
-   • Total de soluções avaliadas: {len(objectives)}
-   • ASF mínima (melhor): {asf_array.min():.6f}
-   • ASF máxima (pior): {asf_array.max():.6f}
-
-✅ SOLUÇÃO ESCOLHIDA (Índice {best_idx}):
-   • ASF: {asf_values[best_idx]:.6f}
-   • Retorno Esperado: {-objectives[best_idx, 0]:.6f}  (normalizado: {objectives_normalized[best_idx, 0]:.3f})
-   • Variância: {objectives[best_idx, 1]:.6f}  (normalizado: {objectives_normalized[best_idx, 1]:.3f})
-   • CVaR: {objectives[best_idx, 2]:.6f}  (normalizado: {objectives_normalized[best_idx, 2]:.3f})
-   • Número de ativos: {np.sum(solutions[best_idx] > 0.001)}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        """
-
-        ax6.text(0.05, 0.95, info_text, transform=ax6.transAxes,
-                fontsize=9, verticalalignment='top', fontfamily='monospace',
-                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.3))
 
         # Salvar figura
         plt.savefig(filepath, dpi=300, bbox_inches='tight', facecolor='white')
@@ -976,7 +855,7 @@ PERFIL DE RISCO: {self.risk_level.upper()}
         print(f"  Perfil de risco: {self.risk_level}")
         print(f"  Número de ativos disponíveis: {num_assets}")
         if max_assets:
-            print(f"  ⚠️  RESTRIÇÃO DE CARDINALIDADE: máx. {max_assets} ativos na carteira")
+            print(f"  ⚠RESTRIÇÃO DE CARDINALIDADE: máx. {max_assets} ativos na carteira")
             print(f"     Usando operadores genéticos com card-constraint")
         print(f"{'='*70}\n")
 
@@ -1368,7 +1247,7 @@ def save_backtest_chart(portfolio: List[Dict],
     from datetime import datetime
 
     print(f"\n{'='*70}")
-    print(f"📊 GERANDO GRÁFICO DE BACKTEST")
+    print(f"GERANDO GRÁFICO DE BACKTEST")
     print(f"{'='*70}")
 
     # Calcular retornos da carteira
@@ -1377,7 +1256,7 @@ def save_backtest_chart(portfolio: List[Dict],
     )
 
     if df_returns.empty:
-        print("  ⚠️  Sem dados para gerar gráfico")
+        print("  Sem dados para gerar gráfico")
         return None
 
     # Calcular retorno acumulado
@@ -1510,10 +1389,10 @@ def main():
     app = create_app()
 
     # Exemplo 1: Otimização normal (sem backtest)
-   # optimize_current_portfolio(app)
+    optimize_current_portfolio(app)
 
     # Exemplo 2: Otimização com backtest (usando dados até uma data específica)
-    backtest(app)
+   # backtest(app)
 
 
 if __name__ == "__main__":
