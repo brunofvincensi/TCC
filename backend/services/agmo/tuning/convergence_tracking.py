@@ -28,26 +28,6 @@ from models import db
 import time
 import numpy as np
 
-# IDEAL POINT (melhor caso realista):
-
-# - Retorno esperado: -2.5% ao mês (melhor observado: ~-2.2%)
-
-# - Volatilidade: 0.3% ao mês (melhor observado: ~0.34%)
-
-# - Max Drawdown: 8% (melhor observado: ~9.9%)
-
-IDEAL_POINT_PORTFOLIO = np.array([-0.025, 0.005, 0.09])
-
-# NADIR POINT (pior caso aceitável):
-
-# - Retorno esperado: +1% ao mês (pior observado: ~-1.6%)
-
-# - Volatilidade: 1% ao mês (pior observado: ~0.69%)
-
-# - Max Drawdown: 16% (pior observado: ~13.5%)
-
-NADIR_POINT_PORTFOLIO = np.array([-0.010, 0.01, 0.15])
-
 def exemplo_simples():
     """
     Exemplo simples: otimização com tracking de convergência e visualização.
@@ -107,9 +87,9 @@ def exemplo_simples():
     # Verifica convergência
     if tracker.has_converged(window=10, threshold=0.01):
         conv_gen = tracker.get_convergence_generation(window=10, threshold=0.01)
-        print(f"✅ Algoritmo convergiu na geração {conv_gen}")
+        print(f"Algoritmo convergiu na geração {conv_gen}")
     else:
-        print(f"⚠️  Algoritmo não convergiu completamente")
+        print(f"Algoritmo não convergiu completamente")
 
     # Gera gráficos
     print(f"\n📊 Gerando gráficos de convergência...")
@@ -147,10 +127,6 @@ def exemplo_comparacao_multiplas_execucoes():
     """
     from services.agmo.tuning import plot_multiple_runs_comparison
 
-    print(f"\n{'='*80}")
-    print(f"📊 EXEMPLO: Comparação de Múltiplas Execuções por Quantidade de Ativos")
-    print(f"{'='*80}\n")
-
     app = create_app()
     risk_level = 'moderado'
 
@@ -174,28 +150,10 @@ def exemplo_comparacao_multiplas_execucoes():
         {'pop': 100, 'gen': 100},
     ]
 
-    # Usa pontos de referência TEÓRICOS fixos para normalização consistente
-    # Isso evita que o R-Hypervolume caia quando o R-NSGA2 elimina diversidade
-    # (comportamento esperado do algoritmo ao convergir para o reference point)
-    fixed_ideal_point = IDEAL_POINT_PORTFOLIO.copy()
-    fixed_nadir_point = NADIR_POINT_PORTFOLIO.copy()
-
-    print(f"\n📐 USANDO PONTOS DE REFERÊNCIA TEÓRICOS FIXOS:")
-    print(f"   Ideal point (melhor caso teórico): {fixed_ideal_point}")
-    print(f"     Retorno: {-fixed_ideal_point[0]*100:.2f}%/mês")
-    print(f"     Volatilidade: {fixed_ideal_point[1]*100:.3f}%/mês")
-    print(f"     Max Drawdown: {fixed_ideal_point[2]*100:.1f}%")
-    print(f"\n   Nadir point (pior caso aceitável): {fixed_nadir_point}")
-    print(f"     Retorno: {-fixed_nadir_point[0]*100:.2f}%/mês")
-    print(f"     Volatilidade: {fixed_nadir_point[1]*100:.3f}%/mês")
-    print(f"     Max Drawdown: {fixed_nadir_point[2]*100:.1f}%")
-    print(f"\n   🔒 Estes valores serão FIXOS para todas as comparações!")
-    print(f"   ✅ R-Hypervolume não cairá artificialmente ao convergir\n")
-
     # Para cada quantidade de ativos
     for num_assets in asset_quantities:
 
-        print(f"\n📐 CALCULANDO PONTOS DE REFERÊNCIA FIXOS...")
+        print(f"\nCalculando pontos de referência fixos...")
         print(f"   Executando configuração de referência para estabelecer baseline...")
 
         # Executa uma configuração de referência para estimar ideal_point e nadir_point
@@ -229,11 +187,9 @@ def exemplo_comparacao_multiplas_execucoes():
         fixed_ideal_point = reference_tracker.ideal_point.copy()
         fixed_nadir_point = reference_tracker.nadir_point.copy()
 
-        print(f"\n   ✅ Pontos de referência calculados (acumulados de 200 gerações):")
+        print(f"\n   Pontos de referência calculados (acumulados de 200 gerações):")
         print(f"      Ideal point: {fixed_ideal_point}")
         print(f"      Nadir point: {fixed_nadir_point}")
-        print(f"   🔒 Estes valores serão FIXOS para todas as comparações!\n")
-
 
         print(f"\n{'='*80}")
         print(f"🎯 TESTANDO COM {num_assets} ATIVOS")

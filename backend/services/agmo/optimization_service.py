@@ -20,7 +20,7 @@ from .agmo_service import Nsga2OtimizacaoService, MIN_ASSETS
 logger = logging.getLogger(__name__)
 
 
-class OtimizacaoService:
+class OptimizationService:
     """
     Serviço de otimização de carteiras que integra com o AGMO.
 
@@ -109,16 +109,6 @@ class OtimizacaoService:
             asset_ids = None  # None = usar todos os ativos disponíveis do tipo ACAO
 
             # ========== 3. EXECUÇÃO DA OTIMIZAÇÃO ==========
-            logger.info("=" * 70)
-            logger.info("INICIANDO OTIMIZAÇÃO AGMO (R-NSGA2)")
-            logger.info("=" * 70)
-            logger.info(f"  Perfil de risco: {risk_profile}")
-            logger.info(f"  Horizonte: {years_period} anos")
-            logger.info(f"  Ativos restringidos: {len(restricted_asset_ids)}")
-            if max_assets:
-                logger.info(f"  Máx. ativos na carteira: {max_assets}")
-            logger.info("=" * 70)
-
             # Cria instância do serviço AGMO
             service = Nsga2OtimizacaoService(
                 app=current_app._get_current_object(),
@@ -137,15 +127,6 @@ class OtimizacaoService:
             # ========== 4. FORMATAÇÃO DO RESULTADO ==========
             composition = result['composicao']
             metrics = result['metricas']
-
-            logger.info("=" * 70)
-            logger.info("OTIMIZAÇÃO CONCLUÍDA COM SUCESSO")
-            logger.info("=" * 70)
-            logger.info(f"  Carteira com {len(composition)} ativos")
-            logger.info(f"  Retorno esperado anual: {metrics['retorno_esperado_anual']*100:.2f}%")
-            logger.info(f"  Volatilidade anual: {metrics['volatilidade_anual']*100:.2f}%")
-            logger.info(f"  Índice de Sharpe: {metrics['sharpe_ratio']:.2f}")
-            logger.info("=" * 70)
 
             # Formata mensagem de sucesso
             message = (

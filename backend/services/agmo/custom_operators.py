@@ -8,16 +8,6 @@ Abordagem:
 - Após cada operação genética, zerar ativos excedentes (menor peso)
 - Renormalizar para soma = 1
 - Garante que todo o espaço de busca respeita a cardinalidade
-
-Referências:
-- Chang, T. J., Meade, N., Beasley, J. E., & Sharaiha, Y. M. (2000).
-  "Heuristics for cardinality constrained portfolio optimisation".
-  Computers & Operations Research, 27(13), 1271-1302.
-
-- Ruiz-Torrubiano, R., & Suárez, A. (2010).
-  "Hybrid approaches and dimensionality reduction for portfolio selection
-  with cardinality constraints". IEEE Computational Intelligence Magazine, 5(2), 92-107.
-
 """
 
 import numpy as np

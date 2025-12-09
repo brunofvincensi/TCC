@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models.ativo import Asset
-from services.agmo.otimizacao_service import OtimizacaoService
+from services.agmo.optimization_service import OptimizationService
 from models import db, Portfolio, OptimizationParameters, PortfolioAsset, ParameterAssetRestriction
 
 carteira_bp = Blueprint('carteiras', __name__)
@@ -18,7 +18,7 @@ def optimize_and_create_portfolio():
     if not parameters or not portfolio_info or not portfolio_info.get('nome'):
         return jsonify({'erro': 'A estrutura da requisição é inválida. Forneça `parametros` e `info_carteira`.'}), 400
 
-    optimized_composition, message = OtimizacaoService.optimize_portfolio(parameters)
+    optimized_composition, message = OptimizationService.optimize_portfolio(parameters)
 
     if not optimized_composition:
         return jsonify({'erro': message}), 500

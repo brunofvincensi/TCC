@@ -35,8 +35,7 @@ class QualityMetrics:
                                 reference_points: np.ndarray,
                                 ideal_point: Optional[np.ndarray] = None,
                                 nadir_point: Optional[np.ndarray] = None,
-                                weights: Optional[np.ndarray] = None,
-                                use_log_transform: bool = True) -> float:
+                                weights: Optional[np.ndarray] = None) -> float:
 
         """
         Calcula o R-Hypervolume (R2 indicator) da fronteira de Pareto.
@@ -153,44 +152,21 @@ class QualityMetrics:
         logger.debug(f"R2 indicator calculado: {r2:.6e}")
         logger.debug(f"Quanto menor R2, melhor a fronteira em relação aos ref points")
 
-        # Usa transformação sigmoid para estabilidade e interpretabilidade
-        # Transformação: R-HV = 1 / (1 + R2)
-        #
-        # Propriedades:
-        # - Sempre positiva: R-HV ∈ (0, 1]
-        # - R2 = 0 (perfeito) → R-HV = 1.0
-        # - R2 = 1 (razoável) → R-HV = 0.5
-        # - R2 = ∞ (péssimo) → R-HV → 0
-        # - Monotônica: menor R2 = maior R-HV
-        if use_log_transform:
-            # Transformação sigmoid (padrão)
-            # R2 negativo significa soluções muito boas (melhores que ref points)
-            # Usamos abs(r2) para manter a escala mesmo quando super-ótimo
-            r2_adjusted = abs(r2) if r2 < 0 else r2
-            r_hv = 1.0 / (1.0 + r2_adjusted)
+        # R2 negativo significa soluções muito boas (melhores que ref points)
+        # Usamos abs(r2) para manter a escala mesmo quando super-ótimo
+        r2_adjusted = abs(r2) if r2 < 0 else r2
+        r_hv = 1.0 / (1.0 + r2_adjusted)
 
-            # Log simplificado nas primeiras gerações
-
-            if self._debug_counter <= 3 or self._debug_counter % 10 == 0:
-
-                logger.info(f"   → R-HV final: {r_hv:.4f} (maior = melhor)")
-
-                if r2 < 0:
-
-                    logger.info(f"   ⭐ R2 NEGATIVO: Soluções melhores que reference points!")
-
-            logger.debug(f"R-HV (sigmoid): R2={r2:.4f} (adjusted={r2_adjusted:.4f}) → R-HV={r_hv:.4f}")
+        # Log simplificado nas primeiras gerações
+        if self._debug_counter <= 3 or self._debug_counter % 10 == 0:
+            logger.info(f"   → R-HV final: {r_hv:.4f} (maior = melhor)")
             if r2 < 0:
-                logger.info(f"⭐ R2 NEGATIVO ({r2:.4f}): Soluções MELHORES que reference points!")
-            logger.debug(f"   Interpretação: 1.0=perfeito, 0.5=razoável, 0.0=péssimo")
-        else:
-            # Inversão tradicional 1/R2 (mantida para compatibilidade)
-            if abs(r2) < 1e-10:
-                logger.warning(f"R2 muito próximo de zero ({r2:.6e}). Usando R-HV máximo.")
-                r_hv = 1e10  # Valor muito alto indica qualidade perfeita
-            else:
-                r_hv = 1.0 / abs(r2)
-            logger.debug(f"R-HV (1/R2): {r_hv:.6e} (quanto maior, melhor)")
+                logger.info(f"   ⭐ R2 NEGATIVO: Soluções melhores que reference points!")
+
+        logger.debug(f"R-HV (sigmoid): R2={r2:.4f} (adjusted={r2_adjusted:.4f}) → R-HV={r_hv:.4f}")
+        if r2 < 0:
+            logger.info(f"⭐ R2 NEGATIVO ({r2:.4f}): Soluções MELHORES que reference points!")
+        logger.debug(f"   Interpretação: 1.0=perfeito, 0.5=razoável, 0.0=péssimo")
 
         return r_hv
 
@@ -312,12 +288,10 @@ class QualityMetrics:
                               ideal_point: Optional[np.ndarray] = None,
                               reference_points: Optional[np.ndarray] = None,
                               nadir_point: Optional[np.ndarray] = None,
-                              weights: Optional[np.ndarray] = None,
-                              use_log_transform: bool = True) -> dict:
+                              weights: Optional[np.ndarray] = None) -> dict:
 
         hv_value = self.calculate_r_hypervolume(
-            pareto_front, reference_points, ideal_point, nadir_point, weights,
-            use_log_transform=use_log_transform
+            pareto_front, reference_points, ideal_point, nadir_point, weights
         )
         metrics = {
             'r_hypervolume': hv_value,
