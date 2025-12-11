@@ -375,7 +375,7 @@ class ConvergenceTracker:
                 # Primeira geração: inicializa ideal point
                 self.ideal_point = min_values.copy()
                 self.ideal_point_set = True
-                logger.info(f"🎯 Ponto ideal INICIAL (melhor caso gen 0): {self.ideal_point}")
+                logger.info(f"Ponto ideal INICIAL (melhor caso gen 0): {self.ideal_point}")
             else:
                 # Atualiza ideal point com os MELHORES valores já vistos
                 # Em minimização: min é melhor
@@ -390,7 +390,7 @@ class ConvergenceTracker:
                 # Primeira geração: inicializa nadir point com margem generosa
                 self.nadir_point = max_values
                 self.nadir_point_set = True
-                logger.info(f"📊 Ponto nadir INICIAL (pior caso gen 0 com margem): {self.nadir_point}")
+                logger.info(f"Ponto nadir INICIAL (pior caso gen 0 com margem): {self.nadir_point}")
             else:
                 # Atualiza nadir point com os PIORES valores já vistos
                 # Em minimização: max é pior
@@ -415,7 +415,7 @@ class ConvergenceTracker:
 
             # Verifica valores inválidos
             if np.any(np.isnan(pareto_front)) or np.any(np.isinf(pareto_front)):
-                logger.error(f"⚠️ Valores inválidos detectados na fronteira de Pareto!")
+                logger.error(f"Valores inválidos detectados na fronteira de Pareto!")
                 logger.error(f"NaN: {np.sum(np.isnan(pareto_front))}, Inf: {np.sum(np.isinf(pareto_front))}")
 
         # Calcula métricas usando o ideal_point GLOBAL

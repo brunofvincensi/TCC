@@ -11,23 +11,23 @@ def main():
     command = sys.argv[1] if len(sys.argv) > 1 else "help"
 
     if command == "setup":
-        print("🚀 Populando os ativos do arquivo .csv...")
+        print("Populando os ativos do arquivo .csv...")
         seed_assets(app)
-        print("\n✅ Ativos populados!")
+        print("\nAtivos populados!")
 
-        print("🔄 Atualizando os preços dos ativos...")
+        print("Atualizando os preços dos ativos...")
         update_prices(app)
-        print("\n✅ Preços atualizados.")
+        print("\nPreços atualizados.")
 
     elif command == "run":
-        print("▶️  Iniciando a API em http://127.0.0.1:5000 ...")
+        print("Iniciando a API...")
         # Para rodar o servidor, usamos o método run do próprio app
         app.run(debug=True)
 
     elif command == "update-daily":
         print("🔄 Executando atualização diária de preços...")
         update_daily_prices(app)
-        print("\n✅ Atualização diária concluída!")
+        print("\nAtualização diária concluída!")
 
     else:
         print(f"\nComando '{command}' não reconhecido.")

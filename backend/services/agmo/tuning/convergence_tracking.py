@@ -75,7 +75,7 @@ def exemplo_comparacao_multiplas_execucoes():
             app=app,
             restricted_asset_ids=[],
             risk_level=risk_level,
-            years_period=10,
+            years_period=5,
             show_chart=False,
             asset_ids=asset_ids
         )
@@ -100,12 +100,12 @@ def exemplo_comparacao_multiplas_execucoes():
         fixed_ideal_point = reference_tracker.ideal_point.copy()
         fixed_nadir_point = reference_tracker.nadir_point.copy()
 
-        print(f"\n   Pontos de referência calculados (acumulados de 200 gerações):")
+        print(f"\n   Pontos de referência calculados:")
         print(f"      Ideal point: {fixed_ideal_point}")
         print(f"      Nadir point: {fixed_nadir_point}")
 
         print(f"\n{'='*80}")
-        print(f"TESTANDO COM {num_assets} ATIVOS")
+        print(f"Testando com {num_assets} ativos")
         print(f"{'='*80}\n")
 
         # Armazena resultados de todas as configurações para esta quantidade de ativos
@@ -117,8 +117,8 @@ def exemplo_comparacao_multiplas_execucoes():
             gen_count = config['gen']
             config_label = f'Pop={pop_size}, Gen={gen_count}'
 
-            print(f"\n📋 Configuração {config_idx}/{len(configs)}: {config_label}")
-            print(f"   Executando 3 vezes para obter média...")
+            print(f"\nConfiguração {config_idx}/{len(configs)}: {config_label}")
+            print(f"   Executando 10 vezes para obter média...")
 
             # Armazena resultados das 3 execuções
             run_hypervolumes = []
@@ -128,13 +128,13 @@ def exemplo_comparacao_multiplas_execucoes():
 
             # Executa 10 vezes a mesma configuração
             for run_num in range(1, 11):
-                print(f"\n   🔄 Execução {run_num}/10...")
+                print(f"\nExecução {run_num}/10...")
 
                 service = Nsga2OtimizacaoService(
                     app=app,
                     restricted_asset_ids=[],
                     risk_level=risk_level,
-                    years_period=10,
+                    years_period=5,
                     show_chart=False,
                     fixed_ideal_point=fixed_ideal_point,
                     fixed_nadir_point=fixed_nadir_point,
@@ -165,10 +165,9 @@ def exemplo_comparacao_multiplas_execucoes():
                 history = tracker.get_history()
                 run_histories.append(history)
 
-                # DEBUG: Imprime valores reais dos objetivos (sem normalização)
+                # Printa os valores reais dos objetivos (sem normalização)
                 if hasattr(tracker, '_all_pareto_fronts') and len(tracker._all_pareto_fronts) > 0:
                     all_fronts = np.vstack(tracker._all_pareto_fronts)
-                    print(f"\n      📊 DEBUG - Valores REAIS dos objetivos:")
                     print(f"         Min observado: {np.min(all_fronts, axis=0)}")
                     print(f"         Max observado: {np.max(all_fronts, axis=0)}")
                     print(f"         Ideal fixo: {fixed_ideal_point}")
@@ -231,10 +230,6 @@ def exemplo_comparacao_multiplas_execucoes():
             """
             Compara duas configurações priorizando hipervolume.
             Retorna config1 se for melhor, config2 caso contrário.
-
-            Regra:
-            - Se hipervolumes forem 90% iguais (diferença relativa <= 0.10), escolhe pelo menor tempo
-            - Caso contrário, escolhe pelo maior hipervolume
             """
             hv1 = config1['hypervolume_mean']
             hv2 = config2['hypervolume_mean']

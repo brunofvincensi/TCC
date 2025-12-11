@@ -23,8 +23,8 @@ from app import create_app
 from models import db, Asset, PriceHistory
 from models.asset import AssetType
 
-DEFAULT_GEN_SIZE = 50
-DEFAULT_POPULATION_SIZE = 100
+DEFAULT_GEN_SIZE = 100
+DEFAULT_POPULATION_SIZE = 150
 
 MIN_ASSETS = 5
 
@@ -1015,7 +1015,7 @@ class Nsga2OtimizacaoService:
                            use_optimal_config: bool):
         if use_optimal_config and (population_size is None or generations is None):
             print(f"\n{'=' * 70}")
-            print(f"🔍 BUSCANDO CONFIGURAÇÃO ÓTIMA PARA {num_assets} ATIVOS")
+            print(f"Buscando configuração ótima para {num_assets} ativos")
             print(f"{'=' * 70}")
 
             population_size, generations = self.get_hyperparameter_config(num_assets, population_size, generations)

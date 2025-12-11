@@ -1,3 +1,5 @@
+from datetime import date, datetime
+from pathlib import Path
 from typing import List, Dict, Tuple
 
 import numpy as np
@@ -182,10 +184,254 @@ def save_backtest_chart(portfolio: List[Dict],
 
     return full_path
 
+
+def generate_assets_evolution_chart(app,
+                                  portfolio: List[Dict],
+                                  start_date: date,
+                                  end_date: date,
+                                  file_name: str = None) -> str:
+    """
+    Gera gráfico mostrando a evolução do retorno acumulado de cada ativo
+    individual da portfolio AGMO, com sumário lateral mostrando a participação
+    de cada ativo.
+    """
+    print(f"\n{'='*70}")
+    print(f"GERANDO GRÁFICO DE EVOLUÇÃO DOS ATIVOS DA CARTEIRA")
+    print(f"{'='*70}")
+
+    # Buscar dados dos ativo s
+    df_retornos, ativos_ordenados = _fetch_individual_assets_data(app,
+        portfolio, start_date, end_date
+    )
+
+    # Calcular retorno acumulado para cada ativo
+    df_retorno_acumulado = (1 + df_retornos).cumprod() - 1
+
+    # Calcular retorno acumulado final de cada ativo para o sumário
+    retorno_final_por_ticker = {}
+    for ticker in df_retorno_acumulado.columns:
+        retorno_final = df_retorno_acumulado[ticker].iloc[-1] * 100  # em %
+        retorno_final_por_ticker[ticker] = retorno_final
+
+    # Configurar cores distintas para cada ativo (usando uma paleta de cores)
+    num_ativos = len(ativos_ordenados)
+    cores = plt.cm.tab20(np.linspace(0, 1, num_ativos))
+
+    # Criar figura com layout customizado
+    # 70% para o gráfico, 30% para o sumário
+    fig = plt.figure(figsize=(18, 10))
+    gs = fig.add_gridspec(1, 2, width_ratios=[7, 3], hspace=0.3, wspace=0.3)
+
+    ax_grafico = fig.add_subplot(gs[0, 0])
+    ax_sumario = fig.add_subplot(gs[0, 1])
+
+    # Criar mapeamento ticker -> cor
+    ticker_cor = {}
+    for i, ativo_info in enumerate(ativos_ordenados):
+        ticker_cor[ativo_info['ticker']] = cores[i]
+
+    # Plotar linhas do gráfico
+    datas = df_retorno_acumulado.index
+
+    for ticker in df_retorno_acumulado.columns:
+        if ticker in ticker_cor:
+            ax_grafico.plot(
+                datas,
+                df_retorno_acumulado[ticker] * 100,
+                linewidth=2,
+                color=ticker_cor[ticker],
+                label=ticker,
+                alpha=0.8
+            )
+
+    # Configurar gráfico
+    ax_grafico.axhline(y=0, color='gray', linestyle='--', alpha=0.5, linewidth=1)
+    ax_grafico.set_title('Evolução dos Ativos da portfolio AGMO',
+                        fontsize=14, fontweight='bold', pad=20)
+    ax_grafico.set_xlabel('Data', fontsize=11)
+    ax_grafico.set_ylabel('Retorno Acumulado (%)', fontsize=11)
+    ax_grafico.grid(True, alpha=0.3, linestyle='--')
+
+    # Rotacionar labels do eixo X para melhor legibilidade
+    ax_grafico.tick_params(axis='x', rotation=45)
+
+    # ====================================================================
+    # CRIAR SUMÁRIO LATERAL
+    # ====================================================================
+    ax_sumario.axis('off')  # Desligar eixos
+
+    # Título do sumário
+    ax_sumario.text(0.5, 0.95, 'Composição da portfolio',
+                   ha='center', va='top', fontsize=12, fontweight='bold',
+                   transform=ax_sumario.transAxes)
+
+    # Desenhar linha separadora
+    ax_sumario.plot([0.1, 0.9], [0.92, 0.92], 'k-', lw=1,
+                   transform=ax_sumario.transAxes)
+
+    # Configurações do sumário
+    y_start = 0.88
+    y_step = 0.85 / (num_ativos + 1)  # Espaçamento dinâmico
+
+    # Cabeçalho
+    y_pos = y_start
+    ax_sumario.text(0.05, y_pos, '#', ha='left', va='top',
+                   fontsize=9, fontweight='bold',
+                   transform=ax_sumario.transAxes)
+    ax_sumario.text(0.15, y_pos, 'Ticker', ha='left', va='top',
+                   fontsize=9, fontweight='bold',
+                   transform=ax_sumario.transAxes)
+    ax_sumario.text(0.50, y_pos, 'Retorno', ha='right', va='top',
+                   fontsize=9, fontweight='bold',
+                   transform=ax_sumario.transAxes)
+    ax_sumario.text(0.70, y_pos, 'Peso', ha='right', va='top',
+                   fontsize=9, fontweight='bold',
+                   transform=ax_sumario.transAxes)
+    ax_sumario.text(0.80, y_pos, 'Barra', ha='left', va='top',
+                   fontsize=9, fontweight='bold',
+                   transform=ax_sumario.transAxes)
+
+    y_pos -= y_step * 0.3
+
+    # Listar ativos
+    for i, ativo_info in enumerate(ativos_ordenados, start=1):
+        ticker = ativo_info['ticker']
+        weight = ativo_info['weight']
+        cor = ticker_cor[ticker]
+        retorno = retorno_final_por_ticker.get(ticker, 0)
+
+        # Número
+        ax_sumario.text(0.05, y_pos, f"{i}", ha='left', va='top',
+                       fontsize=8, color='black',
+                       transform=ax_sumario.transAxes)
+
+        # Ticker (com cor do ativo)
+        ax_sumario.text(0.15, y_pos, ticker, ha='left', va='top',
+                       fontsize=8, fontweight='bold', color=cor,
+                       transform=ax_sumario.transAxes)
+
+        # Retorno acumulado
+        ax_sumario.text(0.50, y_pos, f"{retorno:+.2f}%", ha='right', va='top',
+                       fontsize=8, color='black',
+                       transform=ax_sumario.transAxes)
+
+        # Peso percentual
+        ax_sumario.text(0.70, y_pos, f"{weight*100:.2f}%", ha='right', va='top',
+                       fontsize=8, color='black',
+                       transform=ax_sumario.transAxes)
+
+        # Barra de peso (usando caracteres Unicode)
+        # Normalizar peso para escala de 0 a 15 caracteres
+        max_chars = 12
+        num_chars = int(weight * 100 / (max([a['weight'] for a in ativos_ordenados]) * 100) * max_chars)
+        barra = '█' * max(num_chars, 1)  # Mínimo 1 caractere
+
+        ax_sumario.text(0.80, y_pos, barra, ha='left', va='top',
+                       fontsize=8, color=cor, family='monospace',
+                       transform=ax_sumario.transAxes)
+
+        y_pos -= y_step
+
+    # Adicionar rodapé com total
+    ax_sumario.plot([0.1, 0.9], [y_pos + y_step * 0.2, y_pos + y_step * 0.2],
+                   'k-', lw=0.5, transform=ax_sumario.transAxes)
+
+    total_peso = sum([a['weight'] for a in ativos_ordenados])
+    ax_sumario.text(0.5, y_pos, f"Total: {total_peso*100:.2f}%",
+                   ha='center', va='top', fontsize=9, fontweight='bold',
+                   transform=ax_sumario.transAxes)
+
+    # Ajustar layout manualmente (tight_layout causa warning com axis('off'))
+    plt.subplots_adjust(left=0.05, right=0.98, top=0.95, bottom=0.08, wspace=0.25)
+
+    # Salvar gráfico
+    if file_name is None:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        file_name = f'evolucao_ativos_portfolio_{timestamp}.png'
+
+    output_dir = Path('comparison_results')
+    output_dir.mkdir(exist_ok=True)
+
+    full_path = output_dir / file_name
+    plt.savefig(full_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+    print(f"  ✅ Gráfico de evolução dos ativos salvo em: {full_path}")
+    print(f"{'='*70}\n")
+
+    return str(full_path)
+
+def _fetch_individual_assets_data(app, portfolio: List[Dict],
+                                     start_date: date,
+                                     end_date: date) -> Tuple[pd.DataFrame, List[Dict]]:
+    """
+    Busca dados históricos de retorno de cada ativo individual da portfolio.
+
+    Args:
+        portfolio: Lista com composição da portfolio
+        start_date: Data inicial
+        end_date: Data final
+
+    Returns:
+        Tupla contendo:
+        - DataFrame com retornos mensais de cada ativo (colunas = tickers)
+        - Lista com informações dos ativos ordenados por peso decrescente
+    """
+    with app.app_context():
+        ids_ativos = [item['asset_id'] for item in portfolio]
+
+        # Criar dicionário com informações completas dos ativos
+        ativos_info = {
+            item['ticker']: {
+                'ticker': item['ticker'],
+                'nome': item.get('name', item['ticker']),
+                'weight': item['weight']
+            }
+            for item in portfolio
+        }
+
+        # Buscar retornos dos ativos
+        query = db.session.query(
+            PriceHistory.date,
+            PriceHistory.monthly_variation,
+            Asset.ticker
+        ).join(Asset, PriceHistory.asset_id == Asset.id) \
+            .filter(
+                PriceHistory.asset_id.in_(ids_ativos),
+                PriceHistory.date >= start_date,
+                PriceHistory.date <= end_date
+            ) \
+            .order_by(PriceHistory.date)
+
+        df = pd.read_sql(query.statement, con=db.session.connection())
+
+        if df.empty:
+            raise ValueError("Sem dados históricos para os ativos da portfolio.")
+
+        # Pivot para ter retornos por ativo
+        df_retornos = df.pivot(
+            index='date',
+            columns='ticker',
+            values='monthly_variation'
+        )
+
+        # Ordenar ativos por peso decrescente
+        ativos_ordenados = sorted(
+            ativos_info.values(),
+            key=lambda x: x['weight'],
+            reverse=True
+        )
+
+        return df_retornos, ativos_ordenados
+
+
 def optimize_current_portfolio(app):
-    asset_ids = [14, 92, 67, 51, 96]
-    service = Nsga2OtimizacaoService(app, [1, 10], "conservador", 10, show_chart=True, asset_ids=asset_ids)
+    asset_ids = [14, 92, 67, 51, 86]
+    service = Nsga2OtimizacaoService(app, [1, 10], "moderado", 10, show_chart=True, asset_ids=asset_ids)
     result = service.optimize(max_assets=10, use_optimal_config=False)
+
+    generate_assets_evolution_chart(app, result['composicao'], start_date=date(2002, 1, 1),
+        end_date=date(2024, 12, 31))
 
     # Informações adicionais
     print(f"\n📅 INFORMAÇÕES DO PERÍODO:")

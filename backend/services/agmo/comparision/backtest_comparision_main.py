@@ -112,7 +112,4 @@ def complete_example():
     }
 
 if __name__ == "__main__":
-    # Escolha qual exemplo executar:
-
-    # Exemplo completo
     complete_example()
