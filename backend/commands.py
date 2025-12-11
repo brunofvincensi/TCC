@@ -1,6 +1,6 @@
 import csv
 from models import db
-from models.ativo import Asset, AssetType
+from models.asset import Asset, AssetType
 from services.history_processor.yfinance_processor import YFinanceProcessor
 
 
@@ -24,12 +24,12 @@ def seed_assets(app):
                         print(f"-> Ativo {row['ticker']} adicionado.")
 
                 db.session.commit()
-                print("\n✅ Tabela de ativos populada com sucesso!")
+                print("\nTabela de ativos populada com sucesso!")
         except FileNotFoundError:
-            print("\n❌ ERRO: O arquivo 'ativos.csv' não foi encontrado.")
+            print("\nERRO: O arquivo 'ativos.csv' não foi encontrado.")
         except Exception as e:
             db.session.rollback()
-            print(f"\n❌ Ocorreu um erro inesperado: {e}")
+            print(f"\nOcorreu um erro inesperado: {e}")
 
 def update_prices(app):
     """
@@ -50,7 +50,7 @@ def update_prices(app):
             if asset.type == AssetType.STOCK:
                 yfinance_processor.process(asset)
 
-        print("\n✅ Atualização de preços mensais concluída!")
+        print("\nAtualização de preços mensais concluída!")
 
 def update_daily_prices(app):
     """
@@ -65,7 +65,7 @@ def update_daily_prices(app):
             print("Nenhum ativo encontrado no banco.")
             return
 
-        print(f"\n🔄 Iniciando atualização diária de preços...")
+        print(f"\nIniciando atualização diária de preços...")
 
         updated_count = 0
         for asset in assets:
@@ -74,7 +74,7 @@ def update_daily_prices(app):
                     yfinance_processor.process_daily(asset)
                     updated_count += 1
                 except Exception as e:
-                    print(f"  - ❌ Erro ao atualizar {asset.ticker}: {e}")
+                    print(f"Erro ao atualizar {asset.ticker}: {e}")
                     continue
 
-        print(f"\n✅ Atualização diária concluída! {updated_count} ativos processados.")
+        print(f"\nAtualização diária concluída! {updated_count} ativos processados.")

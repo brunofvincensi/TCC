@@ -3,7 +3,7 @@ import yfinance as yf
 import pandas as pd
 from calendar import monthrange
 from models import db
-from models.ativo import PriceHistory
+from models.asset import PriceHistory
 
 
 class YFinanceProcessor:
@@ -88,7 +88,7 @@ class YFinanceProcessor:
 
         return float((last_price - first_price) / first_price)
 
-    def _upsert_price_record(self, asset, date, price, variation, update_if_exists=False):
+    def _upsert_price_record(self, asset, date, price, variation):
         """
         Insere ou atualiza um registro de preço no banco de dados.
         """
@@ -98,13 +98,11 @@ class YFinanceProcessor:
         ).first()
 
         if existing:
-            if update_if_exists:
-                existing.closing_price = price
-                if variation is not None:
-                    existing.Variation = variation
-                db.session.commit()
-                return 'updated'
-            return 'skipped'
+            existing.closing_price = price
+            if variation is not None:
+                existing.Variation = variation
+            db.session.commit()
+            return 'updated'
 
         # Criar novo registro
         new_price = PriceHistory(
@@ -155,8 +153,7 @@ class YFinanceProcessor:
 
                     # Inserir apenas novos registros (não atualiza existentes)
                     result = self._upsert_price_record(
-                        asset, month_date, closing_price, variation,
-                        update_if_exists=False
+                        asset, month_date, closing_price, variation
                     )
 
                     if result == 'inserted':
@@ -226,7 +223,6 @@ class YFinanceProcessor:
             # Atualizar ou inserir registro
             result = self._upsert_price_record(
                 asset, month_end_date, closing_price, variation,
-                update_if_exists=True
             )
 
             if result == 'updated':
@@ -237,4 +233,4 @@ class YFinanceProcessor:
 
         except Exception as e:
             db.session.rollback()
-            print(f"  - ❌ Erro ao atualizar dados para {asset.ticker}: {e}")
+            print(f"Erro ao atualizar dados para {asset.ticker}: {e}")

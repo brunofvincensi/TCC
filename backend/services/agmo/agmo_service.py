@@ -21,7 +21,7 @@ from pymoo.core.callback import Callback
 
 from app import create_app
 from models import db, Asset, PriceHistory
-from models.ativo import AssetType
+from models.asset import AssetType
 
 DEFAULT_GEN_SIZE = 50
 DEFAULT_POPULATION_SIZE = 100
@@ -116,13 +116,6 @@ class ConvergenceCallback(Callback):
         X = population.get("X")  # Soluções (pesos)
         F = population.get("F")  # Objetivos
 
-        # Selecionar algumas soluções interessantes:
-        # 1. Melhor retorno (menor F[0], pois é negativo)
-        # 2. Menor risco (menor F[1])
-        # 3. Menor CVaR (menor F[2])
-        # 4. Uma solução aleatória
-        # 5. Solução balanceada (próxima ao centro)
-
         indices_to_visualize = []
         labels = []
 
@@ -178,7 +171,7 @@ class ConvergenceCallback(Callback):
 
             self.problem.visualize_cvar(weights, f"{idx}_{label}", save_path)
 
-        print(f"\n  ✅ {len(unique_indices)} visualizações salvas em: {self.output_dir}/")
+        print(f"\n  {len(unique_indices)} visualizações salvas em: {self.output_dir}/")
         print(f"{'='*70}\n")
 
 class PersonalizedPortfolioProblem(ElementwiseProblem):
@@ -314,10 +307,10 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
 
         # ========== DEBUG ==========
         # print(f"\n{'=' * 70}")
-        # print(f"🔍 DEBUG _evaluate")
+        # print(f"DEBUG _evaluate")
         # print(f"{'=' * 70}")
         #
-        # print(f"\n📊 Vetor x (RAW - antes da normalização):")
+        # print(f"\nVetor x (RAW - antes da normalização):")
         # print(f"   Shape: {x.shape}")
         # print(f"   Valores: {x}")
         # print(f"   Soma: {x.sum():.6f}")
@@ -327,7 +320,6 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         # print(f"\n Mapeamento x → Ativos:")
         # for i, (ticker, peso_raw) in enumerate(zip(self.tickers, x)):
         #     print(f"   x[{i}] = {peso_raw:.6f} → {ticker}")
-
 
         weights = x
 
@@ -406,7 +398,6 @@ class Nsga2OtimizacaoService:
             if df_history.empty:
                 raise ValueError("Sem histórico para os ativos selecionados.")
 
-            # Pivot sem dropna para analisar cada ativo
             df_returns_complete = df_history.pivot(
                 index='date',
                 columns='ticker',
@@ -417,14 +408,14 @@ class Nsga2OtimizacaoService:
             available_assets = df_returns_complete.columns.tolist()
             data_count = df_returns_complete.count()
 
-            print(f"\n  📊 Análise de histórico por ativo:")
+            print(f"\n Análise de histórico por ativo:")
             print(f"  {'Ticker':<12} {'Meses':>8} {'Status':<20}")
             print(f"  {'-'*40}")
 
             valid_assets = []
             excluded_assets = []
 
-            # Filtrar ações antes do pivot baseado no horizonte de investimento
+            # Filtrar ações baseado no horizonte de investimento
             minimum_history_months = int(self.years_period * 12)
 
             print(f"\n{'=' * 70}")
@@ -458,8 +449,7 @@ class Nsga2OtimizacaoService:
             # Filtra o DataFrame original para incluir apenas ativos válidos
             df_history_filtered = df_history[df_history['ticker'].isin(valid_assets)]
 
-            # Agora faz o pivot e dropna com segurança
-            # Todos os ativos têm histórico >= mínimo, então dropna é consistente
+            # Todos os ativos têm histórico >= mínimo, então dropna pode ser usado
             df_returns = df_history_filtered.pivot(
                 index='date',
                 columns='ticker',
@@ -497,7 +487,7 @@ class Nsga2OtimizacaoService:
                 print(f"Usando APENAS dados históricos até a data {self.reference_date}")
 
             print(f"\n  Período histórico: {len(df_returns)} meses")
-            print(f"  📅 De {df_returns.index.min()} até {df_returns.index.max()}")
+            print(f"    De {df_returns.index.min()} até {df_returns.index.max()}")
 
             # Calcular estatísticas
             self.mean_returns = df_returns.mean()
@@ -527,7 +517,7 @@ class Nsga2OtimizacaoService:
             print(f"  Volatilidade média: {np.sqrt(np.diag(self.covariance_matrix)).mean() * 100:.2f}%")
 
             # Estatísticas por ativo
-            print(f"\n  📈 Por Ativo:")
+            print(f"\nPor Ativo:")
             for ticker in df_returns.columns:
                 ret = self.mean_returns[ticker] * 100
                 vol = np.sqrt(self.covariance_matrix.loc[ticker, ticker]) * 100
@@ -554,7 +544,7 @@ class Nsga2OtimizacaoService:
         # Pares com correlação muito alta (> 0.8)
         high_correlations = correlations[correlations > 0.8].sort_values(ascending=False)
         if len(high_correlations) > 0:
-            print(f"\n  ⚠️  Pares com Correlação ALTA (> 0.8):")
+            print(f"\n  Pares com Correlação ALTA (> 0.8):")
             for pair, corr in high_correlations.head(5).items():
                 print(f"     {pair[0]:8s} ↔ {pair[1]:8s}: {corr:.3f}")
 
@@ -581,7 +571,7 @@ class Nsga2OtimizacaoService:
         Menor ASF = mais próximo do reference point = melhor solução
         """
         print(f"\n{'='*80}")
-        print(f"🎯 SELEÇÃO DA MELHOR CARTEIRA - PERFIL '{self.risk_level.upper()}'")
+        print(f"SELEÇÃO DA MELHOR CARTEIRA - PERFIL '{self.risk_level.upper()}'")
         print(f"{'='*80}")
 
         # Usa configuração centralizada (constantes do módulo)
@@ -589,12 +579,11 @@ class Nsga2OtimizacaoService:
         weights = WEIGHTS_CONFIG
 
         # Informações sobre o reference point
-        print(f"\n📍 REFERENCE POINT (Ponto de Aspiração):")
+        print(f"\nREFERENCE POINT:")
         print(f"   Perfil: {self.risk_level}")
-        print(f"   Retorno: {ref_point[0]:.3f} (0.0 = melhor possível, 1.0 = pior possível)")
+        print(f"   Retorno: {ref_point[0]:.3f}")
         print(f"   Variância: {ref_point[1]:.3f}")
         print(f"   CVaR: {ref_point[2]:.3f}")
-        print(f"\n   Pesos dos objetivos: Retorno={weights[0]:.2f}, Variância={weights[1]:.2f}, CVaR={weights[2]:.2f}")
 
         # Análise dos objetivos NÃO normalizados
         print(f"\n{'─'*80}")
@@ -637,8 +626,6 @@ class Nsga2OtimizacaoService:
         print(f"CÁLCULO DA ASF (Achievement Scalarizing Function):")
         print(f"{'─'*80}")
         print(f"   Total de soluções na Fronteira de Pareto: {len(objectives)}")
-        print(f"   ASF = max{{w_i * |obj_i - ref_i|}} para i ∈ {{retorno, variância, CVaR}}")
-        print(f"   Quanto MENOR a ASF, mais próxima a solução está do reference point")
 
         # Mostra estatísticas dos valores de ASF
         asf_array = np.array(asf_values)
@@ -655,7 +642,7 @@ class Nsga2OtimizacaoService:
         top_5_indices = np.argsort(asf_values)[:5]
 
         print(f"\n{'─'*80}")
-        print(f"🏆 TOP 5 SOLUÇÕES (menor ASF = melhor):")
+        print(f"TOP 5 SOLUÇÕES (menor ASF = melhor):")
         print(f"{'─'*80}")
         print(f"   {'Rank':<6} {'ASF':<12} {'Retorno':<12} {'Variância':<12} {'CVaR':<12} {'Ativos':>8}")
         print(f"   {'-'*75}")
@@ -847,21 +834,17 @@ class Nsga2OtimizacaoService:
         termination = self.get_termination(generations)
 
         print(f"\n{'='*70}")
-        print(f"🚀 EXECUTANDO OTIMIZAÇÃO R-NSGA2")
+        print(f"Executando a otimização do R-NSGA2")
         print(f"{'='*70}")
         print(f"  Algoritmo: R-NSGA2 (Reference Point Based)")
         print(f"  População: {population_size}")
         print(f"  Gerações: {generations}")
         print(f"  Perfil de risco: {self.risk_level}")
         print(f"  Número de ativos disponíveis: {num_assets}")
-        if max_assets:
-            print(f"  ⚠RESTRIÇÃO DE CARDINALIDADE: máx. {max_assets} ativos na carteira")
-            print(f"     Usando operadores genéticos com card-constraint")
-        print(f"{'='*70}\n")
 
         result = minimize(problem, algorithm, termination,
                            callback=callback, verbose=True)
-        print("🏁 Otimização R-NSGA2 concluída.")
+        print("Otimização R-NSGA2 concluída.")
 
         if result.X is None:
             raise ValueError("O algoritmo não conseguiu encontrar nenhuma solução.")
@@ -1151,250 +1134,4 @@ class Nsga2OtimizacaoService:
 
         print(f"\n✅ Otimização concluída com sucesso!")
         print(f"{'='*80}\n")
-
-def _calculate_portfolio_return(app, portfolio: List[Dict],
-                               start_date,
-                               end_date) -> Tuple[float, List[float], pd.DataFrame]:
-    """
-    Calcula o retorno de uma carteira em um período específico
-
-    Args:
-        portfolio: Lista com composição da carteira
-        start_date: Data inicial do período
-        end_date: Data final do período
-
-    Returns:
-        Tupla com (retorno_total, lista_de_retornos_mensais, dataframe_com_datas)
-    """
-    with app.app_context():
-        # Buscar retornos dos ativos no período
-        asset_ids = [item['asset_id'] for item in portfolio]
-
-        query = db.session.query(
-            PriceHistory.date,
-            PriceHistory.monthly_variation,
-            Asset.ticker
-        ).join(Asset, PriceHistory.asset_id == Asset.id) \
-            .filter(
-            PriceHistory.asset_id.in_(asset_ids),
-            PriceHistory.date > start_date,
-            PriceHistory.date <= end_date
-        ) \
-            .order_by(PriceHistory.date)
-
-        df = pd.read_sql(query.statement, con=db.session.connection())
-
-        if df.empty:
-            return 0.0, [], pd.DataFrame()
-
-        # Pivot para ter retornos por ativo
-        df_returns = df.pivot(
-            index='date',
-            columns='ticker',
-            values='monthly_variation'
-        )
-
-        # Calcular retorno ponderado da carteira
-        weights_dict = {item['ticker']: item['weight'] for item in portfolio}
-
-        monthly_returns = []
-        dates = []
-        for date_idx in df_returns.index:
-            month_return = 0
-            for ticker in df_returns.columns:
-                if ticker in weights_dict:
-                    asset_ret = df_returns.loc[date_idx, ticker]
-                    if pd.notna(asset_ret):
-                        month_return += weights_dict[ticker] * asset_ret
-
-            monthly_returns.append(month_return)
-            dates.append(date_idx)
-
-        # Calcular retorno acumulado
-        total_return = (1 + pd.Series(monthly_returns)).prod() - 1
-
-        # Criar DataFrame com resultados
-        df_result = pd.DataFrame({
-            'data': dates,
-            'retorno_mensal': monthly_returns
-        })
-        df_result.set_index('data', inplace=True)
-
-        return float(total_return), monthly_returns, df_result
-
-
-def save_backtest_chart(portfolio: List[Dict],
-                            start_date,
-                            end_date,
-                            app,
-                            file_name: str = None,
-                            volatility_window: int = 6) -> str:
-    """
-    Gera e salva gráfico mostrando o retorno acumulado e a volatilidade da carteira ao longo do tempo.
-
-    Args:
-        portfolio: Lista com composição da carteira otimizada
-        start_date: Data inicial do backtest
-        end_date: Data final do backtest
-        app: Instância da aplicação Flask
-        file_name: Nome do arquivo para salvar (opcional, gera automaticamente se None)
-        volatility_window: Janela em meses para cálculo da volatilidade rolling (padrão: 6)
-
-    Returns:
-        Caminho completo do arquivo salvo
-    """
-    import os
-    from datetime import datetime
-
-    print(f"\n{'='*70}")
-    print(f"GERANDO GRÁFICO DE BACKTEST")
-    print(f"{'='*70}")
-
-    # Calcular retornos da carteira
-    total_return, monthly_returns, df_returns = _calculate_portfolio_return(
-        app, portfolio, start_date, end_date
-    )
-
-    if df_returns.empty:
-        print("  Sem dados para gerar gráfico")
-        return None
-
-    # Calcular retorno acumulado
-    df_returns['retorno_acumulado'] = (1 + df_returns['retorno_mensal']).cumprod() - 1
-
-    # Calcular volatilidade rolling (anualizada)
-    df_returns['volatilidade_rolling'] = (
-        df_returns['retorno_mensal']
-        .rolling(window=volatility_window, min_periods=1)
-        .std() * np.sqrt(12) * 100  # Anualizada e em %
-    )
-
-    # Configurar figura com 2 subplots
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10))
-    fig.suptitle('Backtest da Carteira Otimizada', fontsize=16, fontweight='bold')
-
-    # Gráfico 1: Retorno Acumulado
-    ax1.plot(df_returns.index, df_returns['retorno_acumulado'] * 100,
-             linewidth=2.5, color='#2E86AB', marker='o', markersize=4, label='Retorno Acumulado')
-    ax1.axhline(y=0, color='red', linestyle='--', alpha=0.5, linewidth=1)
-    ax1.fill_between(df_returns.index, 0, df_returns['retorno_acumulado'] * 100,
-                     alpha=0.3, color='#2E86AB')
-    ax1.set_title('Retorno Acumulado da Carteira ao Longo do Tempo', fontsize=12, fontweight='bold')
-    ax1.set_xlabel('Data', fontsize=10)
-    ax1.set_ylabel('Retorno Acumulado (%)', fontsize=10)
-    ax1.grid(True, alpha=0.3, linestyle='--')
-    ax1.legend(loc='upper left', fontsize=9)
-
-    # Adicionar anotação com retorno total
-    final_return = df_returns['retorno_acumulado'].iloc[-1] * 100
-    ax1.annotate(f'Retorno Total: {final_return:+.2f}%',
-                xy=(df_returns.index[-1], final_return),
-                xytext=(10, 10), textcoords='offset points',
-                bbox=dict(boxstyle='round,pad=0.5', facecolor='yellow', alpha=0.7),
-                fontsize=9, fontweight='bold')
-
-    # Gráfico 2: Volatilidade Rolling
-    ax2.plot(df_returns.index, df_returns['volatilidade_rolling'],
-             linewidth=2.5, color='#F18F01', marker='s', markersize=4, label=f'Volatilidade Rolling ({volatility_window} meses)')
-    ax2.fill_between(df_returns.index, 0, df_returns['volatilidade_rolling'],
-                     alpha=0.3, color='#F18F01')
-    ax2.set_title(f'Volatilidade da Carteira ao Longo do Tempo (janela de {volatility_window} meses)',
-                  fontsize=12, fontweight='bold')
-    ax2.set_xlabel('Data', fontsize=10)
-    ax2.set_ylabel('Volatilidade Anualizada (%)', fontsize=10)
-    ax2.grid(True, alpha=0.3, linestyle='--')
-    ax2.legend(loc='upper left', fontsize=9)
-
-    # Adicionar linha de média de volatilidade
-    mean_vol = df_returns['volatilidade_rolling'].mean()
-    ax2.axhline(y=mean_vol, color='green', linestyle='--', alpha=0.7, linewidth=1.5,
-                label=f'Média: {mean_vol:.2f}%')
-    ax2.legend(loc='upper left', fontsize=9)
-
-    plt.tight_layout()
-
-    # Definir nome do arquivo
-    if file_name is None:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        file_name = f'backtest_carteira_{timestamp}.png'
-
-    # Garantir que o diretório existe
-    directory = os.path.dirname(file_name) if os.path.dirname(file_name) else '.'
-    if not os.path.exists(directory) and directory != '.':
-        os.makedirs(directory, exist_ok=True)
-
-    # Salvar gráfico
-    full_path = os.path.abspath(file_name)
-    plt.savefig(full_path, dpi=300, bbox_inches='tight')
-    plt.close()
-
-    print(f"  ✅ Gráfico salvo em: {full_path}")
-    print(f"  📊 Métricas:")
-    print(f"     Retorno Total: {final_return:+.2f}%")
-    print(f"     Volatilidade Média: {mean_vol:.2f}%")
-    print(f"     Sharpe Ratio: {(final_return/mean_vol):.3f}" if mean_vol > 0 else "     Sharpe Ratio: N/A")
-    print(f"{'='*70}\n")
-
-    return full_path
-
-
-def optimize_current_portfolio(app):
-   # asset_ids = [14, 92, 67, 51, 96]
-    service = Nsga2OtimizacaoService(app, [1, 10], "conservador", 10, show_chart=True)
-    result = service.optimize(max_assets=10, use_optimal_config=False)
-
-    # Informações adicionais
-    print(f"\n📅 INFORMAÇÕES DO PERÍODO:")
-    print(f"   Dados históricos: {result['periodo_inicio']} até {result['periodo_fim']}")
-    print(f"   Total de meses: {result['num_meses']}")
-    print(f"   Hiperparâmetros: Pop={result['hyperparameters_used']['population_size']}, "
-          f"Gen={result['hyperparameters_used']['generations']}")
-
-def backtest(app):
-    from datetime import date
-    backtest_date = date(2015, 1, 1)
-    backtest_service = Nsga2OtimizacaoService(app, [1, 10], "conservador", 10, reference_date=backtest_date, show_chart=True)
-    backtest_portfolio = backtest_service.optimize(max_assets=10)
-
-    # Informações do backtest
-    print(f"\n📅 INFORMAÇÕES DO BACKTEST:")
-    print(f"   Data de referência: {backtest_portfolio['data_referencia']}")
-    print(f"   Dados históricos: {backtest_portfolio['periodo_inicio']} até {backtest_portfolio['periodo_fim']}")
-    print(f"   Total de meses: {backtest_portfolio['num_meses']}")
-    print(f"   Hiperparâmetros: Pop={backtest_portfolio['hyperparameters_used']['population_size']}, "
-          f"Gen={backtest_portfolio['hyperparameters_used']['generations']}")
-
-    end_date = date(2025, 10, 20)
-    period_return, monthly_returns, df_returns = _calculate_portfolio_return(
-        app,
-        backtest_portfolio['composicao'],
-        backtest_date,
-        end_date
-    )
-
-    print(f"     Retorno Acumulado: {period_return * 100:+.2f}%")
-
-    # Gerar e salvar gráfico do backtest
-    save_backtest_chart(
-        backtest_portfolio['composicao'],
-        backtest_date,
-        end_date,
-        app,
-        file_name='backtest_exemplo.png'
-    )
-
-
-def main():
-    """Função principal que interpreta os comandos."""
-    app = create_app()
-
-    # Exemplo 1: Otimização normal (sem backtest)
-    optimize_current_portfolio(app)
-
-    # Exemplo 2: Otimização com backtest (usando dados até uma data específica)
-   # backtest(app)
-
-
-if __name__ == "__main__":
-    main()
 

@@ -61,6 +61,21 @@ export default function OtimizarForm({ onCreated }) {
     setForm((f) => ({ ...f, possiveis_ativos: selected }))
   }
 
+  const getQuantidadeAtivosError = () => {
+    if (form.quantidade_ativos === '') return ''
+    const num = Number(form.quantidade_ativos)
+    if (!Number.isInteger(num)) return 'Deve ser um número inteiro'
+    if (num <= 4) return 'Mínimo 5 ativos'
+    return ''
+  }
+
+  const getHorizonteError = () => {
+    if (form.horizonte_tempo === '') return ''
+    const num = Number(form.horizonte_tempo)
+    if (num < 3) return 'O valor deve ser maior ou igual a 3.'
+    return ''
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setSubmitting(true)
@@ -78,20 +93,20 @@ export default function OtimizarForm({ onCreated }) {
         setSubmitting(false)
         return
       }
-      if (!form.horizonte_tempo || Number(form.horizonte_tempo) <= 0) {
-        setError('Informe um horizonte (prazo) válido em anos')
+      if (!form.horizonte_tempo || Number(form.horizonte_tempo) < 3) {
+        setError('Horizonte (prazo) é obrigatório e deve ser no mínimo 3 anos')
         setSubmitting(false)
         return
       }
-  // quantidade_ativos obrigatório e precisa ser inteiro > 0
-      if (form.quantidade_ativos === '' || Number(form.quantidade_ativos) <= 0 || !Number.isInteger(Number(form.quantidade_ativos))) {
-        setError('Quantidade de ativos é obrigatória e deve ser um número inteiro maior que 0')
+  // quantidade_ativos obrigatório e precisa ser inteiro > 4
+      if (form.quantidade_ativos === '' || Number(form.quantidade_ativos) <= 4 || !Number.isInteger(Number(form.quantidade_ativos))) {
+        setError('Quantidade de ativos é obrigatória e deve ser um número inteiro maior que 4 (mínimo 5)')
         setSubmitting(false)
         return
       }
-  // capital é obrigatório e deve ser > 0
-      if (form.capital === '' || Number(form.capital) <= 0) {
-        setError('Capital (R$) é obrigatório e deve ser maior que 0')
+  // capital é obrigatório e deve ser > 1
+      if (form.capital === '' || Number(form.capital) <= 1) {
+        setError('Capital (R$) é obrigatório e deve ser maior que 1')
         setSubmitting(false)
         return
       }
@@ -137,11 +152,13 @@ export default function OtimizarForm({ onCreated }) {
       <p className='muted text-sm mb-4'>Campos obrigatórios: <span className='font-medium'>Nome</span>, <span className='font-medium'>Perfil de risco</span>, <span className='font-medium'>Horizonte (prazo)</span>, <span className='font-medium'>Capital (R$)</span> e <span className='font-medium'>Quantidade de ativos</span>.</p>
 
       <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-        <Input label={'Nome da carteira *'} name='nome' value={form.nome} onChange={handleChange} placeholder='Ex: Carteira Conservadora' />
+        <Input label={'Nome da carteira *'} name='nome' value={form.nome} onChange={handleChange} placeholder='Ex: Carteira Conservadora' required showError={error !== ''} />
 
         <div>
           <label className='block muted mb-1'>Perfil de risco *</label>
-          <select name='perfil_risco' value={form.perfil_risco} onChange={handleChange} className='w-full p-2 bg-white/3 rounded border border-white/5 focus:border-teal-300 text-black'>
+          <select name='perfil_risco' value={form.perfil_risco} onChange={handleChange} className={`w-full p-2 bg-white/3 rounded border focus:border-teal-300 text-black transition-colors ${
+            error !== '' && !form.perfil_risco ? 'border-red-500' : 'border-white/5'
+          }`}>
             <option value=''>Selecione...</option>
             <option value='conservador'>Conservador</option>
             <option value='moderado'>Moderado</option>
@@ -149,12 +166,12 @@ export default function OtimizarForm({ onCreated }) {
           </select>
         </div>
 
-        <Input label={'Horizonte (anos) *'} name='horizonte_tempo' type='number' value={form.horizonte_tempo} onChange={handleChange} />
+        <Input label={'Horizonte (anos) *'} name='horizonte_tempo' type='number' value={form.horizonte_tempo} onChange={handleChange} min='3' required showError={error !== ''} errorMessage={getHorizonteError()} />
       </div>
 
       <div className='mt-4 grid grid-cols-1 md:grid-cols-2 gap-4'>
-        <Input label='Capital (R$) *' name='capital' type='number' value={form.capital} onChange={handleChange} />
-        <Input label='Quantidade de ativos *' name='quantidade_ativos' type='number' value={form.quantidade_ativos} onChange={handleChange} placeholder='Ex: 10' />
+        <Input label='Capital (R$) *' name='capital' type='number' value={form.capital} onChange={handleChange} min='1' required showError={error !== ''} />
+        <Input label='Quantidade de ativos *' name='quantidade_ativos' type='number' value={form.quantidade_ativos} onChange={handleChange} placeholder='Ex: 10' min='5' required showError={error !== ''} errorMessage={getQuantidadeAtivosError()} />
       </div>
 
       <div className='mt-4'>

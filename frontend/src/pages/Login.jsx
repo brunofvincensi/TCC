@@ -19,7 +19,7 @@ export default function Login() {
     // manter o erro anterior visível até um novo erro chegar ou o usuário navegar
     try {
       // O backend espera { email, senha } (campo 'senha' em PT-BR)
-  const res = await api.post('/api/login', { email, senha: password });
+      const res = await api.post('/api/login', { email, senha: password });
       localStorage.setItem('token', res.data.token);
       // Salva também os dados do usuário retornados pelo backend
       if (res.data.usuario) {

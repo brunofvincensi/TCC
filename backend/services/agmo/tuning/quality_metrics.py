@@ -46,26 +46,6 @@ class QualityMetrics:
         O R-HV é apropriado para algoritmos baseados em pontos de referência
         como R-NSGA2, pois mede a qualidade das soluções em relação aos
         pontos de referência fornecidos pelo usuário.
-
-        O R2 indicator usa a Achievement Scalarizing Function (ASF):
-        R2 = 1/|Z| * Σ_{z∈Z} min_{a∈A} ASF(a, z, w)
-
-        Onde ASF(a, z, w) = max_i {(a_i - z_i) / w_i}
-        - a: solução (normalizada no espaço [0, 1])
-        - z: ponto de referência (aspiração no espaço [0, 1])
-        - w: vetor de pesos
-
-        Quanto MENOR o R2, MELHOR a qualidade
-        Por padrão, retornamos 1/(1+R2) (transformação sigmoid) para estabilidade.
-
-        Returns:
-            Valor do R-HV (maior = melhor qualidade)
-            - Se use_log_transform=True: 1/(1+R2) ∈ (0, 1] onde 1.0=perfeito, 0.5=razoável
-            - Se use_log_transform=False: 1/R2 (pode ser muito grande ou instável)
-
-        Referências:
-            - Hansen & Jaszkiewicz (1998). "Evaluating the quality of approximations to the non-dominated set"
-            - Deb & Sundar (2006). "Reference point based multi-objective optimization"
         """
         if len(pareto_front) == 0 or len(reference_points) == 0:
             return 0.0
@@ -127,8 +107,6 @@ class QualityMetrics:
 
         # R2 = média dos mínimos ASF
         r2 = r2_sum / n_ref_points
-
-        # DEBUG: Log detalhado a cada 10 gerações ou se for gen 0
 
         if not hasattr(self, '_debug_counter'):
             self._debug_counter = 0
@@ -372,7 +350,7 @@ class ConvergenceTracker:
         self._all_pareto_fronts = []
 
         if self.use_fixed_points:
-            logger.info(f"🔒 Usando pontos de referência FIXOS para comparação justa:")
+            logger.info(f"Usando pontos de referência FIXOS para comparação justa:")
             logger.info(f"   Ideal point fixo: {self.fixed_ideal_point}")
             logger.info(f"   Nadir point fixo: {self.fixed_nadir_point}")
 

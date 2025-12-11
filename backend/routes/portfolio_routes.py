@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models.ativo import Asset
+from models.asset import Asset
 from services.agmo.optimization_service import OptimizationService
 from models import db, Portfolio, OptimizationParameters, PortfolioAsset, ParameterAssetRestriction
 
@@ -66,12 +66,12 @@ def optimize_and_create_portfolio():
 
         for item in optimized_composition:
             # Calcula o valor monetário alocado no ativo
-            valor_monetario = float(capital_usado) * float(item['peso']) if capital_usado else None
+            valor_monetario = float(capital_usado) * float(item['weight']) if capital_usado else None
 
             association = PortfolioAsset(
                 portfolio_id=new_portfolio.id,
-                asset_id=item['id_ativo'],
-                weight=item['peso'],
+                asset_id=item['asset_id'],
+                weight=item['weight'],
                 monetary_value=valor_monetario
             )
             db.session.add(association)

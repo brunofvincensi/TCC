@@ -18,101 +18,12 @@ from services.agmo.agmo_service import (
     WEIGHTS_CONFIG
 )
 from services.agmo.tuning import (
-    ConvergenceTracker,
-    plot_convergence_evolution,
-    plot_hypervolume_only,
-    print_convergence_summary
+    ConvergenceTracker
 )
 from models.hyperparameter_config import HyperparameterConfig
-from models import db
+from models import db, Asset, AssetType
 import time
 import numpy as np
-
-def exemplo_simples():
-    """
-    Exemplo simples: otimização com tracking de convergência e visualização.
-    """
-    print(f"\n{'='*80}")
-    print(f"📊 EXEMPLO: Tracking de R-Hypervolume durante Otimização")
-    print(f"{'='*80}\n")
-
-    # Cria aplicação Flask
-    app = create_app()
-
-    # Configuração
-    risk_level = 'moderado'
-    years_period = 10
-    max_assets = 10
-
-    # Cria o serviço de otimização
-    service = Nsga2OtimizacaoService(
-        app=app,
-        restricted_asset_ids=[],
-        risk_level=risk_level,
-        years_period=years_period,
-        show_chart=False  # Não mostra gráfico de Pareto durante execução
-    )
-
-    # Cria o ConvergenceTracker com configuração apropriada para R-NSGA2
-    print(f"🎯 Criando ConvergenceTracker para R-NSGA2...")
-    print(f"   Perfil de risco: {risk_level}")
-    print(f"   Usando R-Hypervolume (R2 indicator)")
-
-    tracker = ConvergenceTracker(
-        reference_points_rnsga2=REFERENCE_POINTS_CONFIG[risk_level],
-        weights=WEIGHTS_CONFIG
-    )
-
-    print(f"   ✅ Tracker criado com sucesso!\n")
-
-    # Executa otimização COM tracking
-    print(f"🚀 Iniciando otimização com tracking de convergência...\n")
-
-    result = service.optimize(
-        population_size=100,
-        generations=200,
-        convergence_tracker=tracker,  # Passa o tracker para o serviço
-        max_assets=60,
-        use_optimal_config=False
-    )
-
-    print(f"\n✅ Otimização concluída!")
-
-    # Obtém histórico de métricas
-    history = tracker.get_history()
-
-    # Imprime resumo estatístico
-    print_convergence_summary(history)
-
-    # Verifica convergência
-    if tracker.has_converged(window=10, threshold=0.01):
-        conv_gen = tracker.get_convergence_generation(window=10, threshold=0.01)
-        print(f"Algoritmo convergiu na geração {conv_gen}")
-    else:
-        print(f"Algoritmo não convergiu completamente")
-
-    # Gera gráficos
-    print(f"\n📊 Gerando gráficos de convergência...")
-
-    # 1. Gráfico completo com todas as métricas
-    plot_convergence_evolution(
-        history=history,
-        title=f"Evolução da Convergência - R-NSGA2 ({risk_level.capitalize()})",
-        save_path=f'convergence_full_{risk_level}.png',
-        show_plot=False  # Não mostra, apenas salva
-    )
-
-    # 2. Gráfico focado no R-Hypervolume
-    plot_hypervolume_only(
-        history=history,
-        title=f"Evolução do R-Hypervolume - {risk_level.capitalize()}",
-        save_path=f'r_hypervolume_{risk_level}.png',
-        show_plot=False
-    )
-
-    print(f"\n✅ Exemplo concluído com sucesso!")
-    print(f"   Verifique os arquivos PNG gerados no diretório atual.")
-
 
 def exemplo_comparacao_multiplas_execucoes():
     """
@@ -121,7 +32,7 @@ def exemplo_comparacao_multiplas_execucoes():
 
     Para cada quantidade de ativos:
     - Testa diferentes configurações de população e gerações
-    - Executa cada configuração 3 vezes para obter média (evitar outliers)
+    - Executa cada configuração X vezes para obter média (evitar outliers)
     - Calcula o melhor trade-off (hypervolume/tempo)
     - Salva a melhor configuração na tabela HyperparameterConfig
     """
@@ -142,16 +53,18 @@ def exemplo_comparacao_multiplas_execucoes():
     # ]
 
     # Array de quantidades de ativos para testar
-    asset_quantities = [20]
+    asset_quantities = [60]
 
     # Configurações de população e gerações para testar
     configs = [
+        {'pop': 100, 'gen': 50},
         {'pop': 150, 'gen': 150},
-        {'pop': 100, 'gen': 100},
     ]
 
     # Para cada quantidade de ativos
     for num_assets in asset_quantities:
+        with app.app_context():
+            asset_ids = [row[0] for row in db.session.query(Asset.id).filter(Asset.type == AssetType.STOCK).limit(num_assets).all()]
 
         print(f"\nCalculando pontos de referência fixos...")
         print(f"   Executando configuração de referência para estabelecer baseline...")
@@ -163,7 +76,8 @@ def exemplo_comparacao_multiplas_execucoes():
             restricted_asset_ids=[],
             risk_level=risk_level,
             years_period=10,
-            show_chart=False
+            show_chart=False,
+            asset_ids=asset_ids
         )
 
         reference_tracker = ConvergenceTracker(
@@ -176,12 +90,11 @@ def exemplo_comparacao_multiplas_execucoes():
             population_size=150,
             generations=200,  # Mais gerações para garantir boa convergência
             convergence_tracker=reference_tracker,
-            max_assets=max(asset_quantities),
+            max_assets=num_assets,
             use_optimal_config=False
         )
 
         # Extrai os pontos de referência fixos do tracker de referência
-        # Ambos são acumulados ao longo de TODAS as gerações:
         # - ideal_point: mínimo acumulado (melhor caso)
         # - nadir_point: máximo acumulado (pior caso)
         fixed_ideal_point = reference_tracker.ideal_point.copy()
@@ -192,7 +105,7 @@ def exemplo_comparacao_multiplas_execucoes():
         print(f"      Nadir point: {fixed_nadir_point}")
 
         print(f"\n{'='*80}")
-        print(f"🎯 TESTANDO COM {num_assets} ATIVOS")
+        print(f"TESTANDO COM {num_assets} ATIVOS")
         print(f"{'='*80}\n")
 
         # Armazena resultados de todas as configurações para esta quantidade de ativos
@@ -214,7 +127,7 @@ def exemplo_comparacao_multiplas_execucoes():
             run_histories = []
 
             # Executa 10 vezes a mesma configuração
-            for run_num in range(1, 4):
+            for run_num in range(1, 11):
                 print(f"\n   🔄 Execução {run_num}/10...")
 
                 service = Nsga2OtimizacaoService(
@@ -225,6 +138,7 @@ def exemplo_comparacao_multiplas_execucoes():
                     show_chart=False,
                     fixed_ideal_point=fixed_ideal_point,
                     fixed_nadir_point=fixed_nadir_point,
+                    asset_ids=asset_ids
                 )
 
                 tracker = ConvergenceTracker(
@@ -270,21 +184,22 @@ def exemplo_comparacao_multiplas_execucoes():
                 # Geração de convergência
                 if tracker.has_converged(window=10, threshold=0.01):
                     conv_gen = tracker.get_convergence_generation(window=10, threshold=0.01)
-                    run_convergence_gens.append(conv_gen)
+                    run_convergence_gens.append(conv_gen if conv_gen is not None else gen_count)
                 else:
-                    run_convergence_gens.append(gen_count)  # Não convergiu
+                    run_convergence_gens.append(gen_count)
 
-                print(f"      ✅ HV: {final_hypervolume:.6e}, Tempo: {execution_time:.2f}s, Conv: Gen {run_convergence_gens[-1]}")
+                print(f"HV: {final_hypervolume:.6e}, Tempo: {execution_time:.2f}s, Conv: Gen {run_convergence_gens[-1]}")
 
             # Calcula médias das 3 execuções
             mean_hypervolume = np.mean(run_hypervolumes)
             mean_execution_time = np.mean(run_execution_times)
-            mean_convergence_gen = np.mean(run_convergence_gens)
+            valid_conv_gens = [g for g in run_convergence_gens if g is not None]
+            mean_convergence_gen = np.mean(valid_conv_gens) if valid_conv_gens else gen_count
 
             # Calcula trade-off (quanto maior, melhor)
             trade_off_score = mean_hypervolume / mean_execution_time if mean_execution_time > 0 else 0
 
-            print(f"\n   📊 MÉDIAS DA CONFIGURAÇÃO:")
+            print(f"\n Mádias da configuração:")
             print(f"      Hypervolume: {mean_hypervolume:.6e}")
             print(f"      Tempo: {mean_execution_time:.2f}s")
             print(f"      Convergência: Gen {mean_convergence_gen:.1f}")
@@ -302,11 +217,7 @@ def exemplo_comparacao_multiplas_execucoes():
                 'histories': run_histories
             })
 
-        # Mostra resumo de TODAS as configurações testadas
-        print(f"\n{'='*80}")
-        print(f"📊 RESUMO DE TODAS AS CONFIGURAÇÕES ({num_assets} ATIVOS):")
-        print(f"{'='*80}\n")
-
+        # Mostra resumo de todas as configurações testadas
         for i, result in enumerate(config_results, 1):
             print(f"{i}. {result['label']}:")
             print(f"   Hypervolume médio:  {result['hypervolume_mean']:.6e}")
@@ -316,7 +227,6 @@ def exemplo_comparacao_multiplas_execucoes():
             print()
 
         # Função para comparar configurações priorizando hipervolume
-        # Tempo só é considerado se hipervolumes forem 90% iguais (diferença <= 10%)
         def compare_configs(config1, config2):
             """
             Compara duas configurações priorizando hipervolume.
@@ -339,7 +249,7 @@ def exemplo_comparacao_multiplas_execucoes():
             else:
                 relative_diff = 0
 
-            # Se hipervolumes são 90% iguais (diferença <= 10%), considera o tempo
+            # Se hipervolumes são 90% iguais, considera o tempo
             if relative_diff <= 0.10:
                 # Hipervolumes muito próximos, escolhe pelo menor tempo
                 return config1 if time1 <= time2 else config2
@@ -354,7 +264,7 @@ def exemplo_comparacao_multiplas_execucoes():
 
         # Explica o critério de seleção
         print(f"\n{'='*80}")
-        print(f"📊 CRITÉRIO DE SELEÇÃO:")
+        print(f"Critérios de seleção:")
         print(f"   ✓ Prioridade: HIPERVOLUME (qualidade da solução)")
         print(f"   ✓ Tempo só é considerado se hipervolumes forem 90% iguais")
         print(f"   ✓ Diferença tolerada: ≤ 10% entre hipervolumes")
@@ -368,11 +278,11 @@ def exemplo_comparacao_multiplas_execucoes():
                 if max_hv > 0:
                     rel_diff = abs(best_config['hypervolume_mean'] - other['hypervolume_mean']) / max_hv
                     if rel_diff <= 0.10:
-                        print(f"   ⚖️  Hipervolume similar detectado (±{rel_diff*100:.1f}%), tempo foi considerado")
+                        print(f"  Hipervolume similar detectado (±{rel_diff*100:.1f}%), tempo foi considerado")
                         break
         print(f"{'='*80}")
 
-        print(f"🏆 MELHOR CONFIGURAÇÃO: #{best_idx} - {best_config['label']}")
+        print(f"MELHOR CONFIGURAÇÃO: #{best_idx} - {best_config['label']}")
         print(f"   População: {best_config['population_size']}")
         print(f"   Gerações: {best_config['generations']}")
         print(f"   Hypervolume médio: {best_config['hypervolume_mean']:.6e}")
@@ -408,14 +318,14 @@ def exemplo_comparacao_multiplas_execucoes():
                 db.session.add(new_config)
                 db.session.commit()
 
-                print(f"✅ Configuração salva no banco de dados (ID: {new_config.id})")
+                print(f"Configuração salva no banco de dados (ID: {new_config.id})")
 
             except Exception as e:
-                print(f"❌ Erro ao salvar configuração: {e}")
+                print(f"Erro ao salvar configuração: {e}")
                 db.session.rollback()
 
         # Gera gráfico de comparação para esta quantidade de ativos
-        print(f"\n📊 Gerando gráfico de comparação para {num_assets} ativos...")
+        print(f"\nGerando gráfico de comparação para {num_assets} ativos...")
 
         # Calcula histórico médio das 3 execuções para cada configuração
         averaged_histories = []
@@ -467,29 +377,14 @@ def exemplo_comparacao_multiplas_execucoes():
             show_plot=False
         )
 
-        print(f"   ✅ Gráfico salvo: comparison_{num_assets}_assets.png")
+        print(f"   Gráfico salvo: comparison_{num_assets}_assets.png")
 
     print(f"\n{'='*80}")
-    print(f"✅ TUNING COMPLETO!")
+    print(f"TUNING COMPLETO!")
     print(f"   Todas as configurações ótimas foram salvas no banco de dados.")
     print(f"   Gráficos de comparação foram gerados para cada quantidade de ativos.")
     print(f"{'='*80}\n")
 
 
 if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description='Exemplos de Tracking de Convergência')
-    parser.add_argument('--exemplo', type=str, default='simples',
-                       choices=['simples', 'comparacao'],
-                       help='Qual exemplo executar')
-
-    args = parser.parse_args()
-
-    if args.exemplo == 'simples':
-        exemplo_simples()
-    elif args.exemplo == 'comparacao':
-        exemplo_comparacao_multiplas_execucoes()
-    else:
-        print(f"Exemplo '{args.exemplo}' não encontrado")
-        print(f"Use: simples ou comparacao")
+    exemplo_comparacao_multiplas_execucoes()

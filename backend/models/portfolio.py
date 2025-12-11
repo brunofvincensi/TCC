@@ -13,11 +13,12 @@ class PortfolioAsset(db.Model):
     portfolio = db.relationship('Portfolio', back_populates='composition')
 
     def to_dict(self):
+        """Retorna dicionário com chaves em português para o frontend"""
         return {
             'ticker': self.asset.ticker,
-            'asset_name': self.asset.name,
-            'weight': f"{float(self.weight):.4f}",
-            'monetary_value': f"{float(self.monetary_value):.2f}" if self.monetary_value else None
+            'nome_ativo': self.asset.name,  # Traduzido de asset_name
+            'peso': f"{float(self.weight):.4f}",  # Traduzido de weight
+            'valor_monetario': f"{float(self.monetary_value):.2f}" if self.monetary_value else None  # Traduzido de monetary_value
         }
 
 
@@ -37,14 +38,15 @@ class Portfolio(db.Model):
     composition = db.relationship('PortfolioAsset', back_populates='portfolio', cascade="all, delete-orphan")
 
     def to_dict(self):
+        """Retorna dicionário com chaves em português para o frontend"""
         return {
             'id': self.id,
             'user_id': self.user_id,
-            'name': self.name,
-            'description': self.description,
-            'created_at': self.created_at.isoformat(),
-            'parameters': self.parameters.to_dict() if self.parameters else None,
-            'composition': [item.to_dict() for item in self.composition]
+            'nome': self.name,  # Traduzido de name
+            'descricao': self.description,  # Traduzido de description
+            'data_criacao': self.created_at.isoformat(),  # Traduzido de created_at
+            'parametros': self.parameters.to_dict() if self.parameters else None,  # Traduzido de parameters
+            'composicao': [item.to_dict() for item in self.composition]  # Traduzido de composition
         }
 
 
@@ -76,10 +78,11 @@ class OptimizationParameters(db.Model):
     restrictions = db.relationship('ParameterAssetRestriction', back_populates='parameters', cascade="all, delete-orphan")
 
     def to_dict(self):
+        """Retorna dicionário com chaves em português para o frontend"""
         return {
-            'risk_profile_used': self.risk_profile_used,
-            'time_horizon_used': self.time_horizon_used,
-            'capital_used': str(self.capital_used) if self.capital_used else None,
-            # Returns a simple list of restricted asset IDs
-            'restricted_asset_ids': [restriction.asset_id for restriction in self.restrictions]
+            'perfil_risco_usado': self.risk_profile_used,  # Traduzido de risk_profile_used
+            'horizonte_tempo_usado': self.time_horizon_used,  # Traduzido de time_horizon_used
+            'capital_usado': str(self.capital_used) if self.capital_used else None,  # Traduzido de capital_used
+            # Returns a simple list of restricted asset IDs - traduzido de restricted_asset_ids
+            'restricoes_ativos_ids': [restriction.asset_id for restriction in self.restrictions]
         }
