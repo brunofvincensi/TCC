@@ -183,8 +183,8 @@ def save_backtest_chart(portfolio: List[Dict],
     return full_path
 
 def optimize_current_portfolio(app):
-   # asset_ids = [14, 92, 67, 51, 96]
-    service = Nsga2OtimizacaoService(app, [1, 10], "conservador", 10, show_chart=True)
+    asset_ids = [14, 92, 67, 51, 96]
+    service = Nsga2OtimizacaoService(app, [1, 10], "conservador", 10, show_chart=True, asset_ids=asset_ids)
     result = service.optimize(max_assets=10, use_optimal_config=False)
 
     # Informações adicionais

@@ -5,8 +5,7 @@ Exemplo de uso integrado do backtest com gráficos e comparação com benchmark.
 from datetime import date
 from app import create_app
 from services.agmo.agmo_service import (
-    Nsga2OtimizacaoService,
-    save_backtest_chart
+    Nsga2OtimizacaoService
 )
 from services.agmo.comparision.benchmark_comparison import BenchmarkComparison
 
@@ -111,41 +110,6 @@ def complete_example():
             'comparacao': metricas_comparativas.get('grafico_path')
         }
     }
-
-
-def simple_backtest_example():
-    """
-    Exemplo simples: Apenas backtest com gráfico
-    """
-    app = create_app()
-
-    print("\n" + "=" * 80)
-    print("📊 EXEMPLO SIMPLES: BACKTEST COM GRÁFICO")
-    print("=" * 80)
-
-    # Otimizar portfolio
-    reference_date = date(2020, 1, 1)
-    service = Nsga2OtimizacaoService(
-        app=app,
-        restricted_asset_ids=[],
-        risk_level='moderado',
-        years_period=5,
-        reference_date=reference_date
-    )
-
-    resultado = service.optimize(max_assets=10, use_optimal_config=False)
-
-    # Gerar gráfico
-    end_date = date(2024, 12, 31)
-    save_backtest_chart(
-        portfolio=resultado['composicao'],
-        start_date=reference_date,
-        end_date=end_date,
-        app=app
-    )
-
-    print("\n✅ Backtest concluído! Verifique o gráfico gerado.\n")
-
 
 if __name__ == "__main__":
     # Escolha qual exemplo executar:
