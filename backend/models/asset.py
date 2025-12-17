@@ -34,8 +34,6 @@ class PriceHistory(db.Model):
 
     # Chave primária composta
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    # A data representará o último dia do mês para o qual o preço foi fechado
-    # Armazena a rentabilidade percentual do mês (ex: 0.05 para 5%)
     date = db.Column(db.Date, nullable=False)
     closing_price = db.Column(db.Numeric(10, 2), nullable=False)
     monthly_variation = db.Column(db.Numeric(10, 6), nullable=True)

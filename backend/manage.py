@@ -25,7 +25,7 @@ def main():
         app.run(debug=True)
 
     elif command == "update-daily":
-        print("🔄 Executando atualização diária de preços...")
+        print("Executando atualização diária de preços...")
         update_daily_prices(app)
         print("\nAtualização diária concluída!")
 

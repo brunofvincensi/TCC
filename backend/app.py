@@ -28,11 +28,11 @@ def _init_price_scheduler(app):
         _price_scheduler = PriceUpdateScheduler(app, update_daily_prices)
         _price_scheduler.start(hour=hour, minute=minute)
 
-        print(f"✅ Scheduler de preços iniciado!")
+        print(f"Scheduler de preços iniciado!")
         print(f"   Horário: {hour:02d}:{minute:02d}")
         print(f"   Próxima execução: {_price_scheduler.get_next_run_time()}")
     except Exception as e:
-        print(f"⚠️  Erro ao inicializar scheduler de preços: {e}")
+        print(f"Erro ao inicializar scheduler de preços: {e}")
         print(f"   A aplicação continuará rodando sem o scheduler.")
 
 def create_app(enable_scheduler=None):
@@ -50,7 +50,7 @@ def create_app(enable_scheduler=None):
     db.init_app(app)
     jwt = JWTManager(app)
     limiter.init_app(app)
-    print(f"✅ Rate limiter inicializado: {limiter}")
+    print(f"Rate limiter inicializado: {limiter}")
     print(f"   Storage: {limiter._storage}")
     print(f"   Estratégia: {limiter._strategy}")
 

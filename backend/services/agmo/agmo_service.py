@@ -221,6 +221,39 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
 
         return float(np.mean(tail))
 
+    def _evaluate(self, x, out, *args, **kwargs):
+        """Avalia uma única carteira (x = vetor de pesos)."""
+
+        # ========== DEBUG ==========
+        # print(f"\n{'=' * 70}")
+        # print(f"DEBUG _evaluate")
+        # print(f"{'=' * 70}")
+        #
+        # print(f"\nVetor x (RAW - antes da normalização):")
+        # print(f"   Shape: {x.shape}")
+        # print(f"   Valores: {x}")
+        # print(f"   Soma: {x.sum():.6f}")
+        # print(f"   Min: {x.min():.6f}")
+        # print(f"   Max: {x.max():.6f}")
+        #
+        # print(f"\n Mapeamento x → Ativos:")
+        # for i, (ticker, peso_raw) in enumerate(zip(self.tickers, x)):
+        #     print(f"   x[{i}] = {peso_raw:.6f} → {ticker}")
+
+        weights = x
+
+        # --- Objetivos ---
+        # Obj 1: Retorno esperado (negativo porque o pymoo minimiza)
+        expected_return = -np.dot(weights, self.mu)
+
+        # Obj 2: Risco (variância)
+        variance = np.dot(weights, self.cov @ weights)
+
+        # Obj 3: Risco de cauda (CVaR)
+        cvar = self._calculate_cvar(weights)
+
+        out["F"] = [expected_return, variance, cvar]
+
     def visualize_cvar(self, weights, solution_id, save_path=None):
         """
         Visualiza a distribuição de perdas e o cálculo do CVaR para uma solução específica.
@@ -301,40 +334,6 @@ class PersonalizedPortfolioProblem(ElementwiseProblem):
         plt.close()
 
         return cvar
-
-    def _evaluate(self, x, out, *args, **kwargs):
-        """Avalia uma única carteira (x = vetor de pesos)."""
-
-        # ========== DEBUG ==========
-        # print(f"\n{'=' * 70}")
-        # print(f"DEBUG _evaluate")
-        # print(f"{'=' * 70}")
-        #
-        # print(f"\nVetor x (RAW - antes da normalização):")
-        # print(f"   Shape: {x.shape}")
-        # print(f"   Valores: {x}")
-        # print(f"   Soma: {x.sum():.6f}")
-        # print(f"   Min: {x.min():.6f}")
-        # print(f"   Max: {x.max():.6f}")
-        #
-        # print(f"\n Mapeamento x → Ativos:")
-        # for i, (ticker, peso_raw) in enumerate(zip(self.tickers, x)):
-        #     print(f"   x[{i}] = {peso_raw:.6f} → {ticker}")
-
-        weights = x
-
-        # --- Objetivos ---
-        # Obj 1: Retorno esperado (negativo porque o pymoo minimiza)
-        expected_return = -np.dot(weights, self.mu)
-
-        # Obj 2: Risco (variância)
-        variance = np.dot(weights, self.cov @ weights)
-
-        # Obj 3: Risco de cauda (CVaR)
-        cvar = self._calculate_cvar(weights)
-
-        out["F"] = [expected_return, variance, cvar]
-
 
 class Nsga2OtimizacaoService:
     def __init__(self, app, restricted_asset_ids, risk_level, years_period=3, reference_date=None, start_date=None, asset_ids: List[int] = None, show_chart=False,
